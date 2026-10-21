@@ -26,7 +26,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.0.0-rc.1";
+  return "1.0.0";
 }
 
 function printHeader() {
