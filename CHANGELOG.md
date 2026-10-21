@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-alpha.3] - 2026-10-21
+
+### Added
+- **Git Notes Engine (Quiet Mode / `git-ai` v3 Standard):**
+  - Core Git Notes adapter (`src/notes/notes.ts`) managing notes under `refs/notes/lognexus` with cross-platform stdin piping.
+  - Automatic state packaging (`src/notes/attach.ts`) capturing active issue, current subtask, contracts, and operational tier attached to any commit without changing commit SHAs.
+- **CLI Note Commands (`lognexus note`):**
+  - `lognexus note show [commit]`: View attached LogNexus note for any commit (default: `HEAD`).
+  - `lognexus note attach [commit]`: Serialize current session state and attach to target commit.
+  - `lognexus note list`: List all commits with LogNexus metadata notes.
+  - `lognexus note push [remote]`: Push `refs/notes/lognexus` to remote repository.
+  - `lognexus note fetch [remote]`: Fetch `refs/notes/lognexus` from remote repository.
+
 ## [1.0.0-alpha.2] - 2026-10-21
 
 ### Added

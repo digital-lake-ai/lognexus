@@ -117,9 +117,9 @@ An independent model inspects the PR diff, verifies task contracts, and signs of
 
 ## Installation & Setup
 
-### 1. Scaffold Rules in Your Repository
-Initialize `.lognexus/` rules, templates, and routing configuration with the CLI:
+### 1. Scaffold Rules & Manage State with the CLI
 
+Initialize `.lognexus/` rules, templates, and routing configuration:
 ```bash
 npx @digital-lake/lognexus init
 ```
@@ -132,6 +132,21 @@ npx @digital-lake/lognexus doctor
 Inspect active branch and tier advisory:
 ```bash
 npx @digital-lake/lognexus status
+```
+
+Manage persistent agent state (`.lognexus/state.json`) and session recovery:
+```bash
+npx @digital-lake/lognexus state sync
+npx @digital-lake/lognexus state show
+npx @digital-lake/lognexus state set-task T1 "Add user schema"
+npx @digital-lake/lognexus state finish-task T1
+```
+
+Quiet Mode with Git Notes (`refs/notes/lognexus`, standard `git-ai` v3):
+```bash
+npx @digital-lake/lognexus note attach HEAD
+npx @digital-lake/lognexus note show HEAD
+npx @digital-lake/lognexus note push origin
 ```
 
 ### 2. Install Rules in Your Agent Environment
