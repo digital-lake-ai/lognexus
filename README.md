@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" alt="LogNexus Logo" width="360">
+</p>
+
 # LogNexus
 
 <p align="center">
@@ -5,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/digital-lake-ai/lognexus/actions"><img src="https://img.shields.io/badge/CI-passing-brightgreen.svg" alt="CI Status"></a>
+  <a href="https://github.com/digital-lake-ai/lognexus/actions"><img src="https://img.shields.io/github/actions/workflow/status/digital-lake-ai/lognexus/ci.yml?branch=main&label=CI" alt="CI Status"></a>
   <a href="https://www.npmjs.com/package/@digital-lake/lognexus"><img src="https://img.shields.io/npm/v/@digital-lake/lognexus.svg?color=blue" alt="npm version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://github.com/digital-lake-ai/lognexus"><img src="https://img.shields.io/badge/org-Digital%20Lake-indigo.svg" alt="Digital Lake"></a>
