@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-10-21
+
+### Summary
+Official General Availability (GA) release of **LogNexus** — the universal, Git-powered context & rules framework for native AI agents.
+
+### Highlights
+- **Universal Multi-Model Support:** 100% generic taxonomy and rules for Anthropic Claude (Opus, Sonnet, Haiku), OpenAI (o3, o1, GPT-4o), Google Gemini (2.5/3.8 Pro & Flash), and DeepSeek (R1, V3, Chat).
+- **Client Flexibility:** Native drop-in support for Claude Code, Cursor, Codex, Google Antigravity, Kimi Code / VS Code, and Zed without external API proxies.
+- **Persistent State Engine (`.lognexus/state.json`):** Automatic session recovery protocol and active issue/subtask tracking to eliminate cognitive amnesia.
+- **Git Notes Engine (Quiet Mode / `git-ai` v3):** Traceability metadata attached under `refs/notes/lognexus` without mutating commit SHAs.
+- **Native MCP Stdio Server (`lognexus mcp`):** Zero-heavy-dependency JSON-RPC 2.0 server exposing LogNexus tools, live state resources, and planning/review prompts.
+- **Journey Timeline & Review Gate Audit (`lognexus timeline` & `lognexus audit`):** Automated timeline reconstruction into PR descriptions and programmatic enforcement of non-self-approval review gates.
+- **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Complete CLI suite with `init`, `doctor`, `status`, `state`, `note`, `timeline`, `audit`, `mcp`, and `--version`.
+
 ## [1.0.0-rc.1] - 2026-10-21
 
 ### Added
