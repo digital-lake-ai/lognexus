@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-alpha.2] - 2026-10-21
+
+### Added
+- **Persistent Agent State Engine (`.lognexus/state.json`):**
+  - Zod-validated state schema tracking `activeIssue`, `currentSubtask`, `completedSubtasks`, and delegation contracts.
+  - Automatic session recovery protocol preventing cognitive amnesia across conversation resets and context compactions.
+  - Git and GitHub CLI synchronizer (`syncStateFromGit`) mapping branches like `issue/<id>-<slug>` to active issues.
+- **CLI State Subcommands (`lognexus state`):**
+  - `lognexus state show`: Inspect real-time agent context, active contracts, and subtask status.
+  - `lognexus state sync`: Synchronize state from Git branch and GitHub Issue metadata.
+  - `lognexus state set-task <id> [title]`: Set active subtask with closed contract.
+  - `lognexus state finish-task <id>`: Move subtask to completed list.
+  - `lognexus state clear`: Cleanly reset local persistent state post-merge.
+
 ## [1.0.0-alpha.1] - 2026-10-21
 
 ### Changed
