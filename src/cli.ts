@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { auditBranch, formatAuditResult } from "./audit/audit.js";
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
@@ -10,6 +13,21 @@ import { clearState, finishSubtask, loadState, setSubtask } from "./state/manage
 import { syncStateFromGit } from "./state/sync.js";
 import { getProjectStatus } from "./status.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
+
+const __cliDir = dirname(fileURLToPath(import.meta.url));
+
+export function getCliVersion(): string {
+  try {
+    const pkgPath = join(__cliDir, "..", "package.json");
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      if (pkg.version) return pkg.version;
+    }
+  } catch {
+    // fallback
+  }
+  return "1.0.0-rc.1";
+}
 
 function printHeader() {
   console.log("\n🔷 LogNexus CLI — Digital Lake");
@@ -30,7 +48,8 @@ Commands:
   timeline     Reconstruct the branch Journey Timeline and draft a PR body
   audit        Audit commit conventions, authorship trailers and review gate
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
-  help         Display this help message
+  version, -v  Display the version of LogNexus
+  help, -h     Display this help message
 
 State Subcommands:
   lognexus state [show]             Display current active issue and task state
@@ -405,6 +424,11 @@ async function main() {
     case "mcp":
       // stdout is reserved for JSON-RPC frames: never print the banner here.
       await startMcpServer();
+      break;
+    case "version":
+    case "--version":
+    case "-v":
+      console.log(getCliVersion());
       break;
     case "help":
     case "--help":

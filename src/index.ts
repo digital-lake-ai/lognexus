@@ -4,6 +4,7 @@ export {
   auditBranch,
   formatAuditResult,
 } from "./audit/audit.js";
+export { getCliVersion } from "./cli.js";
 export { checkGit, checkGitHubCli, checkRulesConfig, runDiagnostics } from "./doctor.js";
 export {
   getMcpPrompt,
