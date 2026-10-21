@@ -4,7 +4,7 @@
   "description": "The Git-powered memory nexus for AI agents. Multi-model routing, durable cognitive logs, and traceable pull requests.",
   "type": "module",
   "bin": {
-    "lognexus": "./dist/cli.js"
+    "lognexus": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
