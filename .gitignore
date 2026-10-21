@@ -16,6 +16,9 @@ coverage/
 *.log
 npm-debug.log*
 
+# LogNexus local session state
+.lognexus/state.json
+
 # OS artifacts
 .DS_Store
 Thumbs.db

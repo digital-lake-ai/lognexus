@@ -15,6 +15,19 @@ Use GitHub as a complete knowledge graph where every brainstorm, commit, review,
 
 ---
 
+## Persistent State & Session Recovery
+
+To eliminate cognitive amnesia between conversation resets, context compactations, or model handoffs:
+1. **At Session Start or after conversation compactation:**
+   Inspect .lognexus/state.json or run px @digital-lake/lognexus state show\ to immediately recover active issue, branch, current subtask, and delegation contract.
+2. **Synchronize State:**
+   Run px @digital-lake/lognexus state sync\ upon branch checkout or switching to update local state from Git and GitHub.
+3. **Subtask Tracking:**
+   - Before coding: px @digital-lake/lognexus state set-task <taskId> [title]   - After verification passes: px @digital-lake/lognexus state finish-task <taskId>4. **Post-Merge Cleanup:**
+   Run px @digital-lake/lognexus state clear\ after PR merge.
+
+---
+
 ## Golden-Path Walkthrough
 
 A complete issue-to-merge example using a concrete fake issue `#999`. Follow this sequence and every artifact produced will pass the acceptance checklists in `commands/lognexus/*.md`. The blocks here are illustrative; the canonical, copy-ready templates live in the phase sub-skills under `skills/lognexus/` (see the Phase Sub-skill Index) and in `references/`. If a template changes, verify this walkthrough example is updated to match.
