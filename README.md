@@ -149,6 +149,13 @@ npx @digital-lake/lognexus note show HEAD
 npx @digital-lake/lognexus note push origin
 ```
 
+Journey Timeline reconstruction and Review Gate audit:
+```bash
+npx @digital-lake/lognexus timeline main
+npx @digital-lake/lognexus timeline main --pr-body
+npx @digital-lake/lognexus audit main
+```
+
 ### 2. Connect via Model Context Protocol (MCP)
 
 LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp`) with zero external SDK dependencies. Connect it to Claude Desktop, Cursor, Google Antigravity, or any MCP-compliant client:
@@ -166,7 +173,7 @@ LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp
 ```
 
 **Exposed Capabilities:**
-- **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_note_show`, `lognexus_note_attach`
+- **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_note_show`, `lognexus_note_attach`, `lognexus_timeline`, `lognexus_audit`
 - **Resources:** `lognexus://state`, `lognexus://routing`
 - **Prompts:** `lognexus-plan`, `lognexus-review`
 
