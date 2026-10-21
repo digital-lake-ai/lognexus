@@ -49,7 +49,8 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "should_release=true" >> "$GITHUB_OUTPUT"
 
-      - name: Verify tag does not already exist
+      - name: Check if tag already exists
+        id: check_tag
         if: steps.detect.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -58,14 +59,14 @@ jobs:
         run: |
           set -euo pipefail
           if gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "::error::Tag ${TAG} already exists on remote — skipping release."
-            echo "Likely cause: this version was already released manually. If the"
-            echo "intent was to re-release, delete the tag first or bump again."
-            exit 1
+            echo "Tag ${TAG} already exists on remote — skipping release creation."
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create tag and GitHub Release
-        if: steps.detect.outputs.should_release == 'true'
+        if: steps.detect.outputs.should_release == 'true' && steps.check_tag.outputs.tag_exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.detect.outputs.tag }}
