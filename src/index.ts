@@ -1,3 +1,9 @@
+export {
+  type AuditResult,
+  type AuditViolation,
+  auditBranch,
+  formatAuditResult,
+} from "./audit/audit.js";
 export { checkGit, checkGitHubCli, checkRulesConfig, runDiagnostics } from "./doctor.js";
 export {
   getMcpPrompt,
@@ -52,3 +58,9 @@ export {
 export * from "./state/schema.js";
 export { fetchIssueMeta, getBranchName, syncStateFromGit } from "./state/sync.js";
 export { getProjectStatus } from "./status.js";
+export {
+  buildTimelineTable,
+  getJourneyTimeline,
+  type JourneyTimelineResult,
+  type TimelineItem,
+} from "./timeline/timeline.js";

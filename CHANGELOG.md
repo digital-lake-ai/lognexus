@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-alpha.5] - 2026-10-21
+
+### Added
+- **Journey Timeline Reconstruction Engine (`src/timeline/timeline.ts`):**
+  - Reconstructs complete branch history comparing against base branch (`main` / `origin/main`).
+  - Enriches each commit with subtask ID, tier, title, and metadata parsed from Git Notes (`refs/notes/lognexus`).
+  - Generates Markdown journey tables, machine-readable JSON, and structured PR body drafts (`--pr-body`).
+- **Programmatic Review Gate Auditor (`src/audit/audit.ts`):**
+  - Enforces commit message formats (`type(#issue/subtask)`).
+  - Validates `Authored-by:` trailers on all branch commits.
+  - Audits Git Notes presence and warns on unlinked commits.
+  - Verifies Review Gate integrity preventing self-approval (`author !== reviewer`).
+- **CLI Commands:** `lognexus timeline [base] [--json|--pr-body]` and `lognexus audit [base]`.
+- **MCP Server Expansion:** Exposes `lognexus_timeline` and `lognexus_audit` tools in native JSON-RPC 2.0 stdio server.
+- **Removed Legacy Artifact:** Removed `docs/MIGRATING_FROM_SHIPLOG.md` and cleaned references in `src/doctor.ts`.
+
 ## [1.0.0-alpha.4] - 2026-10-21
 
 ### Added

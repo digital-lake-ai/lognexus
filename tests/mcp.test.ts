@@ -103,6 +103,8 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
         "lognexus_state_clear",
         "lognexus_note_show",
         "lognexus_note_attach",
+        "lognexus_timeline",
+        "lognexus_audit",
       ]);
 
       for (const tool of tools) {
@@ -261,6 +263,20 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
 
       const payload = JSON.parse(showResult.content[0].text) as { generator: string };
       expect(payload.generator).toBe("LogNexus");
+    });
+
+    it("executes lognexus_timeline returning markdown table", async () => {
+      const res = await rpc("tools/call", { name: "lognexus_timeline", arguments: {} }, tempDir);
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBeUndefined();
+      expect(toolText(result)).toContain("| Commit | Subtask | Summary | Tier | Author | Note |");
+    });
+
+    it("executes lognexus_audit returning audit results", async () => {
+      const res = await rpc("tools/call", { name: "lognexus_audit", arguments: {} }, tempDir);
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBeUndefined();
+      expect(toolText(result)).toContain("[PASS]");
     });
 
     it("returns an error result for an unknown tool name", async () => {

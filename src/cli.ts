@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { auditBranch, formatAuditResult } from "./audit/audit.js";
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
@@ -8,6 +9,7 @@ import { initProject } from "./scaffold.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "./state/manager.js";
 import { syncStateFromGit } from "./state/sync.js";
 import { getProjectStatus } from "./status.js";
+import { getJourneyTimeline } from "./timeline/timeline.js";
 
 function printHeader() {
   console.log("\n🔷 LogNexus CLI — Digital Lake");
@@ -25,6 +27,8 @@ Commands:
   status       Inspect current branch, active issue, and recommended tier
   state        Manage persistent agent state (.lognexus/state.json)
   note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
+  timeline     Reconstruct the branch Journey Timeline and draft a PR body
+  audit        Audit commit conventions, authorship trailers and review gate
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
   help         Display this help message
 
@@ -42,11 +46,20 @@ Note Subcommands:
   lognexus note push [remote]       Push refs/notes/lognexus to remote (default: origin)
   lognexus note fetch [remote]      Fetch refs/notes/lognexus from remote
 
+Timeline & Audit:
+  lognexus timeline [base] [flags]  Print the Journey Timeline of the branch vs. base branch
+    --json                          Emit the full JourneyTimelineResult JSON (no banner)
+    --pr-body                       Emit the ready-to-use PR body draft
+  lognexus audit [base]             Audit commit format, Authored-by trailer, Git Notes,
+                                    subtask file contracts and reviewer separation
+                                    (exits with code 1 on errors)
+
 MCP Server:
   lognexus mcp                      Start MCP server on stdio (JSON-RPC 2.0) for Claude Code,
                                     Cursor, VS Code, Antigravity or any MCP-compatible client
   Tools:     lognexus_status, lognexus_state_get, lognexus_state_sync, lognexus_state_set_task,
-             lognexus_state_finish_task, lognexus_state_clear, lognexus_note_show, lognexus_note_attach
+             lognexus_state_finish_task, lognexus_state_clear, lognexus_note_show,
+             lognexus_note_attach, lognexus_timeline, lognexus_audit
   Resources: lognexus://state, lognexus://routing
   Prompts:   lognexus-plan, lognexus-review
 
@@ -55,6 +68,8 @@ Examples:
   npx @digital-lake/lognexus state sync
   npx @digital-lake/lognexus note attach HEAD
   npx @digital-lake/lognexus note show HEAD
+  npx @digital-lake/lognexus timeline main --pr-body
+  npx @digital-lake/lognexus audit main
   npx @digital-lake/lognexus mcp
 `);
 }
@@ -294,6 +309,73 @@ async function handleNote(args: string[]) {
   }
 }
 
+async function handleTimeline(args: string[]) {
+  const flags = args.filter((arg) => arg.startsWith("-"));
+  const positional = args.filter((arg) => !arg.startsWith("-"));
+  const baseBranch = positional[0] || "main";
+
+  const known = ["--json", "--pr-body"];
+  const unknown = flags.filter((flag) => !known.includes(flag));
+  if (unknown.length > 0) {
+    console.error(`Unknown option(s) for timeline: ${unknown.join(", ")}\n`);
+    printUsage();
+    process.exit(1);
+  }
+
+  const asJson = flags.includes("--json");
+  const asPrBody = flags.includes("--pr-body");
+  const timeline = getJourneyTimeline(baseBranch);
+
+  // --json / --pr-body are machine-consumable: keep stdout free of banners.
+  if (asJson) {
+    console.log(JSON.stringify(timeline, null, 2));
+    return;
+  }
+  if (asPrBody) {
+    console.log(timeline.prBodyDraft);
+    return;
+  }
+
+  printHeader();
+  console.log(`Branch:      ${timeline.branch}`);
+  console.log(`Base Branch: ${timeline.baseBranch}`);
+  console.log(`Commits:     ${timeline.commitCount}\n`);
+
+  if (timeline.commitCount === 0) {
+    console.log("No commits ahead of the base branch.\n");
+    return;
+  }
+
+  console.log(timeline.markdownTable);
+  console.log("");
+}
+
+async function handleAudit(args: string[]) {
+  const baseBranch = args.find((arg) => !arg.startsWith("-")) || "main";
+  const result = auditBranch(baseBranch);
+
+  printHeader();
+  console.log(`Auditing ${result.commitCount} commit(s) against base branch '${baseBranch}'...\n`);
+
+  if (result.passed && result.violations.length === 0) {
+    console.log(`${formatAuditResult(result)}\n`);
+    return;
+  }
+
+  for (const violation of result.violations) {
+    const tag = violation.severity === "error" ? "[ERROR]" : "[WARN] ";
+    console.log(`${tag} ${violation.shortSha} ${violation.rule}: ${violation.message}`);
+  }
+
+  console.log(
+    `\n${result.summary.errors} error(s), ${result.summary.warnings} warning(s) — ${result.passed ? "[PASS] No blocking violations" : "[FAIL] Review gate blocked"}\n`,
+  );
+
+  if (!result.passed) {
+    process.exit(1);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
@@ -313,6 +395,12 @@ async function main() {
       break;
     case "note":
       await handleNote(args.slice(1));
+      break;
+    case "timeline":
+      await handleTimeline(args.slice(1));
+      break;
+    case "audit":
+      await handleAudit(args.slice(1));
       break;
     case "mcp":
       // stdout is reserved for JSON-RPC frames: never print the banner here.
