@@ -1,7 +1,3 @@
-export * from "./config/loadConfig.js";
-export * from "./providers/deepseek.js";
-export * from "./providers/factory.js";
-export * from "./providers/gemini.js";
-export * from "./providers/openaiCompatible.js";
-export * from "./providers/types.js";
-export * from "./routing/tierRouter.js";
+export { checkGit, checkGitHubCli, checkRulesConfig, runDiagnostics } from "./doctor.js";
+export { initProject } from "./scaffold.js";
+export { getProjectStatus } from "./status.js";

@@ -26,8 +26,8 @@ To help us triage and resolve the issue quickly, please provide:
 - **Triage & Fix:** We will provide an assessment and targeted release timeframe within 5 business days.
 - **Disclosure:** We follow coordinated vulnerability disclosure and will publicly credit reporters unless you prefer anonymity.
 
-## Secrets & API Key Safety
+## Secrets & Repository Safety
 
-LogNexus interacts with AI provider APIs (Google Gemini, DeepSeek, etc.).
-- **Never commit `.env` or configuration files containing raw API keys.** LogNexus includes `.env` and `*.local` in `.gitignore` by default.
-- LogNexus CLI (`lognexus doctor`) masks and redacts API keys in console output by default.
+LogNexus governs AI agent development workflows in your repository.
+- **Never commit `.env` or files containing secrets.** LogNexus includes `.env` and `*.local` in `.gitignore` rules by default.
+- LogNexus CLI does not store or process third-party API credentials; authentication is handled directly within your native IDE environments (Google Antigravity, Kimi Code, Cursor).

@@ -77,25 +77,20 @@ Update your workflow commands from `/shiplog` to `/lognexus`:
 
 ---
 
-## 3. Configuring Multi-Model Routing (Gemini + DeepSeek)
+## 3. Native IDE Agent Workflow (Gemini + DeepSeek)
 
-LogNexus introduces native multi-tier routing. Add your API keys to `.env` or your shell profile:
+LogNexus is designed for native client specialization without API proxies:
+- **Google Antigravity (Gemini):** Used for planning, architectural debates, issue generation (`/lognexus plan`), PR timeline synthesis (`/lognexus pr`), and cross-model review verification (`/lognexus review`).
+- **Kimi Code / Cursor (DeepSeek):** Used for surgical, contract-bounded implementation (`/lognexus commit`) on issue branches.
 
-```env
-# Primary Provider
-LOGNEXUS_PROVIDER=gemini
+Configure tier advisory preferences in `.lognexus/routing.md`:
+```markdown
+# Model Routing
 
-# Google Gemini (Tiers 1 & 2)
-GEMINI_API_KEY="your-gemini-api-key"
-GEMINI_MODEL="gemini-3.8-flash"
-
-# DeepSeek (Tier 3 Execution)
-DEEPSEEK_API_KEY="your-deepseek-api-key"
-DEEPSEEK_BASE_URL="https://api.deepseek.com"
-DEEPSEEK_MODEL="deepseek-chat"
+routing: confirm
 ```
 
-Verify live connectivity:
+Verify your local environment health:
 ```bash
-lognexus doctor --live
+npx @digital-lake/lognexus doctor
 ```
