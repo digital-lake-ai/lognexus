@@ -176,6 +176,11 @@ LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp
 }
 ```
 
+**Or install automatically via Smithery:**
+```bash
+npx -y @smithery/cli install @digital-lake/lognexus --client claude
+```
+
 **Exposed Capabilities:**
 - **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_note_show`, `lognexus_note_attach`, `lognexus_timeline`, `lognexus_audit`
 - **Resources:** `lognexus://state`, `lognexus://routing`

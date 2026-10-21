@@ -1,0 +1,14 @@
+# Smithery configuration for LogNexus MCP Server
+# https://smithery.ai/docs/config
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties: {}
+  commandFunction:
+    command: "npx"
+    args:
+      - "-y"
+      - "@digital-lake/lognexus"
+      - "mcp"
