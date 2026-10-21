@@ -1,4 +1,18 @@
 export { checkGit, checkGitHubCli, checkRulesConfig, runDiagnostics } from "./doctor.js";
+export {
+  attachCurrentStateToCommit,
+  buildStateNotePayload,
+  type GitNotePayload,
+} from "./notes/attach.js";
+export {
+  attachNote,
+  DEFAULT_NOTES_REF,
+  fetchNotes,
+  getNote,
+  listNotes,
+  type NoteOptions,
+  pushNotes,
+} from "./notes/notes.js";
 export { initProject } from "./scaffold.js";
 export {
   clearState,

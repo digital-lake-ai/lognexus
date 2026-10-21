@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { runDiagnostics } from "./doctor.js";
+import { attachCurrentStateToCommit } from "./notes/attach.js";
+import { fetchNotes, getNote, listNotes, pushNotes } from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "./state/manager.js";
 import { syncStateFromGit } from "./state/sync.js";
@@ -21,6 +23,7 @@ Commands:
   doctor       Check Git, GitHub CLI authentication, and repository rules health
   status       Inspect current branch, active issue, and recommended tier
   state        Manage persistent agent state (.lognexus/state.json)
+  note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
   help         Display this help message
 
 State Subcommands:
@@ -30,10 +33,18 @@ State Subcommands:
   lognexus state finish-task <id>   Mark subtask as completed (e.g. lognexus state finish-task T1)
   lognexus state clear              Reset persistent state to empty
 
+Note Subcommands:
+  lognexus note [show] [commit]     Display LogNexus Git Note for commit (default: HEAD)
+  lognexus note attach [commit]     Attach current session state as Git Note to commit
+  lognexus note list                List all commits with LogNexus Git Notes
+  lognexus note push [remote]       Push refs/notes/lognexus to remote (default: origin)
+  lognexus note fetch [remote]      Fetch refs/notes/lognexus from remote
+
 Examples:
   npx @digital-lake/lognexus init
   npx @digital-lake/lognexus state sync
-  npx @digital-lake/lognexus state show
+  npx @digital-lake/lognexus note attach HEAD
+  npx @digital-lake/lognexus note show HEAD
 `);
 }
 
@@ -190,6 +201,88 @@ async function handleState(args: string[]) {
   }
 }
 
+async function handleNote(args: string[]) {
+  const sub = args[0]?.toLowerCase() || "show";
+
+  switch (sub) {
+    case "show": {
+      const commit = args[1] || "HEAD";
+      printHeader();
+      const note = getNote(commit);
+      if (note) {
+        console.log(`Git Note for commit [${commit}] (refs/notes/lognexus):\n`);
+        console.log(note);
+      } else {
+        console.log(`No LogNexus note found attached to commit [${commit}].`);
+        console.log("Tip: Run 'lognexus note attach' to attach current state to this commit.");
+      }
+      console.log("");
+      break;
+    }
+
+    case "attach": {
+      const commit = args[1] || "HEAD";
+      printHeader();
+      const payload = attachCurrentStateToCommit(commit);
+      console.log(`[OK] Attached LogNexus note to commit [${commit}] (refs/notes/lognexus):`);
+      console.log(
+        `     Issue:   ${payload.issue ? `#${payload.issue.id} — ${payload.issue.title}` : "(none)"}`,
+      );
+      console.log(
+        `     Subtask: ${payload.subtask ? `${payload.subtask.id} (${payload.subtask.title})` : "(none)"}`,
+      );
+      console.log(`     Tier:    ${payload.tier}\n`);
+      break;
+    }
+
+    case "list": {
+      printHeader();
+      const notes = listNotes();
+      console.log(`LogNexus Notes (refs/notes/lognexus) — ${notes.length} note(s):\n`);
+      if (notes.length === 0) {
+        console.log("No notes recorded yet.");
+      } else {
+        for (const n of notes) {
+          console.log(`  • Commit: ${n.commitSha} (blob: ${n.noteBlob})`);
+        }
+      }
+      console.log("");
+      break;
+    }
+
+    case "push": {
+      const remote = args[1] || "origin";
+      printHeader();
+      console.log(`Pushing refs/notes/lognexus to ${remote}...`);
+      const ok = pushNotes(remote);
+      if (ok) {
+        console.log(`[OK] Notes pushed to ${remote} successfully.\n`);
+      } else {
+        console.error(`[FAIL] Could not push notes to ${remote}.\n`);
+      }
+      break;
+    }
+
+    case "fetch": {
+      const remote = args[1] || "origin";
+      printHeader();
+      console.log(`Fetching refs/notes/lognexus from ${remote}...`);
+      const ok = fetchNotes(remote);
+      if (ok) {
+        console.log(`[OK] Notes fetched from ${remote} successfully.\n`);
+      } else {
+        console.error(`[FAIL] Could not fetch notes from ${remote}.\n`);
+      }
+      break;
+    }
+
+    default:
+      console.error(`Unknown note subcommand: ${sub}\n`);
+      printUsage();
+      process.exit(1);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
@@ -206,6 +299,9 @@ async function main() {
       break;
     case "state":
       await handleState(args.slice(1));
+      break;
+    case "note":
+      await handleNote(args.slice(1));
       break;
     case "help":
     case "--help":
