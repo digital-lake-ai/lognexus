@@ -1,0 +1,31 @@
+# Rejects legacy cross-reference forms that the audit found drifting:
+# bare `lognexus:<skill>` or `shiplog:<skill>` references outside HTML envelopes.
+# LogNexus's own units are referenced by file path; the `plugin:skill` syntax is
+# reserved for external plugins (e.g. `ork:commit`, `superpowers:brainstorming`).
+#
+# Implementation: pure shell + grep, no third-party action. Runs on PRs only.
+
+name: Cross-reference check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Reject legacy plugin:skill refs outside envelopes
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Envelopes start with '<!-- lognexus:' or '<!-- shiplog:'
+          if grep -rnE '(^|[^!:-])(lognexus|shiplog):[a-z]+' skills commands --include='*.md' \
+             | grep -vE '<!-- (lognexus|shiplog):'; then
+            echo "::error::Legacy '<plugin>:<skill>' reference found. Use a file path instead."
+            exit 1
+          fi
+          echo "OK: no legacy plugin:skill references."

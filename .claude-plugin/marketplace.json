@@ -1,0 +1,15 @@
+{
+  "name": "lognexus",
+  "owner": {
+    "name": "Digital Lake"
+  },
+  "metadata": {
+    "description": "Git-as-knowledge-graph workflow for traceability across issues, branches, commits, reviews, and PRs."
+  },
+  "plugins": [
+    {
+      "name": "lognexus",
+      "source": "./"
+    }
+  ]
+}

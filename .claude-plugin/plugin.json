@@ -1,0 +1,13 @@
+{
+  "name": "lognexus",
+  "description": "Git-as-knowledge-graph workflow for traceability across issues, branches, commits, reviews, and PRs.",
+  "version": "1.0.0-alpha.0",
+  "author": {
+    "name": "Digital Lake"
+  },
+  "homepage": "https://github.com/digital-lake-ai/lognexus",
+  "repository": "https://github.com/digital-lake-ai/lognexus",
+  "license": "MIT",
+  "skills": "./skills/",
+  "commands": "./commands/"
+}

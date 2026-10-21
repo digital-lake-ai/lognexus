@@ -1,0 +1,50 @@
+{
+  "name": "@digital-lake/lognexus",
+  "version": "1.0.0-alpha.0",
+  "description": "The Git-powered memory nexus for AI agents. Multi-model routing, durable cognitive logs, and traceable pull requests.",
+  "type": "module",
+  "bin": {
+    "lognexus": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check .",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "git",
+    "ai",
+    "agents",
+    "orchestrator",
+    "gemini",
+    "deepseek",
+    "claude",
+    "memory",
+    "traceability",
+    "knowledge-graph"
+  ],
+  "author": {
+    "name": "Digital Lake",
+    "url": "https://github.com/digital-lake-ai"
+  },
+  "contributors": [
+    {
+      "name": "devallibus",
+      "url": "https://github.com/devallibus"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/digital-lake-ai/lognexus.git"
+  },
+  "homepage": "https://github.com/digital-lake-ai/lognexus#readme",
+  "bugs": {
+    "url": "https://github.com/digital-lake-ai/lognexus/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
