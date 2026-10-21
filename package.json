@@ -11,7 +11,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "biome check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run test"
   },
   "keywords": [
     "git",
@@ -44,7 +45,22 @@
     "url": "https://github.com/digital-lake-ai/lognexus/issues"
   },
   "license": "MIT",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.2",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
