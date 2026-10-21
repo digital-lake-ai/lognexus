@@ -7,7 +7,7 @@ export interface ProjectStatus {
   isInsideGit: boolean;
   activeIssue: string | null;
   routingMode: string;
-  recommendedAgent: string;
+  recommendedTier: string;
 }
 
 export function getProjectStatus(targetDir: string = process.cwd()): ProjectStatus {
@@ -48,9 +48,11 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     if (m) routingMode = m[1].toLowerCase();
   }
 
-  let recommendedAgent = "Gemini in Antigravity (Planning & Review)";
+  let recommendedTier =
+    "tier-1 (Reasoning / Planning: Claude Opus, OpenAI o3, Gemini Pro, DeepSeek R1)";
   if (activeIssue) {
-    recommendedAgent = "DeepSeek in Kimi Code / Cursor (Task Execution) or Gemini (PR & Review)";
+    recommendedTier =
+      "tier-3 (Scoped Execution: Claude Haiku, GPT-4o-mini, DeepSeek Chat, Gemini Flash)";
   }
 
   return {
@@ -58,6 +60,6 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     isInsideGit,
     activeIssue,
     routingMode,
-    recommendedAgent,
+    recommendedTier,
   };
 }

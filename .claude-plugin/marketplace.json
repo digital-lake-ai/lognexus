@@ -4,7 +4,7 @@
     "name": "Digital Lake"
   },
   "metadata": {
-    "description": "Git-as-knowledge-graph workflow for traceability across issues, branches, commits, reviews, and PRs."
+    "description": "The Universal, Git-powered context & rules framework for native AI agents (Claude, OpenAI, Gemini, DeepSeek)."
   },
   "plugins": [
     {

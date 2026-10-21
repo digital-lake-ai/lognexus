@@ -9,6 +9,7 @@ describe("getProjectStatus", () => {
     expect(typeof status.branch).toBe("string");
     expect(status.branch.length).toBeGreaterThan(0);
     expect(["confirm", "warn", "off", "not configured"]).toContain(status.routingMode);
-    expect(typeof status.recommendedAgent).toBe("string");
+    expect(typeof status.recommendedTier).toBe("string");
+    expect(status.recommendedTier).toContain("tier-");
   });
 });

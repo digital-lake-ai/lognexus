@@ -1,7 +1,7 @@
 {
   "name": "@digital-lake/lognexus",
-  "version": "1.0.0-alpha.0",
-  "description": "The Git-powered context & rules framework for native AI agents (Antigravity, Kimi Code, Cursor). Scaffolding CLI and repository governance.",
+  "version": "1.0.0-alpha.1",
+  "description": "The Universal, Git-powered context & rules framework for native AI agents (Claude, OpenAI, Gemini, DeepSeek). Scaffolding CLI and repository governance.",
   "type": "module",
   "bin": {
     "lognexus": "dist/cli.js"
@@ -18,10 +18,13 @@
     "git",
     "ai",
     "agents",
-    "orchestrator",
+    "claude",
+    "openai",
     "gemini",
     "deepseek",
-    "claude",
+    "cursor",
+    "antigravity",
+    "orchestrator",
     "memory",
     "traceability",
     "knowledge-graph"

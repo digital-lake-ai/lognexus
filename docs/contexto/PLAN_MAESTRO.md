@@ -1,115 +1,97 @@
-# Plan Maestro — LogNexus (Arquitectura de Reglas Nativas)
+# Plan Maestro — LogNexus (Framework Universal Multi-Modelo)
 
-> **LogNexus — The Git-Powered Context & Rules Framework for Native AI Agents.**  
+> **LogNexus — The Universal, Git-Powered Context & Rules Framework for Native AI Agents.**  
 > Repo: `digital-lake-ai/lognexus` · npm: `@digital-lake/lognexus` · CLI: `lognexus` · Autor: **Digital Lake**  
 > Basado en `devallibus/shiplog` (MIT). Atribución en `LICENSE` y `NOTICE.md`.
 
 ---
 
-## 1. Principio Fundamental: Framework de Reglas, No un Router de APIs
+## 1. Principio Fundamental: Framework de Reglas Universal y Agnóstico
 
-LogNexus **NO** es un proxy ni un router de llamadas HTTP a modelos de IA.
+LogNexus es un framework de software libre **100% genérico y agnóstico al modelo y al editor**.
 
-### Por qué se descartó el Router de APIs
-Sacar a modelos avanzados como **Gemini** o **DeepSeek** de sus clientes nativos mediante scripts o llamadas directas a APIs destruye el valor principal del desarrollo asistido por IA:
-- Se pierde el acceso directo al contexto del editor (workspace, indexación de código, pestañas de navegador, visores de diffs interactivos y MCP servers).
-- En **Google Antigravity**, Gemini opera con agentes autónomos, terminales persistentes y herramientas de depuración avanzadas.
-- En **Kimi Code / Cursor**, DeepSeek opera con generación inline, contexto de buffers activos y edición multi-archivo nativa.
+### Por qué es un Framework de Reglas (Skill Markdown) y NO un Proxy de APIs
+Sacar a los modelos de sus clientes nativos mediante llamadas directas a APIs destruye el contexto del editor (workspace, buffers activos, visores interactivos de diffs, terminales y MCP servers).
 
-### La Solución LogNexus
-LogNexus es un **Framework Puro de Contexto, Reglas y Memoria Git (Skill Markdown)**:
-1. Gobierna el flujo de trabajo humano-agente y multi-agente dentro de los propios IDEs nativos.
-2. Estandariza la memoria del proyecto utilizando **Git y GitHub como Knowledge Graph** (Issues, Ramas acotadas, Commits atómicos con contexto, PRs con Journey Timeline y Review Gates).
-3. Adapta las directivas, los contratos de delegación y los formatos de prompt específicamente a la forma en que razonan Gemini y DeepSeek en sus respectivos entornos.
+LogNexus opera directamente dentro de los entornos nativos del desarrollador:
+* **Clientes:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code / VS Code, Zed.
+* **Modelos:** Anthropic Claude (Opus, Sonnet, Haiku), OpenAI (o3, o1, GPT-4o/5), Google Gemini (Pro, Flash), DeepSeek (R1, V3, Chat).
 
----
-
-## 2. Especialización de Modelos y Roles Nativos
-
-LogNexus divide el trabajo de ingeniería según la especialidad cognitiva de cada modelo dentro de su cliente nativo:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             DIGITAL LAKE (Humano)                           │
-│             Aprueba planes de issues, autoriza merges y releases            │
-└──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
-                   ┌───────────────────┴───────────────────┐
-                   ▼                                       ▼
-    ┌─────────────────────────────┐         ┌─────────────────────────────┐
-    │     GEMINI (Antigravity)    │         │     DEEPSEEK (Kimi Code)    │
-    │     Orquestador / Tier-1    │         │     Codificador / Tier-3    │
-    ├─────────────────────────────┤         ├─────────────────────────────┤
-    │ • Brainstorming y diseño    │         │ • Implementación quirúrgica │
-    │ • Creación de Issues y Tiers│ ──────▶ │ • Commits bajo contrato     │
-    │ • Contratos de delegación   │         │ • feat(#N/Tk) atómicos      │
-    │ • Síntesis Journey en PR    │ ◀────── │ • Decision budget: NONE     │
-    │ • Cross-Model Review Gate   │         │ • Contexto de editor nativo │
-    └─────────────────────────────┘         └─────────────────────────────┘
-```
-
-| Rol | Agente / Entorno | Responsabilidades en LogNexus |
-|---|---|---|
-| **Maintainer** | Digital Lake (Humano) | Aprueba planes, valida decisiones arquitectónicas, aprueba PRs y publica releases. |
-| **Orquestador (tier-1 / tier-2)** | **Gemini (en Google Antigravity)** | • Convierte debates en issues estructurados con tareas `T1..Tn`.<br>• Redacta contratos de delegación cerrados con allowlists de archivos.<br>• Sintetiza la historia completa del desarrollo en la Journey Timeline del PR.<br>• Actúa como auditor independiente en el Cross-Model Review Gate (`Reviewed-by:`). |
-| **Codificador (tier-3)** | **DeepSeek (en Kimi Code / Cursor)** | • Ejecuta tareas de código delimitadas estrictamente por contrato.<br>• Commits atómicos siguiendo la convención `feat(#N/Tk): ...`.<br>• Presupuesto de decisiones: `none` (no altera arquitecturas ni añade dependencias no autorizadas). |
+### La Aportación de LogNexus
+El proyecto original (`shiplog`) soportaba flujos para Claude y OpenAI en Claude Code, Cursor y Codex. **LogNexus expande este ecosistema sumando soporte de primer nivel para Gemini y DeepSeek** (y clientes como Antigravity o Kimi Code), formalizando:
+1. Una taxonomía operativa de **3 Tiers Cognitivos** aplicable a cualquier combinación de modelos.
+2. Contratos de delegación cerrados (`Decision budget: none`, allowlists de archivos obligatorias).
+3. Gates de revisión cruzada obligatorios (`Reviewed-by:` != `Authored-by:`).
+4. Herramienta CLI de scaffolding y diagnóstico de repositorios (`@digital-lake/lognexus`).
 
 ---
 
-## 3. Optimización de Prompts y Contratos para Gemini y DeepSeek
+## 2. Taxonomía de Tiers y Roles Multi-Modelo
 
-El soporte nativo de LogNexus para Gemini y DeepSeek reside en la ingeniería de especificaciones en `skills/lognexus/`:
+LogNexus desacopla el rol del modelo físico. Los proyectos definen el comportamiento de routing en `.lognexus/routing.md` y asignan los modelos que prefieran a cada nivel:
 
-1. **Para Gemini (Antigravity):**
-   - Directivas optimizadas para razonamiento sistémico, análisis de dependencias cruzadas y contexto extendido (1M+ tokens).
-   - Plantillas de síntesis que organizan hallazgos, alternativas descartadas y decisiones clave en tablas markdown.
-   - Verificación de gates de revisión: auditoría de seguridad y calidad antes de autorizar merge.
+| Tier | Perfil Cognitivo | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Actividades en LogNexus |
+|---|---|---|---|---|---|---|
+| **tier-1 (Reasoning)** | Razonamiento profundo, diseño sistémico y síntesis narrativa | Claude Opus 3.7 / 4.x | o3, o1, GPT-5 | Gemini 2.5 / 3.8 Pro | DeepSeek R1 | Brainstorm-to-issue planning (`/lognexus plan`), síntesis de Journey Timeline en PRs (`/lognexus pr`), auditoría de Review Gate (`/lognexus review`). |
+| **tier-2 (Context & Triage)** | Gran ventana de contexto, triaje y clasificación estructurada | Claude Sonnet | GPT-4.1, GPT-4o | Gemini Flash / Pro (1M) | DeepSeek V3 | Exploración de repositorios grandes, triaje de descubrimientos (`/lognexus lookup`), carga de contexto de issues. |
+| **tier-3 (Execution)** | Ejecución quirúrgica, seguimiento estricto de directivas | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Subtareas acotadas por contrato, commits atómicos (`feat(#N/Tk)`), comentarios de progreso en issues. |
 
-2. **Para DeepSeek (Kimi Code / Cursor):**
-   - Contratos de delegación ultra-específicos:
-     ```markdown
-     ### Contract
-     - Allowed files: src/scaffold.ts, tests/scaffold.test.ts
-     - Must not change: package.json dependencies, public interfaces
-     - Stop and ask if: Any unexpected compiler error requires new packages
-     - Decision budget: none
-     ```
-   - Eliminación de ambigüedades: DeepSeek sigue directivas imperativas de manera extremadamente precisa cuando se le delimita exactamente qué archivos tocar y qué evidencia retornar.
+### Ejemplos de Configuraciones Populares
+
+* **Setup A (Anthropic Pure):** Claude Opus (tier-1) + Claude Sonnet (tier-2) + Claude Haiku (tier-3) en Claude Code o Cursor.
+* **Setup B (Google + DeepSeek):** Gemini Pro (tier-1/2) en Google Antigravity + DeepSeek Chat (tier-3) en Kimi Code / Cursor.
+* **Setup C (OpenAI + DeepSeek):** OpenAI o3 (tier-1) en Cursor + DeepSeek Chat (tier-3) en VS Code.
+* **Setup D (Híbrido con Review Cruzada):** Cualquier combinación donde el modelo que revisa y firma (`Reviewed-by:`) difiere del autor del código (`Last-code-by:`).
+
+---
+
+## 3. Protocolo de Contratos de Delegación Cerrados
+
+Para que cualquier modelo de ejecución rápida (`tier-3`) opere sin riesgo de alucinación o sobreingeniería, LogNexus estandariza el formato de contrato:
+
+```markdown
+### Contract
+- **Allowed files:** `src/scaffold.ts`, `tests/scaffold.test.ts`
+- **Must not change:** `package.json` dependencies, public interfaces
+- **Stop and ask if:** Compiler requires new third-party dependencies
+- **Verification required:** `npm test && npm run lint` must pass
+- **Decision budget:** `none`
+```
+
+Esto garantiza que modelos como DeepSeek Chat, GPT-4o-mini o Claude Haiku ejecuten cambios exactos y verificables dentro de su cliente nativo.
 
 ---
 
 ## 4. El Paquete CLI: `@digital-lake/lognexus` (Scaffolding y Diagnóstico)
 
-El paquete npm distribuido como `@digital-lake/lognexus` cumple un propósito claro y acotado: **ser la herramienta de inicialización y diagnóstico del repositorio**.
+El paquete npm `@digital-lake/lognexus` es una herramienta ligera (**10.5 kB**) para inicializar y auditar repositorios:
 
-### Comandos del CLI
 * `npx @digital-lake/lognexus init`:
-  - Inicializa `.lognexus/` en el proyecto.
-  - Genera `.lognexus/routing.md` (configuración del advisory de modelos).
-  - Configura plantillas de issues y PRs si no existen.
+  - Crea la carpeta `.lognexus/`.
+  - Genera `.lognexus/routing.md` con la taxonomía multi-modelo.
+  - Prepara plantillas de issues y PRs.
 * `npx @digital-lake/lognexus doctor`:
-  - Verifica la presencia y versión de `git`.
+  - Diagnostica la instalación y repositorio `git`.
   - Comprueba la autenticación con GitHub CLI (`gh auth status`).
-  - Audita el estado del repositorio y las reglas `.lognexus/`.
+  - Audita la presencia y configuración de reglas `.lognexus/`.
 * `npx @digital-lake/lognexus status`:
-  - Muestra la rama actual, el issue vinculado y la recomendación de tier para la fase en curso.
+  - Inspecciona la rama actual, el issue vinculado y la recomendación de tier para la fase activa.
 
 ---
 
-## 5. Distribución y Compatibilidad de Clientes
+## 5. Distribución y Compatibilidad
 
-LogNexus se instala y ejecuta como una Skill en cualquier cliente compatible:
-
-1. **Google Antigravity:** A través del sistema nativo de Agent Skills (`skills/lognexus/SKILL.md`).
-2. **Kimi Code / VS Code / Cursor:** A través de las reglas de workspace (`.lognexus/` y prompts de comandos).
-3. **Claude Code:** Como plugin nativo a través de `.claude-plugin/plugin.json`.
-4. **Compatibilidad retroactiva:** Soporte transparente de lectura para proyectos que aún contengan carpetas `.shiplog/` o etiquetas `<!-- shiplog: ... -->`.
+* **Claude Code:** Plugin nativo en `.claude-plugin/plugin.json`.
+* **Cursor / Codex / Agent Skills:** Instalación directa vía `npx skills add digital-lake-ai/lognexus`.
+* **Google Antigravity:** Activación directa vía `skills/lognexus/SKILL.md`.
+* **Kimi Code / VS Code / Zed:** Instrucciones de workspace en `.lognexus/` y comandos markdown.
+* **Compatibilidad retroactiva:** Soporte transparente de lectura para configuraciones legacy `.shiplog/` y metadatos `<!-- shiplog: ... -->`.
 
 ---
 
 ## 6. Roadmap
 
-* **Hito 1 — CLI de Scaffolding y Diagnóstico:** Comandos `init`, `doctor` y `status` ultra-ligeros (sin dependencias de red pesadas).
-* **Hito 2 — Estado Persistente (`.lognexus/state.json`):** Detección automática de sesión y sincronización con GitHub Issues para evitar la amnesia cognitiva tras compactaciones de contexto.
-* **Hito 3 — Git Notes (Estándar `git-ai` v3):** Quiet Mode para adjuntar contratos y metadatos de agentes en `refs/notes/lognexus`.
-* **Hito 4 — Servidor MCP (`lognexus mcp`):** Exponer las reglas, estado del proyecto y plantillas de contrato como recursos y herramientas MCP para que cualquier cliente IDE las consuma nativamente.
+* **Hito 1 — Framework Universal y CLI de Scaffolding:** Soporte completo Claude + OpenAI + Gemini + DeepSeek y CLI `init`/`doctor`/`status` ✅.
+* **Hito 2 — Estado Persistente (`.lognexus/state.json`):** Detección de sesión y sincronización con issues de GitHub para evitar la amnesia cognitiva entre compactaciones de contexto.
+* **Hito 3 — Git Notes (Estándar `git-ai` v3):** Quiet Mode para adjuntar contratos y razonamiento en `refs/notes/lognexus`.
+* **Hito 4 — Servidor MCP (`lognexus mcp`):** Exponer las reglas, estado del proyecto y plantillas de contrato como herramientas y recursos MCP para cualquier IDE.

@@ -5,7 +5,7 @@ import { initProject } from "./scaffold.js";
 import { getProjectStatus } from "./status.js";
 
 function printHeader() {
-  console.log("\n🔷 LogNexus CLI v1.0.0-alpha.0 — Digital Lake");
+  console.log("\n🔷 LogNexus CLI — Digital Lake");
   console.log("   The Git-Powered Context & Rules Framework for Native AI Agents\n");
 }
 
@@ -17,7 +17,7 @@ function printUsage() {
 Commands:
   init         Scaffold .lognexus/ configuration and rules in current repository
   doctor       Check Git, GitHub CLI authentication, and repository rules health
-  status       Inspect current branch, active issue, and recommended agent tier
+  status       Inspect current branch, active issue, and recommended tier
   help         Display this help message
 
 Examples:
@@ -47,9 +47,9 @@ async function handleInit() {
   }
 
   console.log("\nNext Steps:");
-  console.log("  • In Google Antigravity: activate skill 'lognexus' to run /lognexus plan");
-  console.log("  • In Kimi Code / Cursor: run tasks under closed contracts on issue branches");
-  console.log("  • Verify anytime with: npx @digital-lake/lognexus doctor\n");
+  console.log("  • Claude Code / Cursor / Codex / Antigravity / Kimi: use /lognexus plan");
+  console.log("  • Configure model tiers in .lognexus/routing.md");
+  console.log("  • Verify environment anytime with: npx @digital-lake/lognexus doctor\n");
 }
 
 async function handleDoctor() {
@@ -73,7 +73,7 @@ async function handleStatus() {
   console.log(`Current Branch:     ${st.branch}`);
   console.log(`Active Issue:       ${st.activeIssue ?? "(none — on base branch)"}`);
   console.log(`Rules Routing Mode: ${st.routingMode}`);
-  console.log(`Recommended Agent:  ${st.recommendedAgent}\n`);
+  console.log(`Recommended Tier:   ${st.recommendedTier}\n`);
 }
 
 async function main() {

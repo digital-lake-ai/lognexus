@@ -66,6 +66,24 @@ When no `.lognexus/routing.md` exists, or when the user runs `/lognexus models`:
 | **tier-2** (capable) | Context loading, scope judgment, structured documentation | Issue-to-branch, discovery protocol, knowledge retrieval |
 | **tier-3** (fast) | Execution speed, template filling, routine operations | Commits, simple implementations, timeline checkpoints |
 
+### Model-Tier Taxonomy (Multi-Model Support)
+
+LogNexus is completely model-agnostic. Any model can be mapped to any tier depending on your stack. The default taxonomy across major provider families is:
+
+| Tier | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Role |
+|------|------------------|--------|---------------|----------|--------------|
+| **tier-1** (Reasoning) | Claude Opus | o3, o1, GPT-4.5/5 | Gemini Pro / Flash (high) | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, cross-model review gates |
+| **tier-2** (Context / Triage) | Claude Sonnet | GPT-4.1, GPT-4o | Gemini Pro / Flash (1M) | DeepSeek V3 | Issue-to-branch context loading, discovery triage, knowledge retrieval |
+| **tier-3** (Execution) | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Scoped subtask execution, atomic commits (eat(#N/Tk)), timeline comments |
+
+### Example Multi-Model Deployments
+
+Users choose whatever combination best fits their workflow and tools:
+- **Setup A (Anthropic Stack):** Claude Opus (tier-1) + Claude Sonnet (tier-2) + Claude Haiku (tier-3) inside Claude Code or Cursor.
+- **Setup B (Google + DeepSeek):** Gemini Pro (tier-1/2) in Google Antigravity + DeepSeek Chat (tier-3) in Kimi Code / Cursor.
+- **Setup C (OpenAI + DeepSeek):** OpenAI o3 (tier-1) for planning + DeepSeek Chat (tier-3) for execution.
+- **Setup D (Cross-Model Review):** Any different model pairing satisfying the review gate rule (Authored-by: != Reviewed-by:).
+
 ## Default Phase-to-Tier Mapping
 
 | Phase | Default Tier | Recommended Mode | Rationale |

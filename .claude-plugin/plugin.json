@@ -1,7 +1,7 @@
 {
   "name": "lognexus",
-  "description": "Git-as-knowledge-graph workflow for traceability across issues, branches, commits, reviews, and PRs.",
-  "version": "1.0.0-alpha.0",
+  "description": "The Universal, Git-powered context & rules framework for native AI agents (Claude, OpenAI, Gemini, DeepSeek).",
+  "version": "1.0.0-alpha.1",
   "author": {
     "name": "Digital Lake"
   },

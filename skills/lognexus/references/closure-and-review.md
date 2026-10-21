@@ -176,7 +176,7 @@ For the full review runbook — comment template, PR body snapshot fields, self-
 
 ### What constitutes "different model"
 
-- Different model family (e.g., Opus vs Sonnet, GPT-5 vs Claude).
+- Different model family (e.g., Claude vs Gemini, OpenAI vs DeepSeek, Opus vs Sonnet, Gemini Pro vs Flash).
 - Different model version within the same family counts IF explicitly documented (e.g., Opus 4.6 reviewing Opus 4.5 work).
 - Same model, same version, different session does NOT count as independent.
 - Human review always counts as independent.

@@ -5,7 +5,7 @@
 # LogNexus
 
 <p align="center">
-  <strong>The Git-Powered Context & Rules Framework for Native AI Agents</strong>
+  <strong>The Universal, Git-Powered Context & Rules Framework for Native AI Agents</strong>
 </p>
 
 <p align="center">
@@ -21,7 +21,9 @@
 
 As AI coding agents take on complex engineering tasks across different IDEs, they suffer from a fundamental failure mode: **cognitive amnesia**. Between conversation resets, context compactations, model handoffs, and unexpected bugs, the *why* behind design decisions, discarded alternatives, and technical discoveries vanishes.
 
-**LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It operates directly inside your native AI development environments (**Google Antigravity**, **Kimi Code**, **Cursor**, **Claude Code**), governing human-agent and multi-agent workflows through structured rules, delegation contracts, and Git-backed audit trails.
+**LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
+- **Clients:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code, VS Code, Zed.
+- **Models:** Anthropic Claude (Opus, Sonnet, Haiku), OpenAI (o3, o1, GPT-4o), Google Gemini (2.5/3.8 Pro & Flash), DeepSeek (R1, V3, Chat).
 
 ```
 Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context & Diffs) ──▶ PR (Timeline & Review)
@@ -29,26 +31,24 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
          └─────────────────────── Git-Backed Knowledge Graph ──────────────────────────────┘
 ```
 
-> **Framework, Not an API Proxy:** LogNexus does not intercept API calls or pull models out of their native environments. Your models remain inside their native IDEs with full access to editor buffers, diff viewers, terminals, MCP servers, and browser tools.
+> **Framework, Not an API Proxy:** LogNexus never intercepts network calls or wraps vendor APIs. Your models remain inside their native IDEs with full access to editor buffers, interactive diff viewers, terminals, MCP servers, and local tools.
 
 ---
 
 ## Key Features
 
-- **Native IDE Client Integration:** Runs directly as an Agent Skill in **Google Antigravity**, **Kimi Code**, **Cursor**, and **Claude Code**.
-- **Model Specialization (Prompt & Contract Engineering):**
-  - **Google Gemini (in Antigravity):** High-reasoning orchestrator (`tier-1` & `tier-2`). Leverages 1M+ context tokens and Antigravity tooling to structure brainstorms into issues, write closed delegation contracts, and synthesize PR journey timelines.
-  - **DeepSeek (in Kimi Code / Cursor):** High-speed surgical implementer (`tier-3`). Executes bounded delegation contracts with strict allowlists (`feat(#N/Tk)`), zero decision budget, and native editor context.
-- **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`). No model merges its own code without independent verification from another model.
-- **Contract-First Subtasks:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions.
+- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Anthropic Claude**, **OpenAI**, **Google Gemini**, and **DeepSeek**.
+- **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **Google Antigravity**, and **Kimi Code / VS Code**.
+- **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`). No model merges its own code without independent verification from another model family or version.
+- **Contract-First Subtasks:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions (`feat(#42/T1)`).
 - **Hidden Metadata Envelopes:** HTML comments preserve machine-parseable state (`<!-- lognexus: kind: state ... -->`) without cluttering human-readable markdown.
-- **Repository Scaffolding CLI (`@digital-lake/lognexus`):** One-command setup (`npx @digital-lake/lognexus init`) and environment health checking (`doctor`).
+- **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Lightweight scaffolding utility (`npx @digital-lake/lognexus init`) and environment health checking (`doctor`).
 
 ---
 
-## Cognitive Specialization & Model Tiers
+## Model-Tier Routing Matrix
 
-Rather than executing external API calls, LogNexus provides specialized prompting and rule templates optimized for how each model reasons within its native client:
+LogNexus organizes development phases into three cognitive tiers. You can assign any model or native client to any tier according to your team's workflow and cost preferences:
 
 <p align="center">
   <img src="docs/assets/multimodel-routing-costs.png" alt="Multi-Model Routing Cost and Performance Analysis" width="85%">
@@ -56,21 +56,26 @@ Rather than executing external API calls, LogNexus provides specialized promptin
 
 ### Operational Tiers
 
-| Tier | Native IDE / Model | Primary Role |
-|---|---|---|
-| **tier-1 (Reasoning)** | **Gemini in Google Antigravity** · Claude Opus · DeepSeek Reasoner | Architectural design, brainstorm-to-issue structuring, PR journey timeline synthesis, and cross-model review gates. |
-| **tier-2 (Context)** | **Gemini (1M Context) in Antigravity** | Comprehensive codebase exploration, discovery triage, and repository documentation. |
-| **tier-3 (Execution)** | **DeepSeek in Kimi Code / Cursor** | Fast, surgical implementation under closed contracts (`Decision budget: none`), atomic task commits, and timeline updates. |
+| Tier | Cognitive Role | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Activities |
+|---|---|---|---|---|---|---|
+| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x | o3, o1, GPT-5 | Gemini 2.5 / 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model review sign-offs. |
+| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini Flash / Pro (1M context) | DeepSeek V3 | Large codebase exploration, discovery classification, knowledge retrieval. |
+| **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
 
----
+### Example Deployment Setups
 
-## Architecture & Competitive Positioning
+LogNexus adapts to your existing toolstack. Configure your advisory preferences in `.lognexus/routing.md`:
 
-LogNexus advances agentic development workflows beyond passive markdown instructions into an active, verifiable development platform.
-
-<p align="center">
-  <img src="docs/assets/competitive-gap-map.png" alt="Competitive Gap Map and Roadmap" width="85%">
-</p>
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 POPULAR DEPLOYMENT SETUPS                              │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Setup A (Anthropic Pure):  Claude Opus (t1) + Claude Sonnet (t2) + Claude Haiku (t3)   │
+│ Setup B (Google + DeepSeek): Gemini Pro (t1/t2) in Antigravity + DeepSeek Chat in Kimi │
+│ Setup C (OpenAI + DeepSeek): OpenAI o3 (t1) in Cursor + DeepSeek Chat (t3) for code    │
+│ Setup D (Claude + OpenAI):   Claude Opus (t1) for design + GPT-4o-mini (t3) for tasks  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -78,7 +83,7 @@ LogNexus advances agentic development workflows beyond passive markdown instruct
 
 LogNexus coordinates the full issue-to-merge lifecycle through intuitive slash commands:
 
-### 1. Capture the Plan (Antigravity / Gemini)
+### 1. Capture the Plan
 ```bash
 /lognexus plan
 ```
@@ -90,13 +95,13 @@ Transforms an exploratory brainstorm into a structured GitHub Issue with discret
 ```
 Creates an ID-prefixed branch (`issue/<id>-<slug>`) from the default branch tip and logs a signed `[lognexus/session-start]` note.
 
-### 3. Commit with Traceability (Kimi Code / DeepSeek)
+### 3. Commit with Traceability
 ```bash
 /lognexus commit
 ```
 Stages changes and generates structured, task-scoped commits (`feat(#42/T1): ...`) paired with an issue progress update.
 
-### 4. Synthesize the Pull Request (Antigravity / Gemini)
+### 4. Synthesize the Pull Request
 ```bash
 /lognexus pr
 ```
@@ -124,14 +129,13 @@ Verify your environment anytime:
 npx @digital-lake/lognexus doctor
 ```
 
-Inspect active branch and agent advisory:
+Inspect active branch and tier advisory:
 ```bash
 npx @digital-lake/lognexus status
 ```
 
 ### 2. Install Rules in Your Agent Environment
 
-- **Google Antigravity:** The skill is active automatically when present in `skills/lognexus/` or can be loaded via workspace skills.
 - **Claude Code:**
   ```bash
   claude plugin add digital-lake-ai/lognexus
@@ -140,6 +144,8 @@ npx @digital-lake/lognexus status
   ```bash
   npx skills add digital-lake-ai/lognexus
   ```
+- **Google Antigravity:** Active automatically via `skills/lognexus/SKILL.md` or workspace skills.
+- **Kimi Code / VS Code:** Active via `.lognexus/` workspace instructions and prompts.
 
 ---
 
@@ -153,11 +159,11 @@ npx @digital-lake/lognexus status
 
 LogNexus is an independent hard fork and continuation of [`shiplog`](https://github.com/devallibus/shiplog), originally created by **devallibus** under the MIT License.
 
-We extend our deep gratitude to **devallibus** for pioneering the concept of Git-as-knowledge-graph for AI development. LogNexus builds upon that foundation by introducing:
-- Native IDE specialization for **Google Gemini** (Antigravity) and **DeepSeek** (Kimi Code).
-- Closed delegation contract protocols and advisory tier transitions.
-- Standalone repository scaffolding CLI (`@digital-lake/lognexus`).
-- Resilient backwards-compatibility for existing `.shiplog` envelopes and workflows.
+We extend our deep gratitude to **devallibus** for pioneering the concept of Git-as-knowledge-graph for AI development. LogNexus builds upon that foundation by:
+- Expanding the model ecosystem to provide first-class native support for **Google Gemini** and **DeepSeek** alongside **Claude** and **OpenAI**.
+- Formalizing the multi-model tier routing taxonomy and closed delegation contracts.
+- Introducing the repository scaffolding CLI (`@digital-lake/lognexus`).
+- Providing seamless backwards-compatibility for existing `.shiplog` envelopes and workflows.
 
 Additional inspirations and patterns are derived from [OrchestKit](https://github.com/yonatangross/orchestkit) and [Superpowers](https://github.com/obra/superpowers). Detailed license texts are preserved in the [`LICENSES/`](LICENSES/) directory and in [`NOTICE.md`](NOTICE.md).
 
