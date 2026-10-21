@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-rc.1] - 2026-10-21
+
+### Added
+- **Full-Lifecycle End-to-End (E2E) Test Suite (`tests/e2e.test.ts`):**
+  - Validates the complete golden path in a real isolated Git environment: scaffolding, diagnostics, status detection, persistent state tracking, Git Note attachment, timeline reconstruction, Review Gate auditing, and native MCP stdio server interaction.
+- **CLI Flags `--version` and `-v` (`src/cli.ts`):**
+  - Prints current LogNexus version directly to terminal.
+- **Enhanced Documentation & Complete Feature Matrix (`README.md`):**
+  - Updated key feature list showcasing persistent state, Git Notes, native MCP server, journey timeline, and Review Gate auditing.
+
 ## [1.0.0-alpha.5] - 2026-10-21
 
 ### Added

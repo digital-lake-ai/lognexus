@@ -41,8 +41,12 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 - **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **Google Antigravity**, and **Kimi Code / VS Code**.
 - **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`). No model merges its own code without independent verification from another model family or version.
 - **Contract-First Subtasks:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions (`feat(#42/T1)`).
+- **Persistent State & Session Recovery:** Local session state engine (`.lognexus/state.json`) prevents amnesia across context compactations and conversation resets.
+- **Git Notes Engine (Quiet Mode / `git-ai` v3):** Attaches structured session payloads and contracts to commits under `refs/notes/lognexus` without changing commit SHAs.
+- **Native MCP Stdio Server (`lognexus mcp`):** Zero-dependency JSON-RPC 2.0 stdio server exposing LogNexus tools, live state resources, and prompts to Claude Desktop, Cursor, and any MCP client.
+- **Journey Timeline & Review Gate Audit:** Reconstructs the complete branch journey into structured PR descriptions (`lognexus timeline --pr-body`) and programmatically audits review gate separation (`lognexus audit`).
 - **Hidden Metadata Envelopes:** HTML comments preserve machine-parseable state (`<!-- lognexus: kind: state ... -->`) without cluttering human-readable markdown.
-- **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Lightweight scaffolding utility (`npx @digital-lake/lognexus init`) and environment health checking (`doctor`).
+- **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Lightweight CLI for repository scaffolding (`init`), health diagnostics (`doctor`), and real-time status inspection (`status`).
 
 ---
 
