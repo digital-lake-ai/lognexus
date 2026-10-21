@@ -149,7 +149,28 @@ npx @digital-lake/lognexus note show HEAD
 npx @digital-lake/lognexus note push origin
 ```
 
-### 2. Install Rules in Your Agent Environment
+### 2. Connect via Model Context Protocol (MCP)
+
+LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp`) with zero external SDK dependencies. Connect it to Claude Desktop, Cursor, Google Antigravity, or any MCP-compliant client:
+
+**`claude_desktop_config.json` or Cursor MCP settings:**
+```json
+{
+  "mcpServers": {
+    "lognexus": {
+      "command": "npx",
+      "args": ["-y", "@digital-lake/lognexus", "mcp"]
+    }
+  }
+}
+```
+
+**Exposed Capabilities:**
+- **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_note_show`, `lognexus_note_attach`
+- **Resources:** `lognexus://state`, `lognexus://routing`
+- **Prompts:** `lognexus-plan`, `lognexus-review`
+
+### 3. Install Rules in Your Agent Environment
 
 - **Claude Code:**
   ```bash

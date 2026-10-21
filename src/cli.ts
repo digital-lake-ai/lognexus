@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { runDiagnostics } from "./doctor.js";
+import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { fetchNotes, getNote, listNotes, pushNotes } from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
@@ -24,6 +25,7 @@ Commands:
   status       Inspect current branch, active issue, and recommended tier
   state        Manage persistent agent state (.lognexus/state.json)
   note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
+  mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
   help         Display this help message
 
 State Subcommands:
@@ -40,11 +42,20 @@ Note Subcommands:
   lognexus note push [remote]       Push refs/notes/lognexus to remote (default: origin)
   lognexus note fetch [remote]      Fetch refs/notes/lognexus from remote
 
+MCP Server:
+  lognexus mcp                      Start MCP server on stdio (JSON-RPC 2.0) for Claude Code,
+                                    Cursor, VS Code, Antigravity or any MCP-compatible client
+  Tools:     lognexus_status, lognexus_state_get, lognexus_state_sync, lognexus_state_set_task,
+             lognexus_state_finish_task, lognexus_state_clear, lognexus_note_show, lognexus_note_attach
+  Resources: lognexus://state, lognexus://routing
+  Prompts:   lognexus-plan, lognexus-review
+
 Examples:
   npx @digital-lake/lognexus init
   npx @digital-lake/lognexus state sync
   npx @digital-lake/lognexus note attach HEAD
   npx @digital-lake/lognexus note show HEAD
+  npx @digital-lake/lognexus mcp
 `);
 }
 
@@ -302,6 +313,10 @@ async function main() {
       break;
     case "note":
       await handleNote(args.slice(1));
+      break;
+    case "mcp":
+      // stdout is reserved for JSON-RPC frames: never print the banner here.
+      await startMcpServer();
       break;
     case "help":
     case "--help":
