@@ -104,8 +104,7 @@ export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticC
     return {
       name: "LogNexus Rules",
       status: "warn",
-      message:
-        "Found legacy .shiplog/ directory — consider migrating to .lognexus/ (see docs/MIGRATING_FROM_SHIPLOG.md)",
+      message: "Found legacy .shiplog/ directory — run 'lognexus init' to scaffold .lognexus/",
     };
   }
 
