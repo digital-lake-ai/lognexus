@@ -1,8 +1,10 @@
+import { auditBranch, formatAuditResult } from "../audit/audit.js";
 import { attachCurrentStateToCommit } from "../notes/attach.js";
 import { getNote } from "../notes/notes.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "../state/manager.js";
 import { syncStateFromGit } from "../state/sync.js";
 import { getProjectStatus } from "../status.js";
+import { getJourneyTimeline } from "../timeline/timeline.js";
 
 export const MCP_SERVER_NAME = "lognexus";
 
@@ -141,6 +143,41 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: "lognexus_timeline",
+    title: "Journey Timeline",
+    description:
+      "Reconstruct the branch Journey Timeline against a base branch: commit list enriched with Git Notes, subtask IDs, tiers and Authored-by/Reviewed-by trailers, rendered as a Markdown table, JSON or a PR body draft.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        baseBranch: {
+          type: "string",
+          description: "Base branch to compare against. Defaults to 'main' with origin fallback.",
+        },
+        format: {
+          type: "string",
+          enum: ["table", "json", "pr-body"],
+          description: "Output format. Defaults to 'table'.",
+        },
+      },
+    },
+  },
+  {
+    name: "lognexus_audit",
+    title: "Traceability audit",
+    description:
+      "Audit the branch commits against the LogNexus review gate: commit format, Authored-by trailer, Git Note presence, subtask file contracts and reviewer/author separation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        baseBranch: {
+          type: "string",
+          description: "Base branch to compare against. Defaults to 'main' with origin fallback.",
+        },
+      },
+    },
+  },
 ];
 
 export function listMcpTools(): ToolDefinition[] {
@@ -187,6 +224,24 @@ function readStringArg(
 
 function resolveCommitRef(args: Record<string, unknown>): string {
   return readStringArg(args, "commitRef") ?? "HEAD";
+}
+
+const TIMELINE_FORMATS = ["table", "json", "pr-body"] as const;
+type TimelineFormat = (typeof TIMELINE_FORMATS)[number];
+
+function resolveTimelineFormat(args: Record<string, unknown>): TimelineFormat {
+  const raw = readStringArg(args, "format");
+  if (raw === undefined) return "table";
+  if (!(TIMELINE_FORMATS as readonly string[]).includes(raw)) {
+    throw new McpToolError(
+      `Argument 'format' must be one of: ${TIMELINE_FORMATS.join(", ")}. Got '${raw}'.`,
+    );
+  }
+  return raw as TimelineFormat;
+}
+
+function resolveBaseBranch(args: Record<string, unknown>): string {
+  return readStringArg(args, "baseBranch") ?? "main";
 }
 
 export async function callMcpTool(
@@ -238,6 +293,21 @@ export async function callMcpTool(
       case "lognexus_note_attach": {
         const commitRef = resolveCommitRef(args);
         return textResult(attachCurrentStateToCommit(commitRef, { cwd: targetDir }));
+      }
+
+      case "lognexus_timeline": {
+        const baseBranch = resolveBaseBranch(args);
+        const format = resolveTimelineFormat(args);
+        const timeline = getJourneyTimeline(baseBranch, targetDir);
+        if (format === "json") return textResult(timeline);
+        if (format === "pr-body") return textResult(timeline.prBodyDraft);
+        return textResult(timeline.markdownTable);
+      }
+
+      case "lognexus_audit": {
+        const baseBranch = resolveBaseBranch(args);
+        const result = auditBranch(baseBranch, targetDir);
+        return textResult(`${JSON.stringify(result, null, 2)}\n\n${formatAuditResult(result)}`);
       }
 
       default:
