@@ -19,6 +19,10 @@ npm-debug.log*
 # LogNexus local session state
 .lognexus/state.json
 
+# Internal context & planning
+docs/contexto/
+docs/historial_previo/
+
 # OS artifacts
 .DS_Store
 Thumbs.db
