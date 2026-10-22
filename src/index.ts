@@ -2,9 +2,20 @@ export {
   type AuditResult,
   type AuditViolation,
   auditBranch,
+  COMMIT_FORMAT_PATTERN,
+  checkSelfApproval,
+  extractTrailers,
   formatAuditResult,
+  type Identity,
+  parseIdentity,
+  SUBJECT_TASK_PATTERN,
 } from "./audit/audit.js";
 export { getCliVersion } from "./cli.js";
+export {
+  type CommitOptions,
+  type CommitResult,
+  executeAtomicCommit,
+} from "./commit.js";
 export { checkGit, checkGitHubCli, checkRulesConfig, runDiagnostics } from "./doctor.js";
 export {
   getMcpPrompt,

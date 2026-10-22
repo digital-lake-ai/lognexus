@@ -101,6 +101,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
         "lognexus_state_set_task",
         "lognexus_state_finish_task",
         "lognexus_state_clear",
+        "lognexus_commit",
         "lognexus_note_show",
         "lognexus_note_attach",
         "lognexus_timeline",
@@ -206,10 +207,10 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(finishResult.isError).toBeUndefined();
 
       const afterFinish = JSON.parse(finishResult.content[0].text) as {
-        currentSubtask: unknown;
+        currentSubtask: { id: string; status: string } | null;
         completedSubtasks: string[];
       };
-      expect(afterFinish.currentSubtask).toBeNull();
+      expect(afterFinish.currentSubtask?.status).toBe("completed");
       expect(afterFinish.completedSubtasks).toContain("T1");
     });
 
@@ -265,6 +266,34 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(payload.generator).toBe("LogNexus");
     });
 
+    it("executes lognexus_commit atomically through tools/call", async () => {
+      writeFileSync(join(tempDir, "commit_file.txt"), "atomic commit content", "utf8");
+      execSync("git add commit_file.txt", { cwd: tempDir, stdio: "ignore" });
+
+      const res = await rpc(
+        "tools/call",
+        {
+          name: "lognexus_commit",
+          arguments: {
+            message: "feat(#15/T1): add atomic commit",
+            author: "gemini/flash (mcp)",
+            reviewer: "gemini/pro (review-gate)",
+            finishTask: true,
+          },
+        },
+        tempDir,
+      );
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(toolText(result)) as {
+        sha: string;
+        shortSha: string;
+        noteAttached: boolean;
+      };
+      expect(payload.sha).toHaveLength(40);
+      expect(payload.noteAttached).toBe(true);
+    });
+
     it("executes lognexus_timeline returning markdown table", async () => {
       const res = await rpc("tools/call", { name: "lognexus_timeline", arguments: {} }, tempDir);
       const result = res.result as ToolCallResult;
@@ -273,6 +302,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
     });
 
     it("executes lognexus_audit returning audit results", async () => {
+      execSync("git checkout -b feature/audit-check", { cwd: tempDir, stdio: "ignore" });
       const res = await rpc("tools/call", { name: "lognexus_audit", arguments: {} }, tempDir);
       const result = res.result as ToolCallResult;
       expect(result.isError).toBeUndefined();

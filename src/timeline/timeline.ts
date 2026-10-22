@@ -24,7 +24,7 @@ export interface JourneyTimelineResult {
 }
 
 const TRAILER_PATTERN = /^\s*(Authored-by|Reviewed-by|Last-code-by|Updated-by):\s*(.+)$/gim;
-const TASK_ID_PATTERN = /\(#\d+\/(T[\d]+(?:-T?[\d]+)?)\)/i;
+const TASK_ID_PATTERN = /\((?:#\d+|[A-Z][A-Z0-9]*-\d+)\/(T[\d]+(?:-T?[\d]+)?)\)/i;
 const SUBJECT_TASK_PATTERN = /\b(T\d+(?:-T?\d+)?)\b/;
 const TIER_PATTERN = /\[(tier-\d)\]|(?:^|\s)(tier-\d)(?:\s|$)/i;
 const BRANCH_ISSUE_PATTERN = /issue\/(\d+)/i;
@@ -221,12 +221,15 @@ export function buildTimelineTable(items: TimelineItem[]): string {
 
 function extractIssueNumber(branch: string): string | null {
   const match = branch.match(BRANCH_ISSUE_PATTERN);
-  return match ? match[1] : null;
+  if (match) return `#${match[1]}`;
+  const alphanumericMatch = branch.match(/([A-Z][A-Z0-9]*-\d+)/i);
+  if (alphanumericMatch) return alphanumericMatch[1].toUpperCase();
+  return null;
 }
 
 function buildPrBodyDraft(branch: string, baseBranch: string, items: TimelineItem[]): string {
   const issueNumber = extractIssueNumber(branch);
-  const closingLine = issueNumber ? `Closes #${issueNumber}` : "Closes #<N>";
+  const closingLine = issueNumber ? `Closes ${issueNumber}` : "Closes #<N>";
   const lastAuthor = [...items].reverse().find((item) => item.author !== null)?.author ?? null;
   const signature = lastAuthor ?? "<family>/<version> (<tool>)";
 

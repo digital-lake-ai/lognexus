@@ -10,7 +10,8 @@ export interface AuditViolation {
     | "authored-by-trailer"
     | "git-note-presence"
     | "contract-files"
-    | "review-gate-separation";
+    | "review-gate-separation"
+    | "base-branch-range";
   message: string;
   severity: "error" | "warn";
 }
@@ -26,10 +27,16 @@ export interface AuditResult {
 }
 
 const VALID_TYPES = "feat, fix, docs, refactor, test, chore, style, perf";
-const COMMIT_FORMAT_PATTERN =
-  /^(feat|fix|docs|refactor|test|chore|style|perf)\(#\d+(\/T\d+(?:-T?\d+)?)?\): \S+/;
-const SUBJECT_TASK_PATTERN = /\(#\d+\/(T\d+(?:-T?\d+)?)\)/i;
+export const TICKET_PATTERN_SOURCE = "(?:#\\d+|[A-Z][A-Z0-9]*-\\d+)";
+export const COMMIT_FORMAT_PATTERN = new RegExp(
+  `^(feat|fix|docs|refactor|test|chore|style|perf)\\(${TICKET_PATTERN_SOURCE}(\\/T\\d+(?:-T?\\d+)?)?\\): \\S+`,
+);
+export const SUBJECT_TASK_PATTERN = new RegExp(
+  `\\(${TICKET_PATTERN_SOURCE}\\/(T\\d+(?:-T?\\d+)?)\\)`,
+  "i",
+);
 const IDENTITY_PATTERN = /(\S+\/\S+)/;
+const TRAILER_PATTERN = /^\s*(Authored-by|Reviewed-by|Last-code-by|Updated-by):\s*(.+)$/gim;
 
 interface NoteContract {
   allowedFiles?: unknown;
@@ -40,12 +47,12 @@ interface NotePayload {
   subtask?: { contract?: NoteContract | null } | null;
 }
 
-interface Identity {
+export interface Identity {
   full: string;
   family: string;
 }
 
-function parseIdentity(value: string | null): Identity | null {
+export function parseIdentity(value: string | null): Identity | null {
   if (value === null) return null;
 
   const match = value.match(IDENTITY_PATTERN);
@@ -55,6 +62,47 @@ function parseIdentity(value: string | null): Identity | null {
   }
 
   return { full: value.trim().toLowerCase(), family: match[1].toLowerCase() };
+}
+
+export function extractTrailers(commitBody: string): {
+  author: string | null;
+  reviewer: string | null;
+} {
+  let author: string | null = null;
+  let reviewer: string | null = null;
+
+  for (const match of commitBody.matchAll(TRAILER_PATTERN)) {
+    const key = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (value === "") continue;
+
+    if (key === "authored-by") {
+      author = value;
+    } else if (key === "reviewed-by") {
+      reviewer = value;
+    }
+  }
+
+  return { author, reviewer };
+}
+
+export function checkSelfApproval(
+  authorStr: string | null,
+  reviewerStr: string | null,
+): { isSelfApproval: boolean; message?: string } {
+  const author = parseIdentity(authorStr);
+  const reviewer = parseIdentity(reviewerStr);
+
+  if (author !== null && reviewer !== null) {
+    if (author.full === reviewer.full || author.family === reviewer.family) {
+      return {
+        isSelfApproval: true,
+        message: `Self-approval detected: author '${authorStr}' and reviewer '${reviewerStr}' share the same identity or model family ('${author.family}').`,
+      };
+    }
+  }
+
+  return { isSelfApproval: false };
 }
 
 function normalizePath(value: string): string {
@@ -121,20 +169,16 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
     });
   }
 
-  const authorIdentity = parseIdentity(item.author);
-  const reviewerIdentity = parseIdentity(item.reviewer);
-  if (authorIdentity !== null && reviewerIdentity !== null) {
-    if (
-      authorIdentity.full === reviewerIdentity.full ||
-      authorIdentity.family === reviewerIdentity.family
-    ) {
-      violations.push({
-        ...base,
-        rule: "review-gate-separation",
-        message: `Self-approval detected: author '${item.author}' and reviewer '${item.reviewer}' share the same identity.`,
-        severity: "error",
-      });
-    }
+  const selfApprovalCheck = checkSelfApproval(item.author, item.reviewer);
+  if (selfApprovalCheck.isSelfApproval) {
+    violations.push({
+      ...base,
+      rule: "review-gate-separation",
+      message:
+        selfApprovalCheck.message ??
+        `Self-approval detected: author '${item.author}' and reviewer '${item.reviewer}' share the same identity.`,
+      severity: "error",
+    });
   }
 
   const note = getNote(item.sha, { cwd: targetDir });
@@ -205,6 +249,18 @@ export function auditBranch(
 ): AuditResult {
   const timeline = getJourneyTimeline(baseBranch, targetDir);
   const violations = timeline.items.flatMap((item) => auditCommit(item, targetDir));
+
+  const normalizedCurrent = timeline.branch.replace(/^refs\/heads\//, "");
+  const normalizedBase = baseBranch.replace(/^refs\/heads\//, "").replace(/^origin\//, "");
+  if (normalizedCurrent === normalizedBase && timeline.commitCount === 0) {
+    violations.push({
+      commitSha: "HEAD",
+      shortSha: "HEAD",
+      rule: "base-branch-range",
+      message: `Auditing base branch '${baseBranch}' directly: 0 commits in range ${baseBranch}..${timeline.branch}. Run from a feature branch or specify a base commit/range.`,
+      severity: "error",
+    });
+  }
 
   const errors = violations.filter((violation) => violation.severity === "error").length;
   const warnings = violations.length - errors;

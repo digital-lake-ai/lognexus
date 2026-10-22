@@ -98,7 +98,7 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     // 6. Finish subtask
     finishSubtask("T1", tempDir);
     const stateAfter = loadState(tempDir);
-    expect(stateAfter.currentSubtask).toBeNull();
+    expect(stateAfter.currentSubtask?.status).toBe("completed");
     expect(stateAfter.completedSubtasks).toContain("T1");
 
     // 7. Reconstruct Journey Timeline
