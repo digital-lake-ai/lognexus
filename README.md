@@ -215,10 +215,10 @@ npx -y @smithery/cli install @digital-lake/lognexus --client claude
 
 <div align="center">
 
-![Corpus Analyzed](https://img.shields.io/badge/CORPUS_GOVERNED-250%2C000%2B_LOC-00f2fe?style=for-the-badge&labelColor=0d1117)
-![Git Notes Coverage](https://img.shields.io/badge/GIT_NOTES_COVERAGE-100%25_(38%2F38)-00ff87?style=for-the-badge&labelColor=0d1117)
-![Traceability Audit](https://img.shields.io/badge/REVIEW_GATE_AUDIT-100%25_PASS-7928ca?style=for-the-badge&labelColor=0d1117)
-![Test Suite Health](https://img.shields.io/badge/UNIT_TESTS-536_PASSED_(0_WARN)-38ef7d?style=for-the-badge&labelColor=0d1117)
+![Corpus Analyzed](https://img.shields.io/badge/CORPUS_GOVERNED-250%2C000%2B_LOC-0e7490?style=for-the-badge&labelColor=0d1117)
+![Git Notes Coverage](https://img.shields.io/badge/GIT_NOTES_COVERAGE-100%25_(38%2F38)-238636?style=for-the-badge&labelColor=0d1117)
+![Traceability Audit](https://img.shields.io/badge/REVIEW_GATE_AUDIT-100%25_PASS-6e40c9?style=for-the-badge&labelColor=0d1117)
+![Test Suite Health](https://img.shields.io/badge/UNIT_TESTS-536_PASSED_(0_WARN)-238636?style=for-the-badge&labelColor=0d1117)
 
 </div>
 
