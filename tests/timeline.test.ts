@@ -155,4 +155,22 @@ describe("Journey Timeline", () => {
     expect(prBodyDraft).toContain(timeline.markdownTable);
     expect(prBodyDraft).toContain(timeline.items[0].shortSha);
   });
+
+  it("extracts subtask and issue from alphanumeric ticket schemes (e.g. SLM-201/T1)", () => {
+    createBranch(tempDir, "feature/SLM-201-parser");
+
+    commitFile(
+      tempDir,
+      "feature.txt",
+      "feature",
+      "feat(SLM-201/T1): add symbol table indexer\n\nAuthored-by: gemini/flash\n",
+    );
+
+    const timeline = getJourneyTimeline(baseBranch, tempDir);
+    const [item] = timeline.items;
+
+    expect(item.taskId).toBe("T1");
+    expect(item.subject).toContain("SLM-201/T1");
+    expect(timeline.prBodyDraft).toContain("Closes SLM-201");
+  });
 });

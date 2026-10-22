@@ -83,7 +83,13 @@ export function finishSubtask(taskId: string, targetDir: string = process.cwd())
     state.completedSubtasks.push(taskId);
   }
   if (state.currentSubtask?.id === taskId) {
-    state.currentSubtask = null;
+    state.currentSubtask.status = "completed";
+  } else if (!state.currentSubtask) {
+    state.currentSubtask = {
+      id: taskId,
+      title: "",
+      status: "completed",
+    };
   }
   saveState(state, targetDir);
   return state;

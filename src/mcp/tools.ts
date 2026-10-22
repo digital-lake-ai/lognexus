@@ -1,4 +1,5 @@
 import { auditBranch, formatAuditResult } from "../audit/audit.js";
+import { executeAtomicCommit } from "../commit.js";
 import { attachCurrentStateToCommit } from "../notes/attach.js";
 import { getNote } from "../notes/notes.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "../state/manager.js";
@@ -111,6 +112,39 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {},
+    },
+  },
+  {
+    name: "lognexus_commit",
+    title: "Atomic commit",
+    description:
+      "Atomically create a Git commit with conventional commit format, authorship trailers, subtask file contract validation, automatic task finishing, and Git Note attachment in a single operation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        message: {
+          type: "string",
+          description:
+            "Conventional commit message, e.g. 'feat(#15/T1): add atomic commit CLI and tool'.",
+        },
+        author: {
+          type: "string",
+          description: "Author trailer identity, e.g. 'gemini/flash (antigravity)'.",
+        },
+        reviewer: {
+          type: "string",
+          description: "Optional reviewer trailer identity, e.g. 'gemini/pro (review-gate)'.",
+        },
+        finishTask: {
+          type: "boolean",
+          description: "If true, marks the active subtask as completed in the persistent state.",
+        },
+        allowEmpty: {
+          type: "boolean",
+          description: "If true, allows creating an empty commit.",
+        },
+      },
+      required: ["message"],
     },
   },
   {
@@ -279,6 +313,23 @@ export async function callMcpTool(
             { type: "text", text: JSON.stringify(cleared, null, 2) },
           ],
         };
+      }
+
+      case "lognexus_commit": {
+        const message = readStringArg(args, "message", { required: true }) as string;
+        const author = readStringArg(args, "author");
+        const reviewer = readStringArg(args, "reviewer");
+        const finishTask = Boolean(args.finishTask);
+        const allowEmpty = Boolean(args.allowEmpty);
+        const res = executeAtomicCommit({
+          message,
+          author,
+          reviewer,
+          finishTask,
+          allowEmpty,
+          targetDir,
+        });
+        return textResult(res);
       }
 
       case "lognexus_note_show": {

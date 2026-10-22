@@ -83,12 +83,14 @@ describe("State Manager & Schema", () => {
     expect(state.currentSubtask?.contract?.allowedFiles).toEqual(["src/types.ts"]);
   });
 
-  it("finishSubtask moves subtask to completed list and clears active", () => {
+  it("finishSubtask moves subtask to completed list and marks currentSubtask status as completed", () => {
     setSubtask("T1", "Task 1", undefined, tempDir);
     finishSubtask("T1", tempDir);
 
     const state = loadState(tempDir);
-    expect(state.currentSubtask).toBeNull();
+    expect(state.currentSubtask).not.toBeNull();
+    expect(state.currentSubtask?.id).toBe("T1");
+    expect(state.currentSubtask?.status).toBe("completed");
     expect(state.completedSubtasks).toContain("T1");
   });
 

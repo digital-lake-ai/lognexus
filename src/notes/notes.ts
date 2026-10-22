@@ -5,6 +5,7 @@ export const DEFAULT_NOTES_REF = "refs/notes/lognexus";
 export interface NoteOptions {
   ref?: string;
   cwd?: string;
+  force?: boolean;
 }
 
 export function attachNote(

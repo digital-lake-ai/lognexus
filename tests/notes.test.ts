@@ -89,4 +89,40 @@ describe("Git Notes (Quiet Mode)", () => {
     expect(parsed.issue.id).toBe(5);
     expect(parsed.subtask.id).toBe("T1");
   });
+
+  it("throws error on attachCurrentStateToCommit when self-approval is detected", () => {
+    writeFileSync(join(tempDir, "file2.txt"), "more content", "utf8");
+    execSync("git add file2.txt", { cwd: tempDir, stdio: "ignore" });
+    const msg =
+      "feat(#5/T1): test commit\n\nAuthored-by: gemini/flash\nReviewed-by: gemini/flash\n";
+    const msgFile = join(tmpdir(), `msg-${Date.now()}.txt`);
+    writeFileSync(msgFile, msg, "utf8");
+    try {
+      execSync(`git commit -F "${msgFile}"`, { cwd: tempDir, stdio: "ignore" });
+    } finally {
+      rmSync(msgFile, { force: true });
+    }
+
+    expect(() => {
+      attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    }).toThrow(/Review-gate separation violation/);
+  });
+
+  it("allows attachCurrentStateToCommit when author and reviewer belong to different families", () => {
+    writeFileSync(join(tempDir, "file3.txt"), "valid content", "utf8");
+    execSync("git add file3.txt", { cwd: tempDir, stdio: "ignore" });
+    const msg =
+      "feat(#5/T1): valid commit\n\nAuthored-by: deepseek/chat\nReviewed-by: gemini/pro\n";
+    const msgFile = join(tmpdir(), `msg-${Date.now()}.txt`);
+    writeFileSync(msgFile, msg, "utf8");
+    try {
+      execSync(`git commit -F "${msgFile}"`, { cwd: tempDir, stdio: "ignore" });
+    } finally {
+      rmSync(msgFile, { force: true });
+    }
+
+    expect(() => {
+      attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    }).not.toThrow();
+  });
 });

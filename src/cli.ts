@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditBranch, formatAuditResult } from "./audit/audit.js";
+import { executeAtomicCommit } from "./commit.js";
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
@@ -26,7 +27,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.0.0";
+  return "1.1.0";
 }
 
 function printHeader() {
@@ -43,6 +44,7 @@ Commands:
   init         Scaffold .lognexus/ configuration and rules in current repository
   doctor       Check Git, GitHub CLI authentication, and repository rules health
   status       Inspect current branch, active issue, and recommended tier
+  commit       Atomic commit with trailers, contract validation, and Git Note
   state        Manage persistent agent state (.lognexus/state.json)
   note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
   timeline     Reconstruct the branch Journey Timeline and draft a PR body
@@ -50,6 +52,14 @@ Commands:
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
   version, -v  Display the version of LogNexus
   help, -h     Display this help message
+
+Commit Command:
+  lognexus commit -m "<msg>" [options]
+    -m, --message "<msg>"           Commit message (e.g. feat(#15/T1): add feature)
+    --author "<identity>"           Author trailer (e.g. gemini/flash (antigravity))
+    --reviewer "<identity>"         Optional reviewer trailer (e.g. gemini/pro)
+    --finish-task                   Mark active subtask as completed in state
+    --allow-empty                   Allow creating empty commits
 
 State Subcommands:
   lognexus state [show]             Display current active issue and task state
@@ -113,8 +123,11 @@ async function handleInit() {
   }
 
   console.log("\nNext Steps:");
-  console.log("  • Claude Code / Cursor / Codex / Antigravity / Kimi: use /lognexus plan");
+  console.log("  • Claude Code / Cursor / Codex / Antigravity / Gemini / Kimi: use /lognexus plan");
   console.log("  • Configure model tiers in .lognexus/routing.md");
+  console.log(
+    "  • Tip: install locally with 'npm i -D @digital-lake/lognexus' for instant execution (~0.15s)",
+  );
   console.log("  • Verify environment anytime with: npx @digital-lake/lognexus doctor\n");
 }
 
@@ -395,11 +408,70 @@ async function handleAudit(args: string[]) {
   }
 }
 
+async function handleCommit(args: string[]) {
+  let message: string | undefined;
+  let author: string | undefined;
+  let reviewer: string | undefined;
+  let finishTask = false;
+  let allowEmpty = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "-m" || arg === "--message") {
+      message = args[++i];
+    } else if (arg === "--author") {
+      author = args[++i];
+    } else if (arg === "--reviewer") {
+      reviewer = args[++i];
+    } else if (arg === "--finish-task") {
+      finishTask = true;
+    } else if (arg === "--allow-empty") {
+      allowEmpty = true;
+    }
+  }
+
+  if (!message) {
+    console.error(
+      "Error: Commit message is required (e.g. lognexus commit -m 'feat(#15/T1): add feature')\n",
+    );
+    printUsage();
+    process.exit(1);
+  }
+
+  printHeader();
+  try {
+    const res = executeAtomicCommit({
+      message,
+      author,
+      reviewer,
+      finishTask,
+      allowEmpty,
+    });
+
+    console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);
+    console.log(`     Authored-by: ${res.author}`);
+    if (res.reviewer) {
+      console.log(`     Reviewed-by: ${res.reviewer}`);
+    }
+    if (res.subtaskCompleted) {
+      console.log(`     Subtask:     ${res.subtaskCompleted} (marked completed)`);
+    }
+    console.log("     Git Note:    Attached to HEAD (refs/notes/lognexus)\n");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[FAIL] Commit failed: ${msg}\n`);
+    process.exit(1);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
 
   switch (command) {
+    case "commit":
+      await handleCommit(args.slice(1));
+      break;
     case "init":
       await handleInit();
       break;

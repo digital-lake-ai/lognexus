@@ -136,12 +136,39 @@ describe("Traceability audit", () => {
     expect(violation?.message).toContain("T<n>");
   });
 
-  it("returns a clean result when there is nothing ahead of the base branch", () => {
+  it("accepts alphanumeric ticket prefixes (e.g. SLM-201/T1)", () => {
+    commitFile(
+      tempDir,
+      "feature.txt",
+      "feature",
+      "feat(SLM-201/T1): implement dialog deindexer\n\nAuthored-by: gemini/flash (antigravity)\n",
+    );
+    attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "commit-format")).toBe(false);
+    expect(result.passed).toBe(true);
+  });
+
+  it("fails audit when run directly on base branch with 0 commit range (base-branch-range error)", () => {
     execSync(`git checkout ${baseBranch}`, { cwd: tempDir, stdio: "ignore" });
 
     const result = auditBranch(baseBranch, tempDir);
 
     expect(result.commitCount).toBe(0);
+    const violation = result.violations.find((v) => v.rule === "base-branch-range");
+    expect(violation).toBeDefined();
+    expect(violation?.severity).toBe("error");
+    expect(result.passed).toBe(false);
+  });
+
+  it("returns a clean result on a feature branch when there is nothing ahead of the base branch", () => {
+    execSync("git checkout -b feature/empty-branch", { cwd: tempDir, stdio: "ignore" });
+
+    const result = auditBranch(baseBranch, tempDir);
+
+    expect(result.commitCount).toBe(0);
     expect(result.violations).toEqual([]);
+    expect(result.passed).toBe(true);
   });
 });

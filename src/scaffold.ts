@@ -11,10 +11,10 @@ export const DEFAULT_ROUTING_TEMPLATE = `# Model-Tier Routing Configuration
 # Modes: confirm (pause and prompt) | warn (banner only) | off (silent)
 routing: confirm
 
-# Operational Tier Taxonomy (Advisory across Claude, OpenAI, Gemini, DeepSeek)
-# tier-1 (Reasoning / Arch / Review): Claude Opus, OpenAI o3/GPT, Gemini Pro, DeepSeek R1
-# tier-2 (Context / Triage / Discovery): Claude Sonnet, GPT-4.1, Gemini Flash/Pro (1M), DeepSeek V3
-# tier-3 (Scoped Execution / Commits): Claude Haiku, GPT-4o-mini, DeepSeek Chat (V3), Gemini Flash
+# Operational Tier Taxonomy (Empirical recommendations across Gemini, Claude, OpenAI, DeepSeek, Kimi)
+# tier-1 (Reasoning / Arch / Review Gate): Gemini 1.5/2.0 Pro, Google Antigravity, Claude 3.5/3.7 Sonnet, OpenAI o3/o1, DeepSeek R1
+# tier-2 (Orchestration / Large Context >500 lines): Gemini 1.5 Pro (2M), Claude Sonnet, Kimi K2.7 Code
+# tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini 2.0/1.5 Flash, DeepSeek V3, Kimi K2.7 Code, Claude Haiku, GPT-4o-mini
 `;
 
 export function initProject(targetDir: string = process.cwd()): InitResult {
