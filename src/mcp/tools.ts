@@ -5,6 +5,15 @@ import { getNote } from "../notes/notes.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "../state/manager.js";
 import { syncStateFromGit } from "../state/sync.js";
 import { getProjectStatus } from "../status.js";
+import {
+  buildAnonymousCommunityPayload,
+  clearTelemetry,
+  disableTelemetry,
+  enableTelemetry,
+  isTelemetryGloballyDisabled,
+  loadTelemetry,
+} from "../telemetry/collector.js";
+import { generateTelemetryReportFile } from "../telemetry/report.js";
 import { getJourneyTimeline } from "../timeline/timeline.js";
 
 export const MCP_SERVER_NAME = "lognexus";
@@ -212,6 +221,36 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: "lognexus_telemetry",
+    title: "Opt-in telemetry & ROI report engine",
+    description:
+      "Inspect telemetry status, enable local or anonymous community telemetry, disable tracking, inspect zero-PII payload, generate telemetry markdown reports, or clear metrics store.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["status", "enable", "disable", "inspect", "report", "clear"],
+          description: "Telemetry action to perform. Defaults to 'status'.",
+        },
+        share: {
+          type: "boolean",
+          description:
+            "When action is 'enable', set to true to enable anonymous community telemetry.",
+        },
+        acceptTerms: {
+          type: "boolean",
+          description: "Explicit acceptance of telemetry terms (required when share is true).",
+        },
+        outputPath: {
+          type: "string",
+          description:
+            "Target file path when generating report (defaults to .lognexus/telemetry.md).",
+        },
+      },
+    },
+  },
 ];
 
 export function listMcpTools(): ToolDefinition[] {
@@ -359,6 +398,57 @@ export async function callMcpTool(
         const baseBranch = resolveBaseBranch(args);
         const result = auditBranch(baseBranch, targetDir);
         return textResult(`${JSON.stringify(result, null, 2)}\n\n${formatAuditResult(result)}`);
+      }
+
+      case "lognexus_telemetry": {
+        const action = readStringArg(args, "action") ?? "status";
+        if (action === "status") {
+          const store = loadTelemetry(targetDir);
+          const disabled = isTelemetryGloballyDisabled();
+          return textResult({
+            active: !disabled && (store.mode === "local" || store.mode === "community"),
+            mode: store.mode,
+            globallyDisabled: disabled,
+            detectedStacks: store.detectedStacks,
+            consent: store.consent,
+            summary: store.summary,
+            lastUpdated: store.lastUpdated,
+          });
+        }
+        if (action === "enable") {
+          const share = Boolean(args.share);
+          const acceptTerms = Boolean(args.acceptTerms);
+          const result = enableTelemetry({ share, acceptTerms, cwd: targetDir });
+          return textResult({
+            message: `Telemetry enabled in '${result.mode}' mode.`,
+            ...result,
+          });
+        }
+        if (action === "disable") {
+          disableTelemetry(targetDir);
+          return textResult({ message: "Telemetry disabled." });
+        }
+        if (action === "inspect") {
+          const store = loadTelemetry(targetDir);
+          const payload = buildAnonymousCommunityPayload(store);
+          return textResult(payload);
+        }
+        if (action === "report") {
+          const outputPath = readStringArg(args, "outputPath");
+          const res = generateTelemetryReportFile(targetDir, outputPath);
+          return textResult({
+            message: `Telemetry report written to ${res.filePath}`,
+            filePath: res.filePath,
+            content: res.content,
+          });
+        }
+        if (action === "clear") {
+          clearTelemetry(targetDir);
+          return textResult({ message: "Telemetry store reset." });
+        }
+        throw new McpToolError(
+          `Unknown telemetry action: '${action}'. Expected one of: status, enable, disable, inspect, report, clear.`,
+        );
       }
 
       default:

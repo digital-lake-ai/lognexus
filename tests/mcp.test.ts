@@ -106,6 +106,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
         "lognexus_note_attach",
         "lognexus_timeline",
         "lognexus_audit",
+        "lognexus_telemetry",
       ]);
 
       for (const tool of tools) {
@@ -307,6 +308,58 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       const result = res.result as ToolCallResult;
       expect(result.isError).toBeUndefined();
       expect(toolText(result)).toContain("[PASS]");
+    });
+
+    it("executes lognexus_telemetry tool actions through tools/call", async () => {
+      // 1. Initial status is off
+      const statusRes = await rpc(
+        "tools/call",
+        { name: "lognexus_telemetry", arguments: { action: "status" } },
+        tempDir,
+      );
+      const statusResult = statusRes.result as ToolCallResult;
+      expect(statusResult.isError).toBeUndefined();
+      expect(toolText(statusResult)).toContain('"mode": "off"');
+
+      // 2. Enable local telemetry
+      const enableRes = await rpc(
+        "tools/call",
+        { name: "lognexus_telemetry", arguments: { action: "enable" } },
+        tempDir,
+      );
+      const enableResult = enableRes.result as ToolCallResult;
+      expect(enableResult.isError).toBeUndefined();
+      expect(toolText(enableResult)).toContain("Telemetry enabled in 'local' mode");
+
+      // 3. Inspect zero-pii payload
+      const inspectRes = await rpc(
+        "tools/call",
+        { name: "lognexus_telemetry", arguments: { action: "inspect" } },
+        tempDir,
+      );
+      const inspectResult = inspectRes.result as ToolCallResult;
+      expect(inspectResult.isError).toBeUndefined();
+      expect(toolText(inspectResult)).toContain("anonymousProjectId");
+
+      // 4. Generate report
+      const reportRes = await rpc(
+        "tools/call",
+        { name: "lognexus_telemetry", arguments: { action: "report" } },
+        tempDir,
+      );
+      const reportResult = reportRes.result as ToolCallResult;
+      expect(reportResult.isError).toBeUndefined();
+      expect(toolText(reportResult)).toContain("LogNexus Telemetry & ROI Performance Report");
+
+      // 5. Disable telemetry
+      const disableRes = await rpc(
+        "tools/call",
+        { name: "lognexus_telemetry", arguments: { action: "disable" } },
+        tempDir,
+      );
+      const disableResult = disableRes.result as ToolCallResult;
+      expect(disableResult.isError).toBeUndefined();
+      expect(toolText(disableResult)).toContain("Telemetry disabled");
     });
 
     it("returns an error result for an unknown tool name", async () => {
