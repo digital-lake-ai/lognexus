@@ -1,0 +1,16 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-23T17:33:53.288Z",
+  "issue": {
+    "id": 17,
+    "title": "v1.2.0: Opt-in telemetry, stack profiler & ROI cost-savings report engine"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Implement opt-in telemetry, stack profiler and ROI report engine",
+    "status": "completed"
+  },
+  "tier": "tier-3"
+}
