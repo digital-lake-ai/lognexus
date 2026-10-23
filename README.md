@@ -170,6 +170,28 @@ npx @digital-lake/lognexus timeline main --pr-body
 npx @digital-lake/lognexus audit main
 ```
 
+Opt-in Telemetry, Stack Profiling & ROI Cost-Savings Engine:
+```bash
+# Check telemetry status (disabled by default, 0% overhead)
+npx @digital-lake/lognexus telemetry status
+
+# Enable local telemetry (stores metrics only in .lognexus/telemetry.json)
+npx @digital-lake/lognexus telemetry enable
+
+# Or enable anonymous community telemetry (explicit GDPR opt-in)
+npx @digital-lake/lognexus telemetry enable --share --accept-terms
+
+# Generate .lognexus/telemetry.md report with ROI metrics
+npx @digital-lake/lognexus telemetry report
+
+# Inspect the exact Zero-PII payload before sending
+npx @digital-lake/lognexus telemetry inspect
+
+# Disable telemetry immediately
+npx @digital-lake/lognexus telemetry disable
+```
+*Read our strict Zero-PII policy in [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md).*
+
 ### 2. Connect via Model Context Protocol (MCP)
 
 LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp`) with zero external SDK dependencies. Connect it to Claude Desktop, Cursor, Google Antigravity, or any MCP-compliant client:
@@ -192,7 +214,7 @@ npx -y @smithery/cli install @digital-lake/lognexus --client claude
 ```
 
 **Exposed Capabilities:**
-- **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_commit`, `lognexus_note_show`, `lognexus_note_attach`, `lognexus_timeline`, `lognexus_audit`
+- **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_commit`, `lognexus_note_show`, `lognexus_note_attach`, `lognexus_timeline`, `lognexus_audit`, `lognexus_telemetry`
 - **Resources:** `lognexus://state`, `lognexus://routing`
 - **Prompts:** `lognexus-plan`, `lognexus-review`
 

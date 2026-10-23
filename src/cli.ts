@@ -13,6 +13,15 @@ import { initProject } from "./scaffold.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "./state/manager.js";
 import { syncStateFromGit } from "./state/sync.js";
 import { getProjectStatus } from "./status.js";
+import {
+  buildAnonymousCommunityPayload,
+  clearTelemetry,
+  disableTelemetry,
+  enableTelemetry,
+  isTelemetryGloballyDisabled,
+  loadTelemetry,
+} from "./telemetry/collector.js";
+import { generateTelemetryReportFile } from "./telemetry/report.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
 
 const __cliDir = dirname(fileURLToPath(import.meta.url));
@@ -27,7 +36,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.1.0";
+  return "1.2.0";
 }
 
 function printHeader() {
@@ -49,9 +58,20 @@ Commands:
   note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
   timeline     Reconstruct the branch Journey Timeline and draft a PR body
   audit        Audit commit conventions, authorship trailers and review gate
+  telemetry    Opt-in performance monitoring, stack profiler and ROI report
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
   version, -v  Display the version of LogNexus
   help, -h     Display this help message
+
+Telemetry Subcommands:
+  lognexus telemetry [status]       Show current telemetry mode and project metrics
+  lognexus telemetry enable         Enable local telemetry (zero network calls)
+  lognexus telemetry enable --share --accept-terms
+                                    Enable anonymous community telemetry (GDPR opt-in)
+  lognexus telemetry inspect        Inspect the exact Zero-PII payload before sending
+  lognexus telemetry report [-o f]  Generate .lognexus/telemetry.md report with ROI metrics
+  lognexus telemetry disable        Disable all telemetry immediately
+  lognexus telemetry clear          Reset local telemetry store
 
 Commit Command:
   lognexus commit -m "<msg>" [options]
@@ -464,6 +484,111 @@ async function handleCommit(args: string[]) {
   }
 }
 
+async function handleTelemetry(args: string[]) {
+  const sub = args[0]?.toLowerCase() || "status";
+
+  switch (sub) {
+    case "status": {
+      printHeader();
+      const store = loadTelemetry();
+      const globallyDisabled = isTelemetryGloballyDisabled();
+      console.log("LogNexus Telemetry Status:\n");
+      console.log(
+        `  Globally Disabled (DO_NOT_TRACK): ${globallyDisabled ? "Yes (Forced OFF)" : "No"}`,
+      );
+      console.log(`  Operating Mode:                   ${store.mode.toUpperCase()}`);
+      console.log(`  Anonymous Project ID:             ${store.anonymousProjectId}`);
+      console.log(
+        `  Community Consent:                ${store.consent.accepted ? "Accepted (Shared)" : "No (Local Only)"}`,
+      );
+      if (store.consent.acceptedAt) {
+        console.log(`  Consent Recorded At:              ${store.consent.acceptedAt}`);
+      }
+      console.log(
+        `  Detected Stacks:                  ${store.detectedStacks.join(", ") || "(none)"}`,
+      );
+      console.log(`  Total Commits Monitored:          ${store.summary.totalCommits}`);
+      console.log(
+        `  Estimated Cost Savings:           ${store.summary.estimatedCostSavingsPct}%\n`,
+      );
+      break;
+    }
+
+    case "enable": {
+      printHeader();
+      const share = args.includes("--share");
+      const acceptTerms = args.includes("--accept-terms");
+
+      try {
+        const res = enableTelemetry({ share, acceptTerms });
+        if (res.mode === "community") {
+          console.log("[OK] Telemetry enabled in COMMUNITY mode.");
+          console.log(
+            "     Terms accepted. Anonymous non-sensitive metrics will help mature MCP & routing.",
+          );
+          console.log("     Full policy & payload schema: docs/TELEMETRY_PRIVACY.md\n");
+        } else {
+          console.log("[OK] Telemetry enabled in LOCAL mode.");
+          console.log("     Metrics are stored strictly locally in .lognexus/telemetry.json.");
+          console.log(
+            "     Zero network calls are made. Run 'lognexus telemetry report' to generate a report.\n",
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[FAIL] ${msg}\n`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "disable": {
+      printHeader();
+      disableTelemetry();
+      console.log("[OK] Telemetry disabled. Zero metrics will be recorded or transmitted.\n");
+      break;
+    }
+
+    case "inspect": {
+      printHeader();
+      const store = loadTelemetry();
+      const payload = buildAnonymousCommunityPayload(store);
+      console.log("Anonymous Telemetry Payload (Zero-PII Audit):\n");
+      console.log(JSON.stringify(payload, null, 2));
+      console.log(
+        "\nNote: No code, file paths, file names, commit messages, or identities are included.\n",
+      );
+      break;
+    }
+
+    case "report": {
+      printHeader();
+      let outputPath: string | undefined;
+      const outIdx = args.findIndex((a) => a === "--output" || a === "-o");
+      if (outIdx !== -1 && args[outIdx + 1]) {
+        outputPath = args[outIdx + 1];
+      }
+      const res = generateTelemetryReportFile(process.cwd(), outputPath);
+      console.log("[OK] Telemetry & ROI Performance Report generated:");
+      console.log(`     Output file: ${res.filePath}\n`);
+      console.log(res.content);
+      break;
+    }
+
+    case "clear": {
+      printHeader();
+      clearTelemetry();
+      console.log("[OK] Local telemetry store cleared and reset.\n");
+      break;
+    }
+
+    default:
+      console.error(`Unknown telemetry subcommand: ${sub}\n`);
+      printUsage();
+      process.exit(1);
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
@@ -471,6 +596,9 @@ async function main() {
   switch (command) {
     case "commit":
       await handleCommit(args.slice(1));
+      break;
+    case "telemetry":
+      await handleTelemetry(args.slice(1));
       break;
     case "init":
       await handleInit();

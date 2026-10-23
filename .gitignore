@@ -16,8 +16,9 @@ coverage/
 *.log
 npm-debug.log*
 
-# LogNexus local session state
+# LogNexus local session state & raw telemetry
 .lognexus/state.json
+.lognexus/telemetry.json
 
 # Internal context & planning
 docs/contexto/

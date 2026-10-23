@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { checkSelfApproval } from "./audit/audit.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { finishSubtask, loadState } from "./state/manager.js";
+import { recordCommitTelemetry, recordReviewGateBlock } from "./telemetry/collector.js";
 
 export interface CommitOptions {
   message: string;
@@ -81,6 +82,7 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   if (author && reviewer) {
     const check = checkSelfApproval(author, reviewer);
     if (check.isSelfApproval) {
+      recordReviewGateBlock(cwd);
       throw new Error(`Review-gate separation violation: ${check.message}`);
     }
   }
@@ -108,6 +110,7 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
       forbidden.some((rule) => matchesPath(file, rule)),
     );
     if (forbiddenTouched.length > 0) {
+      recordReviewGateBlock(cwd);
       throw new Error(
         `Contract violation: staged file(s) touch forbidden set: ${forbiddenTouched.join(", ")}`,
       );
@@ -118,6 +121,7 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
         (file) => !allowed.some((rule) => matchesPath(file, rule)),
       );
       if (outsideTouched.length > 0) {
+        recordReviewGateBlock(cwd);
         throw new Error(
           `Contract violation: staged file(s) are outside the allowed set: ${outsideTouched.join(", ")}`,
         );
@@ -168,6 +172,14 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
 
   // 8. Attach current state Git Note (with completed status preserved)
   attachCurrentStateToCommit("HEAD", { cwd });
+
+  // 9. Passive telemetry hook (only active if user opted in)
+  recordCommitTelemetry({
+    sha,
+    author,
+    tier: state.activeIssue?.tier ?? "tier-3",
+    targetDir: cwd,
+  });
 
   return {
     sha,

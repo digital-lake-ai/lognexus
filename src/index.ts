@@ -70,6 +70,7 @@ export {
 export * from "./state/schema.js";
 export { fetchIssueMeta, getBranchName, syncStateFromGit } from "./state/sync.js";
 export { getProjectStatus } from "./status.js";
+export * from "./telemetry/index.js";
 export {
   buildTimelineTable,
   getJourneyTimeline,

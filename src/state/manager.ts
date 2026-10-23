@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { recordTaskFinish, recordTaskStart } from "../telemetry/collector.js";
 import {
   type LognexusState,
   LognexusStateSchema,
@@ -74,6 +75,7 @@ export function setSubtask(
   };
   state.currentSubtask = subtask;
   saveState(state, targetDir);
+  recordTaskStart(taskId, targetDir);
   return state;
 }
 
@@ -92,5 +94,6 @@ export function finishSubtask(taskId: string, targetDir: string = process.cwd())
     };
   }
   saveState(state, targetDir);
+  recordTaskFinish(taskId, targetDir);
   return state;
 }
