@@ -154,6 +154,9 @@ npx @digital-lake/lognexus commit -m "feat(#42/T1): add user schema" \
   --author "gemini/flash (antigravity)" \
   --reviewer "gemini/pro (lead-architect)" \
   --finish-task
+
+# Or read message from file (safe against Windows shell quote-stripping):
+npx @digital-lake/lognexus commit -F commit-msg.txt --finish-task
 ```
 
 Quiet Mode with Git Notes (`refs/notes/lognexus`, standard `git-ai` v3):

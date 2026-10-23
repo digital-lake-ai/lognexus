@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkSelfApproval } from "./audit/audit.js";
@@ -14,6 +14,75 @@ export interface CommitOptions {
   finishTask?: boolean;
   targetDir?: string;
   allowEmpty?: boolean;
+}
+
+export interface ParsedCommitArgs {
+  message?: string;
+  author?: string;
+  reviewer?: string;
+  finishTask: boolean;
+  allowEmpty: boolean;
+}
+
+export function parseCommitArgs(args: string[]): ParsedCommitArgs {
+  let message: string | undefined;
+  let author: string | undefined;
+  let reviewer: string | undefined;
+  let finishTask = false;
+  let allowEmpty = false;
+
+  const isFlag = (token: string | undefined): boolean => {
+    if (!token) return false;
+    return token.startsWith("--") || token === "-F" || token === "-m";
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "-m" || arg === "--message") {
+      const parts: string[] = [];
+      while (i + 1 < args.length && !isFlag(args[i + 1])) {
+        parts.push(args[++i]);
+      }
+      const val = parts.join(" ").trim();
+      message = val.length > 0 ? val : undefined;
+    } else if (arg === "-F" || arg === "--file") {
+      const filePath = args[++i];
+      if (!filePath) {
+        throw new Error("Flag -F / --file requires a file path argument.");
+      }
+      if (!existsSync(filePath)) {
+        throw new Error(`Commit message file not found: '${filePath}'`);
+      }
+      const content = readFileSync(filePath, "utf8").trim();
+      message = content.length > 0 ? content : undefined;
+    } else if (arg === "--author") {
+      const parts: string[] = [];
+      while (i + 1 < args.length && !isFlag(args[i + 1])) {
+        parts.push(args[++i]);
+      }
+      const val = parts.join(" ").trim();
+      author = val.length > 0 ? val : undefined;
+    } else if (arg === "--reviewer") {
+      const parts: string[] = [];
+      while (i + 1 < args.length && !isFlag(args[i + 1])) {
+        parts.push(args[++i]);
+      }
+      const val = parts.join(" ").trim();
+      reviewer = val.length > 0 ? val : undefined;
+    } else if (arg === "--finish-task") {
+      finishTask = true;
+    } else if (arg === "--allow-empty") {
+      allowEmpty = true;
+    }
+  }
+
+  return {
+    message,
+    author,
+    reviewer,
+    finishTask,
+    allowEmpty,
+  };
 }
 
 export interface CommitResult {

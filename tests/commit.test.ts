@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeAtomicCommit } from "../src/commit.js";
+import { executeAtomicCommit, parseCommitArgs } from "../src/commit.js";
 import { getNote } from "../src/notes/notes.js";
 import { loadState, setSubtask } from "../src/state/manager.js";
 
@@ -130,5 +130,103 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
       targetDir: tempDir,
     });
     expect(result.noteAttached).toBe(true);
+  });
+
+  it("executes atomic commit using -F / --file message file", () => {
+    writeFileSync(join(tempDir, "file_input.txt"), "hello world", "utf8");
+    execSync("git add file_input.txt", { cwd: tempDir, stdio: "ignore" });
+
+    const msgFile = join(tempDir, "commit_msg.txt");
+    writeFileSync(msgFile, "feat(#15/T1): commit via file input\n\nDetailed context line.", "utf8");
+
+    const parsed = parseCommitArgs(["-F", msgFile, "--author", "gemini/flash"]);
+    expect(parsed.message).toBeDefined();
+    const result = executeAtomicCommit({
+      message: parsed.message || "",
+      author: parsed.author,
+      targetDir: tempDir,
+    });
+
+    expect(result.subject).toBe("feat(#15/T1): commit via file input");
+    expect(result.noteAttached).toBe(true);
+
+    const log = execSync("git log -1 --format=%B HEAD", { cwd: tempDir, encoding: "utf8" });
+    expect(log).toContain("Detailed context line.");
+    expect(log).toContain("Authored-by: gemini/flash");
+  });
+});
+
+describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
+  it("parses conventional single-string arguments cleanly", () => {
+    const parsed = parseCommitArgs([
+      "-m",
+      "feat(#15/T1): standard commit message",
+      "--author",
+      "gemini/flash",
+      "--reviewer",
+      "gemini/pro",
+      "--finish-task",
+      "--allow-empty",
+    ]);
+
+    expect(parsed.message).toBe("feat(#15/T1): standard commit message");
+    expect(parsed.author).toBe("gemini/flash");
+    expect(parsed.reviewer).toBe("gemini/pro");
+    expect(parsed.finishTask).toBe(true);
+    expect(parsed.allowEmpty).toBe(true);
+  });
+
+  it("reassembles quote-stripped positional words split by Windows shells (cmd.exe quote-stripping)", () => {
+    // Windows cmd.exe /c strips quotes on special characters like parenthesis: feat(#15/T1):
+    // resulting in individual positional args in process.argv
+    const rawTokens = [
+      "-m",
+      "feat(#15/T1):",
+      "implementar",
+      "rig",
+      "humanoide",
+      "universal",
+      "--author",
+      "deepseek/chat",
+      "(kimi-code)",
+      "--reviewer",
+      "gemini/pro",
+      "(lead-architect)",
+    ];
+
+    const parsed = parseCommitArgs(rawTokens);
+    expect(parsed.message).toBe("feat(#15/T1): implementar rig humanoide universal");
+    expect(parsed.author).toBe("deepseek/chat (kimi-code)");
+    expect(parsed.reviewer).toBe("gemini/pro (lead-architect)");
+  });
+
+  it("supports reading commit message from file using -F and --file", () => {
+    const msgFile = join(tmpdir(), `lognexus-msg-test-${Date.now()}-${Math.random()}.txt`);
+    const multiLineMessage =
+      "feat(#15/T1): multiline commit from file\n\nDetailed context line 1.\nDetailed context line 2.";
+    writeFileSync(msgFile, multiLineMessage, "utf8");
+
+    try {
+      const parsedShort = parseCommitArgs(["-F", msgFile, "--finish-task"]);
+      expect(parsedShort.message).toBe(multiLineMessage);
+      expect(parsedShort.finishTask).toBe(true);
+
+      const parsedLong = parseCommitArgs(["--file", msgFile]);
+      expect(parsedLong.message).toBe(multiLineMessage);
+    } finally {
+      rmSync(msgFile, { force: true });
+    }
+  });
+
+  it("throws a descriptive error when -F target file does not exist", () => {
+    expect(() => {
+      parseCommitArgs(["-F", "non_existent_commit_file_xyz.txt"]);
+    }).toThrow(/Commit message file not found/);
+  });
+
+  it("throws a descriptive error when -F is provided without a path", () => {
+    expect(() => {
+      parseCommitArgs(["-F"]);
+    }).toThrow(/Flag -F \/ --file requires a file path argument/);
   });
 });

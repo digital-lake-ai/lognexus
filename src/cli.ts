@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditBranch, formatAuditResult } from "./audit/audit.js";
-import { executeAtomicCommit } from "./commit.js";
+import { executeAtomicCommit, type ParsedCommitArgs, parseCommitArgs } from "./commit.js";
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
@@ -25,6 +25,8 @@ import { generateTelemetryReportFile } from "./telemetry/report.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
 
 const __cliDir = dirname(fileURLToPath(import.meta.url));
+
+export { type ParsedCommitArgs, parseCommitArgs } from "./commit.js";
 
 export function getCliVersion(): string {
   try {
@@ -75,7 +77,9 @@ Telemetry Subcommands:
 
 Commit Command:
   lognexus commit -m "<msg>" [options]
+  lognexus commit -F <file> [options]
     -m, --message "<msg>"           Commit message (e.g. feat(#15/T1): add feature)
+    -F, --file <file>               Read commit message from file
     --author "<identity>"           Author trailer (e.g. gemini/flash (antigravity))
     --reviewer "<identity>"         Optional reviewer trailer (e.g. gemini/pro)
     --finish-task                   Mark active subtask as completed in state
@@ -429,30 +433,19 @@ async function handleAudit(args: string[]) {
 }
 
 async function handleCommit(args: string[]) {
-  let message: string | undefined;
-  let author: string | undefined;
-  let reviewer: string | undefined;
-  let finishTask = false;
-  let allowEmpty = false;
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "-m" || arg === "--message") {
-      message = args[++i];
-    } else if (arg === "--author") {
-      author = args[++i];
-    } else if (arg === "--reviewer") {
-      reviewer = args[++i];
-    } else if (arg === "--finish-task") {
-      finishTask = true;
-    } else if (arg === "--allow-empty") {
-      allowEmpty = true;
-    }
+  let parsed: ParsedCommitArgs;
+  try {
+    parsed = parseCommitArgs(args);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Error: ${msg}\n`);
+    printUsage();
+    process.exit(1);
   }
 
-  if (!message) {
+  if (!parsed.message) {
     console.error(
-      "Error: Commit message is required (e.g. lognexus commit -m 'feat(#15/T1): add feature')\n",
+      "Error: Commit message is required (e.g. lognexus commit -m 'feat(#15/T1): add feature' or -F <file>)\n",
     );
     printUsage();
     process.exit(1);
@@ -461,11 +454,11 @@ async function handleCommit(args: string[]) {
   printHeader();
   try {
     const res = executeAtomicCommit({
-      message,
-      author,
-      reviewer,
-      finishTask,
-      allowEmpty,
+      message: parsed.message,
+      author: parsed.author,
+      reviewer: parsed.reviewer,
+      finishTask: parsed.finishTask,
+      allowEmpty: parsed.allowEmpty,
     });
 
     console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);

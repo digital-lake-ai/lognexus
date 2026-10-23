@@ -10,7 +10,7 @@ export {
   parseIdentity,
   SUBJECT_TASK_PATTERN,
 } from "./audit/audit.js";
-export { getCliVersion } from "./cli.js";
+export { getCliVersion, type ParsedCommitArgs, parseCommitArgs } from "./cli.js";
 export {
   type CommitOptions,
   type CommitResult,
