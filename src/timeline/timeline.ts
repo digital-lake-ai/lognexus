@@ -1,14 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { extractIssueNumber as extractScopedIssueNumber } from "../branch.js";
+import { rejectNotesReference, validateGitReference, verifyCommitish } from "../git/safe.js";
 import { getNote } from "../notes/notes.js";
 
-export function validateGitReference(ref: string): string {
-  const sanitized = ref.trim();
-  if (!/^[a-zA-Z0-9._/-]+$/.test(sanitized) || sanitized.startsWith("-")) {
-    throw new Error(`Governance violation: Invalid or unsafe Git reference provided: "${ref}"`);
-  }
-  return sanitized;
-}
+export { validateGitReference };
 
 export function sanitizeMarkdown(value: string | null): string {
   if (value === null || value === "") return NO_VALUE;
@@ -329,7 +324,8 @@ export function getJourneyTimeline(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
 ): JourneyTimelineResult {
-  const safeBase = validateGitReference(baseBranch);
+  const safeBase = rejectNotesReference(baseBranch, "base branch");
+  verifyCommitish(safeBase, targetDir);
   const branch = getCurrentBranch(targetDir);
   const resolvedBase = resolveBaseBranch(safeBase, branch, targetDir);
   const rawCommits = listCommits(resolvedBase, targetDir);

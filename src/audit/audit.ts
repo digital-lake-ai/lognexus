@@ -1,10 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { rejectNotesReference, validateGitReference } from "../git/safe.js";
 import { getNote } from "../notes/notes.js";
-import {
-  getJourneyTimeline,
-  type TimelineItem,
-  validateGitReference,
-} from "../timeline/timeline.js";
+import { getJourneyTimeline, type TimelineItem } from "../timeline/timeline.js";
 
 export interface AuditViolation {
   commitSha: string;
@@ -257,7 +254,7 @@ export function auditBranch(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
 ): AuditResult {
-  const safeBase = validateGitReference(baseBranch);
+  const safeBase = rejectNotesReference(baseBranch, "audit base branch");
   const timeline = getJourneyTimeline(safeBase, targetDir);
   const violations = timeline.items.flatMap((item) => auditCommit(item, targetDir));
 

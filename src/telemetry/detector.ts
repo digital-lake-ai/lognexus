@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
+import { validateGitReference } from "../git/safe.js";
 
 export interface DiffStatItem {
   ext: string;
@@ -65,10 +66,7 @@ export function extractCommitDiffStats(
   const extensionMap = new Map<string, { linesAdded: number; linesDeleted: number }>();
 
   try {
-    const sanitizedSha = sha.trim();
-    if (!/^[a-zA-Z0-9._/-]+$/.test(sanitizedSha) || sanitizedSha.startsWith("-")) {
-      return [];
-    }
+    const sanitizedSha = validateGitReference(sha);
 
     const raw = execFileSync(
       "git",

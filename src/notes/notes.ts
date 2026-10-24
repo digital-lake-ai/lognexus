@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { validateGitReference } from "../git/safe.js";
 
 export const DEFAULT_NOTES_REF = "refs/notes/lognexus";
 
@@ -9,11 +10,7 @@ export interface NoteOptions {
 }
 
 function validateRef(ref: string): string {
-  const sanitized = ref.trim();
-  if (!/^[a-zA-Z0-9._/-]+$/.test(sanitized) || sanitized.startsWith("-")) {
-    throw new Error(`Governance violation: Invalid or unsafe Git reference provided: "${ref}"`);
-  }
-  return sanitized;
+  return validateGitReference(ref);
 }
 
 export function attachNote(
