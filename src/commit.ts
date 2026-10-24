@@ -14,6 +14,7 @@ export interface CommitOptions {
   finishTask?: boolean;
   targetDir?: string;
   allowEmpty?: boolean;
+  allowDirectMain?: boolean;
 }
 
 export interface ParsedCommitArgs {
@@ -22,6 +23,7 @@ export interface ParsedCommitArgs {
   reviewer?: string;
   finishTask: boolean;
   allowEmpty: boolean;
+  allowDirectMain: boolean;
 }
 
 export function parseCommitArgs(args: string[]): ParsedCommitArgs {
@@ -30,6 +32,7 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
   let reviewer: string | undefined;
   let finishTask = false;
   let allowEmpty = false;
+  let allowDirectMain = false;
 
   const isFlag = (token: string | undefined): boolean => {
     if (!token) return false;
@@ -73,6 +76,8 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
       finishTask = true;
     } else if (arg === "--allow-empty") {
       allowEmpty = true;
+    } else if (arg === "--allow-direct-main") {
+      allowDirectMain = true;
     }
   }
 
@@ -82,6 +87,7 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
     reviewer,
     finishTask,
     allowEmpty,
+    allowDirectMain,
   };
 }
 
@@ -130,7 +136,23 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     throw new Error("Commit message cannot be empty.");
   }
 
-  // 1. Resolve author and reviewer
+  // 1. Branch governance guard: forbid direct commits on main / master
+  let currentBranch = "";
+  try {
+    currentBranch = runGit("branch --show-current", cwd);
+  } catch {
+    // Non-git or detached HEAD
+  }
+
+  const PROTECTED_BRANCHES = new Set(["main", "master"]);
+  if (PROTECTED_BRANCHES.has(currentBranch) && !options.allowDirectMain) {
+    recordReviewGateBlock(cwd);
+    throw new Error(
+      `Governance violation: Direct commits on protected branch '${currentBranch}' are strictly forbidden. Switch to a scoped branch first: git checkout -b issue/<id>-<slug>`,
+    );
+  }
+
+  // 2. Resolve author and reviewer
   let author = options.author?.trim();
   if (!author) {
     author = process.env.LOGNEXUS_AUTHOR?.trim();

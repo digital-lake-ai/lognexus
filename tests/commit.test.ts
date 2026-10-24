@@ -20,6 +20,7 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     writeFileSync(join(tempDir, "initial.txt"), "hello", "utf8");
     execSync("git add initial.txt", { cwd: tempDir, stdio: "ignore" });
     execSync('git commit -m "chore: initial commit"', { cwd: tempDir, stdio: "ignore" });
+    execSync("git checkout -b issue/15-test-branch", { cwd: tempDir, stdio: "ignore" });
   });
 
   afterEach(() => {
@@ -154,6 +155,54 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     expect(log).toContain("Detailed context line.");
     expect(log).toContain("Authored-by: gemini/flash");
   });
+
+  it("rejects direct commits on protected branch 'main' with clear governance violation", () => {
+    execSync("git checkout -B main", { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "direct.txt"), "forbidden", "utf8");
+    execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
+
+    expect(() => {
+      executeAtomicCommit({
+        message: "feat(#15/T1): direct commit attempt on main",
+        author: "gemini/flash",
+        targetDir: tempDir,
+      });
+    }).toThrow(
+      /Governance violation: Direct commits on protected branch 'main' are strictly forbidden/,
+    );
+  });
+
+  it("rejects direct commits on protected branch 'master' with clear governance violation", () => {
+    execSync("git checkout -B master", { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "direct.txt"), "forbidden", "utf8");
+    execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
+
+    expect(() => {
+      executeAtomicCommit({
+        message: "feat(#15/T1): direct commit attempt on master",
+        author: "gemini/flash",
+        targetDir: tempDir,
+      });
+    }).toThrow(
+      /Governance violation: Direct commits on protected branch 'master' are strictly forbidden/,
+    );
+  });
+
+  it("permits direct commits on protected branches when allowDirectMain is explicitly enabled", () => {
+    execSync("git checkout -B main", { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "direct.txt"), "allowed with override", "utf8");
+    execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
+
+    const result = executeAtomicCommit({
+      message: "chore: bootstrap commit on main",
+      author: "gemini/flash",
+      allowDirectMain: true,
+      targetDir: tempDir,
+    });
+
+    expect(result.noteAttached).toBe(true);
+    expect(result.subject).toBe("chore: bootstrap commit on main");
+  });
 });
 
 describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
@@ -228,5 +277,11 @@ describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
     expect(() => {
       parseCommitArgs(["-F"]);
     }).toThrow(/Flag -F \/ --file requires a file path argument/);
+  });
+
+  it("parses --allow-direct-main flag in parseCommitArgs", () => {
+    const parsed = parseCommitArgs(["-m", "chore: initial setup", "--allow-direct-main"]);
+
+    expect(parsed.allowDirectMain).toBe(true);
   });
 });

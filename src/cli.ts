@@ -38,7 +38,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.2.1";
+  return "1.2.2";
 }
 
 function printHeader() {
@@ -84,6 +84,7 @@ Commit Command:
     --reviewer "<identity>"         Optional reviewer trailer (e.g. gemini/pro)
     --finish-task                   Mark active subtask as completed in state
     --allow-empty                   Allow creating empty commits
+    --allow-direct-main             Bypass protected branch governance guard (bootstrap only)
 
 State Subcommands:
   lognexus state [show]             Display current active issue and task state
@@ -459,6 +460,7 @@ async function handleCommit(args: string[]) {
       reviewer: parsed.reviewer,
       finishTask: parsed.finishTask,
       allowEmpty: parsed.allowEmpty,
+      allowDirectMain: parsed.allowDirectMain,
     });
 
     console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);
