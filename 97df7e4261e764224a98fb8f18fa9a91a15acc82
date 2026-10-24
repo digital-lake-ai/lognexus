@@ -1,0 +1,16 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-24T13:54:59.825Z",
+  "issue": {
+    "id": 19,
+    "title": "[lognexus/plan] Governance hardening, protected branch guard & repository hygiene"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Harden agent rules, enforce no-ff merges and cross-model review gate",
+    "status": "completed"
+  },
+  "tier": "tier-3"
+}
