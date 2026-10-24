@@ -96,8 +96,18 @@ By delegating scoped subtasks to lightweight execution models (\`tier-3\`) while
 }
 
 export function resolveConfinedOutputPath(targetDir: string, outputPath: string): string {
+  const normalizedInput =
+    process.platform === "win32" ? outputPath : outputPath.replace(/\\/g, "/");
+
+  if (process.platform !== "win32" && /^[a-zA-Z]:/.test(normalizedInput)) {
+    throw new Error(
+      `Governance violation: Path traversal detected in output path "${outputPath}". ` +
+        `Reports must be written inside ${resolve(targetDir)}.`,
+    );
+  }
+
   const resolvedBase = resolve(targetDir);
-  const resolvedOut = resolve(resolvedBase, outputPath);
+  const resolvedOut = resolve(resolvedBase, normalizedInput);
   const rel = relative(resolvedBase, resolvedOut);
 
   if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {

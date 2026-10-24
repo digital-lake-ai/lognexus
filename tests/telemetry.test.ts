@@ -234,6 +234,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       for (const attack of [
         "../escaped.md",
+        "..\\escaped.md",
         "../../outside.md",
         "/etc/passwd",
         "C:\\Windows\\Temp\\evil.md",
