@@ -1,0 +1,16 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-24T13:55:18.248Z",
+  "issue": {
+    "id": 19,
+    "title": "[lognexus/plan] Governance hardening, protected branch guard & repository hygiene"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Bump version to 1.2.2 across manifests, lockfile and privacy documentation",
+    "status": "completed"
+  },
+  "tier": "tier-3"
+}
