@@ -14,7 +14,14 @@ description: "Phase 5: Create PR with timeline body, handle review gate, and lin
 
 2. **Create PR (Full Mode).** Use the PR timeline template below. Create the PR with `lognexus/history` and `lognexus/issue-driven` already applied. Sign per the signing spec — see SKILL.md → "Agent Identity Signing".
 
-3. **Review gate.** Every PR requires cross-model review before merge. Use the execution ladder in `references/closure-and-review.md`: bounded reviewer lane if available, then external session delegation, then a contract-only review handoff. Local parallel tool fan-out does not count as an independent reviewer identity.
+3. **Review gate & Merge Execution.**
+   - Every PR requires cross-model review before merge (`Authored-by` != `Reviewed-by`). Use the execution ladder in `references/closure-and-review.md`. Local parallel tool fan-out does not count as an independent reviewer identity.
+   - **Zero exceptions by change type:** `chore:`, `ci:`, `docs:`, `build:`, and `test:` require a branch and PR exactly like `feat:` or `fix:`. Direct pushes to `main` are strictly prohibited.
+   - **Mandatory Merge Commit (`--no-ff`):** Merge exclusively using:
+     ```bash
+     gh pr merge <num> --merge --delete-branch
+     ```
+     Squash merge (`--squash`) and rebase merge (`--rebase`) are strictly prohibited because they destroy the discrete `T1..Tn` commit history and orphan attached LogNexus Git Notes (`refs/notes/lognexus`) on discarded SHAs.
 
 4. **Link and store.** PR body includes `Closes #<issue>` when the PR fully resolves the issue. For partial delivery, use `Addresses #<issue> (completes T1, T2, ...)` - see the partial-delivery template below and `references/closure-and-review.md` Section 1. Store key learning in knowledge graph.
 

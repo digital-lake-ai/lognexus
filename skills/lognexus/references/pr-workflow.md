@@ -153,7 +153,19 @@ Every PR requires cross-model review before merge. After creating the PR:
 5. After each signed review comment, refresh the PR body's review snapshot in place.
 6. If new code lands after a review, flip the snapshot to `needs re-review` before asking for another review.
 
-Do not merge without a review sign-off unless the user explicitly overrides.
+Do not merge without a cross-model review sign-off (`Authored-by` != `Reviewed-by`).
+
+### Merge Execution (Strict `--no-ff` Mandatory)
+
+When merging via GitHub CLI, use exclusively `--merge` to force a standard merge commit:
+
+```bash
+gh pr merge <PR_NUMBER> --merge --delete-branch
+```
+
+**Prohibición absoluta de Squash y Rebase:**
+- Never use `--squash` or `--rebase`.
+- Squash and rebase merges collapse all atomic subtask commits (`T1..Tn`) and orphan LogNexus Git Notes (`refs/notes/lognexus`) on disconnected commit SHAs.
 
 ## Step 6: Post-merge (after review and merge)
 

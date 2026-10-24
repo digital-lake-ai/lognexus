@@ -37,8 +37,9 @@ Every version bump merged to `main` automatically triggers a GitHub Release and 
 
 ## 3. Pull Request Workflow
 
-1. **Issue First:** Every change starts with an issue tagged with `lognexus/plan`.
-2. **Branch Naming:** Create a branch from `main` using the format:
+1. **Zero Exceptions on Main:** Every change (including `chore:`, `ci:`, `docs:`, `build:`, `test:`) requires an issue, a dedicated task branch, and a Pull Request. Direct pushes to `main` are blocked by server rulesets and the commit engine.
+2. **Issue First:** Every change starts with an issue tagged with `lognexus/plan`.
+3. **Branch Naming:** Create a branch from `main` using the format:
    ```bash
    git checkout -b issue/<id>-<slug> origin/main
    ```
@@ -55,7 +56,13 @@ Every version bump merged to `main` automatically triggers a GitHub Release and 
    - Include the Journey Timeline, verification checklist, and `Closes #<id>`.
 5. **Cross-Model Review:**
    - Submit for review and label as `lognexus/needs-review`.
-   - The reviewing agent or peer signs off with `Reviewed-by: <reviewer>`.
+   - The reviewing agent or peer signs off with `Reviewed-by: <reviewer>` (`Authored-by` != `Reviewed-by` is strictly enforced).
+6. **Merge Execution (Strict `--no-ff` Mandatory):**
+   - Merges must be performed exclusively with standard merge commits:
+     ```bash
+     gh pr merge <num> --merge --delete-branch
+     ```
+   - **Squash and Rebase Merges are strictly prohibited:** They destroy the discrete subtask commit graph and orphan attached LogNexus Git Notes (`refs/notes/lognexus`).
 
 ---
 
