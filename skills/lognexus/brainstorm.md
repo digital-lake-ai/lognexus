@@ -122,7 +122,7 @@ Task ID rules:
 
 ---
 Authored-by: <family>/<version> (<tool>)
-*Captain's log entry created by [lognexus](https://github.com/devallibus/lognexus)*
+*Captain's log entry created by [lognexus](https://github.com/digital-lake-ai/lognexus)*
 ```
 
 On PowerShell, prefer the `--body-file` temp-file pattern from `references/shell-portability.md`.

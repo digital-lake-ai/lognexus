@@ -107,7 +107,7 @@ Closes #<ISSUE_NUMBER>
 ---
 Authored-by: <family>/<version> (<tool>)
 Last-code-by: <family>/<version> (<tool>)
-*Captain's log - PR timeline by [lognexus](https://github.com/devallibus/lognexus)*
+*Captain's log - PR timeline by [lognexus](https://github.com/digital-lake-ai/lognexus)*
 ```
 
 The PR body is large enough that `--body-file` should be the preferred portable path.
@@ -171,5 +171,5 @@ Addresses #<ISSUE_NUMBER> (completes T1, T2, T3)
 ---
 Authored-by: <family>/<version> (<tool>)
 Last-code-by: <family>/<version> (<tool>)
-*Captain's log - partial delivery by [lognexus](https://github.com/devallibus/lognexus)*
+*Captain's log - partial delivery by [lognexus](https://github.com/digital-lake-ai/lognexus)*
 ```
