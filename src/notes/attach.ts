@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { checkSelfApproval, extractTrailers } from "../audit/audit.js";
 import { loadState } from "../state/manager.js";
 import { attachNote, type NoteOptions } from "./notes.js";
@@ -41,10 +41,15 @@ export function buildStateNotePayload(targetDir: string = process.cwd()): GitNot
 
 function getCommitMessage(commitRef: string, cwd: string): string {
   try {
-    return execSync(`git log -1 --format=%B ${commitRef}`, {
+    const sanitized = commitRef.trim();
+    if (!/^[a-zA-Z0-9._/-]+$/.test(sanitized) || sanitized.startsWith("-")) {
+      return "";
+    }
+    return execFileSync("git", ["log", "-1", "--format=%B", sanitized], {
       cwd,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     });
   } catch {
     return "";

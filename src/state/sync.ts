@@ -1,13 +1,14 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { loadState, saveState } from "./manager.js";
 import type { ActiveIssueState, LognexusState } from "./schema.js";
 
 export function getBranchName(targetDir: string = process.cwd()): string | null {
   try {
-    const branch = execSync("git branch --show-current", {
+    const branch = execFileSync("git", ["branch", "--show-current"], {
       cwd: targetDir,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     }).trim();
     return branch || null;
   } catch {
@@ -20,11 +21,19 @@ export function fetchIssueMeta(
   targetDir: string = process.cwd(),
 ): { title: string; readiness: ActiveIssueState["readiness"] } | null {
   try {
-    const raw = execSync(`gh issue view ${issueId} --json title,state,labels`, {
-      cwd: targetDir,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    if (!Number.isSafeInteger(issueId) || issueId < 0) {
+      return null;
+    }
+    const raw = execFileSync(
+      "gh",
+      ["issue", "view", String(issueId), "--json", "title,state,labels"],
+      {
+        cwd: targetDir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      },
+    );
     const parsed = JSON.parse(raw);
     const title = parsed.title ?? "";
 

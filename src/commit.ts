@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -97,11 +97,12 @@ export interface CommitResult {
   noteAttached: boolean;
 }
 
-function runGit(command: string, cwd: string): string {
-  return execSync(`git ${command}`, {
+function runGit(args: string[], cwd: string): string {
+  return execFileSync("git", args, {
     cwd,
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
+    shell: false,
   }).trim();
 }
 
@@ -135,14 +136,14 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   // 1. Branch governance guard: forbid direct commits on main / master once repository has commits
   let currentBranch = "";
   try {
-    currentBranch = runGit("branch --show-current", cwd);
+    currentBranch = runGit(["branch", "--show-current"], cwd);
   } catch {
     // Non-git or detached HEAD
   }
 
   let hasExistingCommits = true;
   try {
-    runGit("rev-parse --verify HEAD", cwd);
+    runGit(["rev-parse", "--verify", "HEAD"], cwd);
   } catch {
     hasExistingCommits = false;
   }
@@ -166,8 +167,8 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   }
   if (!author) {
     try {
-      const name = runGit("config user.name", cwd);
-      const email = runGit("config user.email", cwd);
+      const name = runGit(["config", "user.name"], cwd);
+      const email = runGit(["config", "user.email"], cwd);
       author = `${name || "unknown"} (${email || "local"})`;
     } catch {
       author = "agent/unknown (lognexus)";
@@ -194,7 +195,7 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
 
     let stagedFiles: string[] = [];
     try {
-      const output = runGit("diff --cached --name-only", cwd);
+      const output = runGit(["diff", "--cached", "--name-only"], cwd);
       stagedFiles = output
         .replace(/\r\n/g, "\n")
         .split("\n")
@@ -250,16 +251,19 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   writeFileSync(tempMsgFile, fullMessage, "utf8");
 
   try {
-    const emptyFlag = options.allowEmpty ? "--allow-empty" : "";
-    runGit(`commit -F "${tempMsgFile}" ${emptyFlag}`.trim(), cwd);
+    const commitArgs = ["commit", "-F", tempMsgFile];
+    if (options.allowEmpty) {
+      commitArgs.push("--allow-empty");
+    }
+    runGit(commitArgs, cwd);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
 
   // 6. Read commit metadata
-  const sha = runGit("rev-parse HEAD", cwd);
-  const shortSha = runGit("rev-parse --short HEAD", cwd);
-  const subject = runGit("log -1 --format=%s HEAD", cwd);
+  const sha = runGit(["rev-parse", "HEAD"], cwd);
+  const shortSha = runGit(["rev-parse", "--short", "HEAD"], cwd);
+  const subject = runGit(["log", "-1", "--format=%s", "HEAD"], cwd);
 
   // 7. If finishTask requested, mark subtask completed
   let subtaskCompleted: string | null = null;
