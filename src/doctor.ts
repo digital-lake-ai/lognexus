@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -10,16 +10,18 @@ export interface DiagnosticCheck {
 
 export function checkGit(targetDir: string = process.cwd()): DiagnosticCheck {
   try {
-    const version = execSync("git --version", {
+    const version = execFileSync("git", ["--version"], {
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     }).trim();
     let insideRepo = false;
     try {
-      const isInside = execSync("git rev-parse --is-inside-work-tree", {
+      const isInside = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
         cwd: targetDir,
         encoding: "utf8",
         stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
       }).trim();
       insideRepo = isInside === "true";
     } catch {
@@ -50,12 +52,20 @@ export function checkGit(targetDir: string = process.cwd()): DiagnosticCheck {
 
 export function checkGitHubCli(): DiagnosticCheck {
   try {
-    const version = execSync("gh --version", { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] })
+    const version = execFileSync("gh", ["--version"], {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    })
       .split("\n")[0]
       .trim();
 
     try {
-      execSync("gh auth status", { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+      execFileSync("gh", ["auth", "status"], {
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      });
       return {
         name: "GitHub CLI",
         status: "pass",

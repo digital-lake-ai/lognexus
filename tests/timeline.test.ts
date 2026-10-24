@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
 import { setSubtask } from "../src/state/manager.js";
-import { getJourneyTimeline } from "../src/timeline/timeline.js";
+import {
+  getJourneyTimeline,
+  sanitizeMarkdown,
+  validateGitReference,
+} from "../src/timeline/timeline.js";
 
 function git(args: string, targetDir: string): string {
   return execSync(`git ${args}`, { cwd: targetDir, encoding: "utf8" }).trim();
@@ -172,5 +176,81 @@ describe("Journey Timeline", () => {
     expect(item.taskId).toBe("T1");
     expect(item.subject).toContain("SLM-201/T1");
     expect(timeline.prBodyDraft).toContain("Closes SLM-201");
+  });
+
+  describe("Security Hardening & Injection Mitigation (Issue #21)", () => {
+    it("aborts execution and throws governance violation when baseBranch contains shell metacharacters", () => {
+      const maliciousPayloads = [
+        "main; echo pwned",
+        "main | rm -rf /",
+        "main && evil",
+        "main$(whoami)",
+        "main`id`",
+        "main\nmalicious",
+      ];
+
+      for (const payload of maliciousPayloads) {
+        expect(
+          () => getJourneyTimeline(payload, tempDir),
+          `Expected payload "${payload}" to be blocked`,
+        ).toThrowError(/Governance violation: Invalid or unsafe Git reference provided/);
+      }
+    });
+
+    it("aborts execution and throws governance violation when baseBranch starts with flag injection (--*)", () => {
+      const maliciousFlags = ["--upload-pack=evil", "--help", "-v", "--output=/dev/null"];
+
+      for (const flag of maliciousFlags) {
+        expect(
+          () => getJourneyTimeline(flag, tempDir),
+          `Expected flag "${flag}" to be blocked`,
+        ).toThrowError(/Governance violation: Invalid or unsafe Git reference provided/);
+      }
+    });
+
+    it("validates Git references strictly with validateGitReference", () => {
+      expect(validateGitReference("main")).toBe("main");
+      expect(validateGitReference("origin/main")).toBe("origin/main");
+      expect(validateGitReference("issue/21-security-command-injection-fix")).toBe(
+        "issue/21-security-command-injection-fix",
+      );
+      expect(validateGitReference("v1.2.3")).toBe("v1.2.3");
+      expect(validateGitReference("HEAD")).toBe("HEAD");
+      expect(validateGitReference("0303b48")).toBe("0303b48");
+      expect(validateGitReference("feature/sub_task-1.0")).toBe("feature/sub_task-1.0");
+
+      expect(() => validateGitReference("")).toThrow(/Governance violation/);
+      expect(() => validateGitReference("   ")).toThrow(/Governance violation/);
+      expect(() => validateGitReference("--upload-pack=evil")).toThrow(/Governance violation/);
+      expect(() => validateGitReference("main; echo pwned")).toThrow(/Governance violation/);
+    });
+
+    it("sanitizes Markdown special characters in commit subject to prevent format injection", () => {
+      createBranch(tempDir, "issue/21-sanitize");
+
+      commitFile(
+        tempDir,
+        "sanitize.txt",
+        "data",
+        "feat(#21/T1): test [tier-3] with | pipe & *star* & `code`\n\nAuthored-by: gemini/flash\n",
+      );
+
+      const timeline = getJourneyTimeline(baseBranch, tempDir);
+      const [item] = timeline.items;
+
+      expect(item.subject).toBe("feat(#21/T1): test [tier-3] with | pipe & *star* & `code`");
+
+      // Verify sanitized in markdown table
+      expect(timeline.markdownTable).toContain(
+        "test \\[tier-3\\] with \\| pipe & \\*star\\* & 'code'",
+      );
+
+      // Verify sanitizeMarkdown unit behavior
+      expect(sanitizeMarkdown("hello | world")).toBe("hello \\| world");
+      expect(sanitizeMarkdown("[link]")).toBe("\\[link\\]");
+      expect(sanitizeMarkdown("*bold*")).toBe("\\*bold\\*");
+      expect(sanitizeMarkdown("`code`")).toBe("'code'");
+      expect(sanitizeMarkdown(null)).toBe("—");
+    });
   });
 });

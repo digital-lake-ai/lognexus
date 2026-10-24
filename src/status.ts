@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -15,19 +15,21 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
   let branch = "detached";
 
   try {
-    const inside = execSync("git rev-parse --is-inside-work-tree", {
+    const inside = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
       cwd: targetDir,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     }).trim();
     isInsideGit = inside === "true";
 
     if (isInsideGit) {
       branch =
-        execSync("git branch --show-current", {
+        execFileSync("git", ["branch", "--show-current"], {
           cwd: targetDir,
           encoding: "utf8",
           stdio: ["pipe", "pipe", "pipe"],
+          shell: false,
         }).trim() || "detached";
     }
   } catch {

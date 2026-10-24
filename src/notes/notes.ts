@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 export const DEFAULT_NOTES_REF = "refs/notes/lognexus";
 
@@ -8,32 +8,44 @@ export interface NoteOptions {
   force?: boolean;
 }
 
+function validateRef(ref: string): string {
+  const sanitized = ref.trim();
+  if (!/^[a-zA-Z0-9._/-]+$/.test(sanitized) || sanitized.startsWith("-")) {
+    throw new Error(`Governance violation: Invalid or unsafe Git reference provided: "${ref}"`);
+  }
+  return sanitized;
+}
+
 export function attachNote(
   content: string,
   commitRef: string = "HEAD",
   options: NoteOptions = {},
 ): void {
-  const ref = options.ref ?? DEFAULT_NOTES_REF;
+  const ref = validateRef(options.ref ?? DEFAULT_NOTES_REF);
+  const safeCommitRef = validateRef(commitRef);
   const cwd = options.cwd ?? process.cwd();
 
   // Pass note content via stdin (-F -) for 100% reliable cross-platform escaping
-  execSync(`git notes --ref="${ref}" add -f -F - ${commitRef}`, {
+  execFileSync("git", ["notes", `--ref=${ref}`, "add", "-f", "-F", "-", safeCommitRef], {
     input: content,
     cwd,
     encoding: "utf8",
     stdio: ["pipe", "pipe", "pipe"],
+    shell: false,
   });
 }
 
 export function getNote(commitRef: string = "HEAD", options: NoteOptions = {}): string | null {
-  const ref = options.ref ?? DEFAULT_NOTES_REF;
-  const cwd = options.cwd ?? process.cwd();
-
   try {
-    const output = execSync(`git notes --ref="${ref}" show ${commitRef}`, {
+    const ref = validateRef(options.ref ?? DEFAULT_NOTES_REF);
+    const safeCommitRef = validateRef(commitRef);
+    const cwd = options.cwd ?? process.cwd();
+
+    const output = execFileSync("git", ["notes", `--ref=${ref}`, "show", safeCommitRef], {
       cwd,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     });
     return output.trim();
   } catch {
@@ -44,14 +56,15 @@ export function getNote(commitRef: string = "HEAD", options: NoteOptions = {}): 
 export function listNotes(
   options: NoteOptions = {},
 ): Array<{ commitSha: string; noteBlob: string }> {
-  const ref = options.ref ?? DEFAULT_NOTES_REF;
-  const cwd = options.cwd ?? process.cwd();
-
   try {
-    const raw = execSync(`git notes --ref="${ref}" list`, {
+    const ref = validateRef(options.ref ?? DEFAULT_NOTES_REF);
+    const cwd = options.cwd ?? process.cwd();
+
+    const raw = execFileSync("git", ["notes", `--ref=${ref}`, "list"], {
       cwd,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     }).trim();
 
     if (!raw) return [];
@@ -69,14 +82,16 @@ export function listNotes(
 }
 
 export function pushNotes(remote: string = "origin", options: NoteOptions = {}): boolean {
-  const ref = options.ref ?? DEFAULT_NOTES_REF;
-  const cwd = options.cwd ?? process.cwd();
-
   try {
-    execSync(`git push ${remote} ${ref}`, {
+    const ref = validateRef(options.ref ?? DEFAULT_NOTES_REF);
+    const safeRemote = validateRef(remote);
+    const cwd = options.cwd ?? process.cwd();
+
+    execFileSync("git", ["push", safeRemote, ref], {
       cwd,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     });
     return true;
   } catch {
@@ -85,14 +100,16 @@ export function pushNotes(remote: string = "origin", options: NoteOptions = {}):
 }
 
 export function fetchNotes(remote: string = "origin", options: NoteOptions = {}): boolean {
-  const ref = options.ref ?? DEFAULT_NOTES_REF;
-  const cwd = options.cwd ?? process.cwd();
-
   try {
-    execSync(`git fetch ${remote} ${ref}:${ref}`, {
+    const ref = validateRef(options.ref ?? DEFAULT_NOTES_REF);
+    const safeRemote = validateRef(remote);
+    const cwd = options.cwd ?? process.cwd();
+
+    execFileSync("git", ["fetch", safeRemote, `${ref}:${ref}`], {
       cwd,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     });
     return true;
   } catch {

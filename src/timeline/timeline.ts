@@ -1,5 +1,23 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { getNote } from "../notes/notes.js";
+
+export function validateGitReference(ref: string): string {
+  const sanitized = ref.trim();
+  if (!/^[a-zA-Z0-9._/-]+$/.test(sanitized) || sanitized.startsWith("-")) {
+    throw new Error(`Governance violation: Invalid or unsafe Git reference provided: "${ref}"`);
+  }
+  return sanitized;
+}
+
+export function sanitizeMarkdown(value: string | null): string {
+  if (value === null || value === "") return NO_VALUE;
+  return value
+    .replace(/\|/g, "\\|")
+    .replace(/`/g, "'")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]")
+    .replace(/\*/g, "\\*");
+}
 
 export interface TimelineItem {
   sha: string;
@@ -47,10 +65,11 @@ interface NotePayload {
 
 function runGit(args: string[], targetDir: string): string | null {
   try {
-    const output = execSync(`git ${args.join(" ")}`, {
+    const output = execFileSync("git", args, {
       cwd: targetDir,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
     });
     return output.replace(/\r\n/g, "\n");
   } catch {
@@ -199,11 +218,6 @@ function cell(value: string | null): string {
   return `\`${value.replace(/\|/g, "\\|")}\``;
 }
 
-function plainCell(value: string | null): string {
-  if (value === null || value === "") return NO_VALUE;
-  return value.replace(/\|/g, "\\|");
-}
-
 export function buildTimelineTable(items: TimelineItem[]): string {
   const lines = [
     "| Commit | Subtask | Summary | Tier | Author | Note |",
@@ -212,7 +226,7 @@ export function buildTimelineTable(items: TimelineItem[]): string {
 
   for (const item of items) {
     lines.push(
-      `| ${cell(item.shortSha)} | ${cell(item.taskId)} | ${plainCell(item.subject)} | ${cell(item.tier)} | ${cell(item.author)} | ${item.hasNote ? "Yes" : "No"} |`,
+      `| ${cell(item.shortSha)} | ${cell(item.taskId)} | ${sanitizeMarkdown(item.subject)} | ${cell(item.tier)} | ${cell(item.author)} | ${item.hasNote ? "Yes" : "No"} |`,
     );
   }
 
@@ -236,7 +250,9 @@ function buildPrBodyDraft(branch: string, baseBranch: string, items: TimelineIte
   const changes =
     items.length === 0
       ? "_No commits ahead of the base branch yet._"
-      : items.map((item) => `- \`${item.shortSha}\` — ${item.subject}`).join("\n");
+      : items
+          .map((item) => `- \`${item.shortSha}\` — ${sanitizeMarkdown(item.subject)}`)
+          .join("\n");
 
   const tiers = [...new Set(items.map((item) => item.tier).filter((tier) => tier !== null))];
   const notesCoverage = items.filter((item) => item.hasNote).length;
@@ -313,11 +329,12 @@ export function getJourneyTimeline(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
 ): JourneyTimelineResult {
+  const safeBase = validateGitReference(baseBranch);
   const branch = getCurrentBranch(targetDir);
-  const resolvedBase = resolveBaseBranch(baseBranch, branch, targetDir);
+  const resolvedBase = resolveBaseBranch(safeBase, branch, targetDir);
   const rawCommits = listCommits(resolvedBase, targetDir);
   const items = rawCommits.map((commit) => buildItem(commit, targetDir));
-  const effectiveBase = resolvedBase ?? `${baseBranch} (unresolved)`;
+  const effectiveBase = resolvedBase ?? `${safeBase} (unresolved)`;
 
   return {
     branch,

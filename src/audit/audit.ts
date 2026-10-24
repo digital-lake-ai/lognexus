@@ -1,6 +1,10 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { getNote } from "../notes/notes.js";
-import { getJourneyTimeline, type TimelineItem } from "../timeline/timeline.js";
+import {
+  getJourneyTimeline,
+  type TimelineItem,
+  validateGitReference,
+} from "../timeline/timeline.js";
 
 export interface AuditViolation {
   commitSha: string;
@@ -131,11 +135,17 @@ function matchesPath(file: string, rule: string): boolean {
 
 function listCommitFiles(sha: string, targetDir: string): string[] {
   try {
-    const output = execSync(`git diff-tree --no-commit-id --name-only -r ${sha}`, {
-      cwd: targetDir,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const safeSha = validateGitReference(sha);
+    const output = execFileSync(
+      "git",
+      ["diff-tree", "--no-commit-id", "--name-only", "-r", safeSha],
+      {
+        cwd: targetDir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      },
+    );
     return output
       .replace(/\r\n/g, "\n")
       .split("\n")
@@ -247,17 +257,18 @@ export function auditBranch(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
 ): AuditResult {
-  const timeline = getJourneyTimeline(baseBranch, targetDir);
+  const safeBase = validateGitReference(baseBranch);
+  const timeline = getJourneyTimeline(safeBase, targetDir);
   const violations = timeline.items.flatMap((item) => auditCommit(item, targetDir));
 
   const normalizedCurrent = timeline.branch.replace(/^refs\/heads\//, "");
-  const normalizedBase = baseBranch.replace(/^refs\/heads\//, "").replace(/^origin\//, "");
+  const normalizedBase = safeBase.replace(/^refs\/heads\//, "").replace(/^origin\//, "");
   if (normalizedCurrent === normalizedBase && timeline.commitCount === 0) {
     violations.push({
       commitSha: "HEAD",
       shortSha: "HEAD",
       rule: "base-branch-range",
-      message: `Auditing base branch '${baseBranch}' directly: 0 commits in range ${baseBranch}..${timeline.branch}. Run from a feature branch or specify a base commit/range.`,
+      message: `Auditing base branch '${safeBase}' directly: 0 commits in range ${safeBase}..${timeline.branch}. Run from a feature branch or specify a base commit/range.`,
       severity: "error",
     });
   }

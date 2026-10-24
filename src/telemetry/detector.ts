@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 
@@ -65,11 +65,21 @@ export function extractCommitDiffStats(
   const extensionMap = new Map<string, { linesAdded: number; linesDeleted: number }>();
 
   try {
-    const raw = execSync(`git diff-tree --numstat --no-commit-id -r ${sha}`, {
-      cwd: targetDir,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const sanitizedSha = sha.trim();
+    if (!/^[a-zA-Z0-9._/-]+$/.test(sanitizedSha) || sanitizedSha.startsWith("-")) {
+      return [];
+    }
+
+    const raw = execFileSync(
+      "git",
+      ["diff-tree", "--numstat", "--no-commit-id", "-r", sanitizedSha],
+      {
+        cwd: targetDir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      },
+    );
 
     for (const line of raw.split("\n")) {
       const trimmed = line.trim();
