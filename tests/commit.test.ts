@@ -188,7 +188,30 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     );
   });
 
-  it("permits direct commits on protected branches when allowDirectMain is explicitly enabled", () => {
+  it("automatically permits the first foundational commit on an unborn branch (0 commits bootstrap)", () => {
+    const freshDir = mkdtempSync(join(tmpdir(), "unborn-test-"));
+    try {
+      execSync("git init", { cwd: freshDir, stdio: "ignore" });
+      execSync('git config user.name "Test Runner"', { cwd: freshDir, stdio: "ignore" });
+      execSync('git config user.email "test@example.com"', { cwd: freshDir, stdio: "ignore" });
+      execSync('git config commit.gpgsign "false"', { cwd: freshDir, stdio: "ignore" });
+      writeFileSync(join(freshDir, "init.txt"), "first", "utf8");
+      execSync("git add init.txt", { cwd: freshDir, stdio: "ignore" });
+
+      const result = executeAtomicCommit({
+        message: "chore: foundational commit on unborn branch",
+        author: "gemini/flash",
+        targetDir: freshDir,
+      });
+
+      expect(result.noteAttached).toBe(true);
+      expect(result.subject).toBe("chore: foundational commit on unborn branch");
+    } finally {
+      rmSync(freshDir, { recursive: true, force: true });
+    }
+  });
+
+  it("permits direct commits on protected branches when _internalTestAllowMain is explicitly enabled", () => {
     execSync("git checkout -B main", { cwd: tempDir, stdio: "ignore" });
     writeFileSync(join(tempDir, "direct.txt"), "allowed with override", "utf8");
     execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
@@ -196,7 +219,7 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     const result = executeAtomicCommit({
       message: "chore: bootstrap commit on main",
       author: "gemini/flash",
-      allowDirectMain: true,
+      _internalTestAllowMain: true,
       targetDir: tempDir,
     });
 
@@ -277,11 +300,5 @@ describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
     expect(() => {
       parseCommitArgs(["-F"]);
     }).toThrow(/Flag -F \/ --file requires a file path argument/);
-  });
-
-  it("parses --allow-direct-main flag in parseCommitArgs", () => {
-    const parsed = parseCommitArgs(["-m", "chore: initial setup", "--allow-direct-main"]);
-
-    expect(parsed.allowDirectMain).toBe(true);
   });
 });

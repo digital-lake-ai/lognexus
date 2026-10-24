@@ -152,10 +152,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "boolean",
           description: "If true, allows creating an empty commit.",
         },
-        allowDirectMain: {
-          type: "boolean",
-          description: "If true, bypasses protected branch governance check (bootstrap only).",
-        },
       },
       required: ["message"],
     },
@@ -364,14 +360,12 @@ export async function callMcpTool(
         const reviewer = readStringArg(args, "reviewer");
         const finishTask = Boolean(args.finishTask);
         const allowEmpty = Boolean(args.allowEmpty);
-        const allowDirectMain = Boolean(args.allowDirectMain);
         const res = executeAtomicCommit({
           message,
           author,
           reviewer,
           finishTask,
           allowEmpty,
-          allowDirectMain,
           targetDir,
         });
         return textResult(res);

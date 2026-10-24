@@ -14,7 +14,8 @@ export interface CommitOptions {
   finishTask?: boolean;
   targetDir?: string;
   allowEmpty?: boolean;
-  allowDirectMain?: boolean;
+  /** Internal test-only escape hatch for isolated unit tests. Never exposed via CLI or MCP. */
+  _internalTestAllowMain?: boolean;
 }
 
 export interface ParsedCommitArgs {
@@ -23,7 +24,6 @@ export interface ParsedCommitArgs {
   reviewer?: string;
   finishTask: boolean;
   allowEmpty: boolean;
-  allowDirectMain: boolean;
 }
 
 export function parseCommitArgs(args: string[]): ParsedCommitArgs {
@@ -32,7 +32,6 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
   let reviewer: string | undefined;
   let finishTask = false;
   let allowEmpty = false;
-  let allowDirectMain = false;
 
   const isFlag = (token: string | undefined): boolean => {
     if (!token) return false;
@@ -76,8 +75,6 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
       finishTask = true;
     } else if (arg === "--allow-empty") {
       allowEmpty = true;
-    } else if (arg === "--allow-direct-main") {
-      allowDirectMain = true;
     }
   }
 
@@ -87,7 +84,6 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
     reviewer,
     finishTask,
     allowEmpty,
-    allowDirectMain,
   };
 }
 
@@ -136,7 +132,7 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     throw new Error("Commit message cannot be empty.");
   }
 
-  // 1. Branch governance guard: forbid direct commits on main / master
+  // 1. Branch governance guard: forbid direct commits on main / master once repository has commits
   let currentBranch = "";
   try {
     currentBranch = runGit("branch --show-current", cwd);
@@ -144,8 +140,19 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     // Non-git or detached HEAD
   }
 
+  let hasExistingCommits = true;
+  try {
+    runGit("rev-parse --verify HEAD", cwd);
+  } catch {
+    hasExistingCommits = false;
+  }
+
   const PROTECTED_BRANCHES = new Set(["main", "master"]);
-  if (PROTECTED_BRANCHES.has(currentBranch) && !options.allowDirectMain) {
+  if (
+    PROTECTED_BRANCHES.has(currentBranch) &&
+    hasExistingCommits &&
+    !options._internalTestAllowMain
+  ) {
     recordReviewGateBlock(cwd);
     throw new Error(
       `Governance violation: Direct commits on protected branch '${currentBranch}' are strictly forbidden. Switch to a scoped branch first: git checkout -b issue/<id>-<slug>`,
