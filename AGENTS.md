@@ -11,6 +11,10 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
   - Even if the user requests a "quick fix", "fast push", or asks to skip the PR, the agent MUST decline direct pushes to `main`, explain the governance requirement, and create a branch + PR.
 - **Branch Naming Standard:**
   - Branches must originate from `main`: `git checkout -b issue/<id>-<slug> main`.
+  - Two scoped lanes are supported and treated identically by the engine (`src/branch.ts`):
+    - `issue/<id>-<slug>` — feature, fix, chore, docs, ci and refactor work.
+    - `security/<id>-<slug>` — security remediation, audits and supply-chain hardening.
+  - Both lanes are recognised by `lognexus status`, `lognexus state sync`, `lognexus timeline`, `lognexus audit` and the protected-branch guard.
 
 ---
 
@@ -37,6 +41,21 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
     Reviewed-by: <family>/<version> (<client>)
     ```
   - Merging without an independent review sign-off is strictly prohibited.
+
+- **Anti-Spoofing Rule (non-negotiable):**
+  - **No author agent (`Authored-by`) may write `Reviewed-by:` trailers or run `gh pr merge`.**
+  - The review sign-off belongs exclusively to the independent reviewer. An author who writes its own `Reviewed-by:` trailer — under any model name, including one attributed to a different model family — is forging the gate.
+  - The reviewer must derive `Reviewed-by:` from an actual review of the delivered commits, performed through a client whose model family differs from the one in `Authored-by`.
+  - Merge execution is also reserved to the independent reviewer or repository orchestrator after the sign-off exists; the author never merges its own work.
+
+- **`Planned-by` registration for external master plans:**
+  - When work originates from a plan authored outside this repository (a "master plan" produced by an external orchestrator session), record that provenance with a `Planned-by:` trailer in the PR body, alongside the commit trailers:
+    ```markdown
+    Planned-by: <family>/<version> (<client>) — <plan identifier>
+    Authored-by: <family>/<version> (<client>)
+    Reviewed-by: <family>/<version> (<client>)
+    ```
+  - `Planned-by` documents where the plan came from; it does **not** grant review authority, merge rights, or any exception from the rules above.
 
 ---
 

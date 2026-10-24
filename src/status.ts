@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { extractIssueNumber } from "./branch.js";
 
 export interface ProjectStatus {
   branch: string;
@@ -37,9 +38,9 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
   }
 
   let activeIssue: string | null = null;
-  const match = branch.match(/issue\/(\d+)/i);
-  if (match) {
-    activeIssue = `#${match[1]}`;
+  const issueNumber = extractIssueNumber(branch);
+  if (issueNumber) {
+    activeIssue = `#${issueNumber}`;
   }
 
   let routingMode = "not configured";

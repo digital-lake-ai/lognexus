@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { SCOPED_BRANCH_PATTERN } from "../branch.js";
 import { loadState, saveState } from "./manager.js";
 import type { ActiveIssueState, LognexusState } from "./schema.js";
 
@@ -66,7 +67,7 @@ export function syncStateFromGit(targetDir: string = process.cwd()): LognexusSta
     return state;
   }
 
-  const match = branch.match(/issue\/(\d+)(?:-(.*))?/i);
+  const match = branch.match(SCOPED_BRANCH_PATTERN);
   if (match) {
     const issueId = Number.parseInt(match[1], 10);
     const slug = match[2] ? match[2].replace(/-/g, " ") : `Issue #${issueId}`;
