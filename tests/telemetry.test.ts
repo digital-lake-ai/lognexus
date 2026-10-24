@@ -222,6 +222,34 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content).toContain("`.py`");
     });
 
+    it("confines outputPath to targetDir and rejects traversal escapes", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const nested = generateTelemetryReportFile(tempDir, join(".lognexus", "roi.md"));
+      expect(nested.filePath).toBe(join(tempDir, ".lognexus", "roi.md"));
+      expect(existsSync(nested.filePath)).toBe(true);
+
+      const clamped = generateTelemetryReportFile(tempDir, join(".lognexus", "exports", "roi.md"));
+      expect(clamped.filePath).toBe(join(tempDir, ".lognexus", "exports", "roi.md"));
+
+      for (const attack of [
+        "../escaped.md",
+        "..\\escaped.md",
+        "../../outside.md",
+        "/etc/passwd",
+        "C:\\Windows\\Temp\\evil.md",
+        "D:\\evil.md",
+      ]) {
+        expect(() => generateTelemetryReportFile(tempDir, attack)).toThrow(
+          /Governance violation: Path traversal detected/,
+        );
+      }
+
+      expect(() => generateTelemetryReportFile(tempDir, ".")).toThrow(
+        /Governance violation: Path traversal detected/,
+      );
+    });
+
     it("builds a valid GDPR/CCPA compliant anonymous community payload", () => {
       enableTelemetry({ share: true, acceptTerms: true, cwd: tempDir });
       const store = loadTelemetry(tempDir);

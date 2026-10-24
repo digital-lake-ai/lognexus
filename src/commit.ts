@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkSelfApproval } from "./audit/audit.js";
+import { SCOPED_BRANCH_TEMPLATE } from "./branch.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { finishSubtask, loadState } from "./state/manager.js";
 import { recordCommitTelemetry, recordReviewGateBlock } from "./telemetry/collector.js";
@@ -156,7 +157,7 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   ) {
     recordReviewGateBlock(cwd);
     throw new Error(
-      `Governance violation: Direct commits on protected branch '${currentBranch}' are strictly forbidden. Switch to a scoped branch first: git checkout -b issue/<id>-<slug>`,
+      `Governance violation: Direct commits on protected branch '${currentBranch}' are strictly forbidden. Switch to a scoped branch first: git checkout -b ${SCOPED_BRANCH_TEMPLATE}`,
     );
   }
 

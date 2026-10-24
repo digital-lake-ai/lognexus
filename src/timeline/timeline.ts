@@ -1,13 +1,9 @@
 import { execFileSync } from "node:child_process";
+import { extractIssueNumber as extractScopedIssueNumber } from "../branch.js";
+import { rejectNotesReference, validateGitReference, verifyCommitish } from "../git/safe.js";
 import { getNote } from "../notes/notes.js";
 
-export function validateGitReference(ref: string): string {
-  const sanitized = ref.trim();
-  if (!/^[a-zA-Z0-9._/-]+$/.test(sanitized) || sanitized.startsWith("-")) {
-    throw new Error(`Governance violation: Invalid or unsafe Git reference provided: "${ref}"`);
-  }
-  return sanitized;
-}
+export { validateGitReference };
 
 export function sanitizeMarkdown(value: string | null): string {
   if (value === null || value === "") return NO_VALUE;
@@ -45,7 +41,6 @@ const TRAILER_PATTERN = /^\s*(Authored-by|Reviewed-by|Last-code-by|Updated-by):\
 const TASK_ID_PATTERN = /\((?:#\d+|[A-Z][A-Z0-9]*-\d+)\/(T[\d]+(?:-T?[\d]+)?)\)/i;
 const SUBJECT_TASK_PATTERN = /\b(T\d+(?:-T?\d+)?)\b/;
 const TIER_PATTERN = /\[(tier-\d)\]|(?:^|\s)(tier-\d)(?:\s|$)/i;
-const BRANCH_ISSUE_PATTERN = /issue\/(\d+)/i;
 const FIELD_SEPARATOR = "\x1f";
 const RECORD_SEPARATOR = "\x1e";
 const NO_VALUE = "—";
@@ -234,8 +229,8 @@ export function buildTimelineTable(items: TimelineItem[]): string {
 }
 
 function extractIssueNumber(branch: string): string | null {
-  const match = branch.match(BRANCH_ISSUE_PATTERN);
-  if (match) return `#${match[1]}`;
+  const scopedIssue = extractScopedIssueNumber(branch);
+  if (scopedIssue) return `#${scopedIssue}`;
   const alphanumericMatch = branch.match(/([A-Z][A-Z0-9]*-\d+)/i);
   if (alphanumericMatch) return alphanumericMatch[1].toUpperCase();
   return null;
@@ -329,7 +324,8 @@ export function getJourneyTimeline(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
 ): JourneyTimelineResult {
-  const safeBase = validateGitReference(baseBranch);
+  const safeBase = rejectNotesReference(baseBranch, "base branch");
+  verifyCommitish(safeBase, targetDir);
   const branch = getCurrentBranch(targetDir);
   const resolvedBase = resolveBaseBranch(safeBase, branch, targetDir);
   const rawCommits = listCommits(resolvedBase, targetDir);

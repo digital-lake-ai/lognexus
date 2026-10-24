@@ -14,8 +14,13 @@ description: "Phase 5: Create PR with timeline body, handle review gate, and lin
 
 2. **Create PR (Full Mode).** Use the PR timeline template below. Create the PR with `lognexus/history` and `lognexus/issue-driven` already applied. Sign per the signing spec — see SKILL.md → "Agent Identity Signing".
 
+   LogNexus accepts two scoped branch lanes: `issue/<id>-<slug>` for regular feature and fix work, and `security/<id>-<slug>` for security, supply-chain, and hardened-remediation work. Both parse identically for issue lookup, state sync, and PR `Closes`/`Addresses` detection.
+
+   When a master plan drafted outside this repository drove the work, register it in the signature block with a `Planned-by:` trailer naming the external planner and its plan identifier. The authoring identity goes in `Authored-by:` and stays distinct from any reviewer.
+
 3. **Review gate & Merge Execution.**
    - Every PR requires cross-model review before merge (`Authored-by` != `Reviewed-by`). Use the execution ladder in `references/closure-and-review.md`. Local parallel tool fan-out does not count as an independent reviewer identity.
+   - **Anti-Spoofing Rule (hard boundary):** the authoring agent never writes a `Reviewed-by:` trailer and never runs `gh pr merge`. Both actions belong exclusively to the reviewing identity. An author who signs its own review gate is a governance violation, not a shortcut.
    - **Zero exceptions by change type:** `chore:`, `ci:`, `docs:`, `build:`, and `test:` require a branch and PR exactly like `feat:` or `fix:`. Direct pushes to `main` are strictly prohibited.
    - **Mandatory Merge Commit (`--no-ff`):** Merge exclusively using:
      ```bash
@@ -48,7 +53,7 @@ PR body:
 <!-- lognexus:
 kind: history
 issue: <ISSUE_NUMBER>
-branch: issue/<ISSUE_NUMBER>-<slug>
+branch: <issue|security>/<ISSUE_NUMBER>-<slug>
 status: resolved
 updated_at: <ISO_TIMESTAMP>
 review_status: awaiting-review
@@ -114,6 +119,7 @@ Closes #<ISSUE_NUMBER>
 ---
 Authored-by: <family>/<version> (<tool>)
 Last-code-by: <family>/<version> (<tool>)
+Planned-by: <family>/<version> (<tool>) — plan <PLAN_ID>
 *Captain's log - PR timeline by [lognexus](https://github.com/digital-lake-ai/lognexus)*
 ```
 
@@ -132,7 +138,7 @@ When a PR ships some tasks but the issue has remaining work:
 <!-- lognexus:
 kind: history
 issue: <ISSUE_NUMBER>
-branch: issue/<ISSUE_NUMBER>-<slug>
+branch: <issue|security>/<ISSUE_NUMBER>-<slug>
 status: in-progress
 updated_at: <ISO_TIMESTAMP>
 review_status: awaiting-review
@@ -178,5 +184,6 @@ Addresses #<ISSUE_NUMBER> (completes T1, T2, T3)
 ---
 Authored-by: <family>/<version> (<tool>)
 Last-code-by: <family>/<version> (<tool>)
+Planned-by: <family>/<version> (<tool>) — plan <PLAN_ID>
 *Captain's log - partial delivery by [lognexus](https://github.com/digital-lake-ai/lognexus)*
 ```
