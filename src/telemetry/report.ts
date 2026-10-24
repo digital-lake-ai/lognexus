@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { loadTelemetry } from "./collector.js";
 import type { TelemetryStore } from "./schema.js";
 
@@ -95,6 +95,21 @@ By delegating scoped subtasks to lightweight execution models (\`tier-3\`) while
 `;
 }
 
+export function resolveConfinedOutputPath(targetDir: string, outputPath: string): string {
+  const resolvedBase = resolve(targetDir);
+  const resolvedOut = resolve(resolvedBase, outputPath);
+  const rel = relative(resolvedBase, resolvedOut);
+
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(
+      `Governance violation: Path traversal detected in output path "${outputPath}". ` +
+        `Reports must be written inside ${resolvedBase}.`,
+    );
+  }
+
+  return resolvedOut;
+}
+
 export function generateTelemetryReportFile(
   targetDir: string = process.cwd(),
   outputPath?: string,
@@ -102,11 +117,7 @@ export function generateTelemetryReportFile(
   const store = loadTelemetry(targetDir);
   const content = formatTelemetryMarkdownReport(store);
   const defaultPath = join(targetDir, ".lognexus", "telemetry.md");
-  const filePath = outputPath
-    ? outputPath.startsWith("/") || outputPath.includes(":")
-      ? outputPath
-      : join(targetDir, outputPath)
-    : defaultPath;
+  const filePath = resolveConfinedOutputPath(targetDir, outputPath ?? defaultPath);
 
   const parentDir = join(filePath, "..");
   if (!existsSync(parentDir)) {
