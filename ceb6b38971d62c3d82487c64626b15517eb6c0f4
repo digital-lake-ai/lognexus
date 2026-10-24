@@ -1,0 +1,16 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-24T18:56:38.521Z",
+  "issue": {
+    "id": 22,
+    "title": "security: path confinement, unified git ref guard & supply-chain baseline"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "bump atomic version contract to 1.2.4",
+    "status": "completed"
+  },
+  "tier": "tier-3"
+}
