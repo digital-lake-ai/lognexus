@@ -20,6 +20,7 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     writeFileSync(join(tempDir, "initial.txt"), "hello", "utf8");
     execSync("git add initial.txt", { cwd: tempDir, stdio: "ignore" });
     execSync('git commit -m "chore: initial commit"', { cwd: tempDir, stdio: "ignore" });
+    execSync("git checkout -b issue/15-test-branch", { cwd: tempDir, stdio: "ignore" });
   });
 
   afterEach(() => {
@@ -153,6 +154,77 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     const log = execSync("git log -1 --format=%B HEAD", { cwd: tempDir, encoding: "utf8" });
     expect(log).toContain("Detailed context line.");
     expect(log).toContain("Authored-by: gemini/flash");
+  });
+
+  it("rejects direct commits on protected branch 'main' with clear governance violation", () => {
+    execSync("git checkout -B main", { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "direct.txt"), "forbidden", "utf8");
+    execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
+
+    expect(() => {
+      executeAtomicCommit({
+        message: "feat(#15/T1): direct commit attempt on main",
+        author: "gemini/flash",
+        targetDir: tempDir,
+      });
+    }).toThrow(
+      /Governance violation: Direct commits on protected branch 'main' are strictly forbidden/,
+    );
+  });
+
+  it("rejects direct commits on protected branch 'master' with clear governance violation", () => {
+    execSync("git checkout -B master", { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "direct.txt"), "forbidden", "utf8");
+    execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
+
+    expect(() => {
+      executeAtomicCommit({
+        message: "feat(#15/T1): direct commit attempt on master",
+        author: "gemini/flash",
+        targetDir: tempDir,
+      });
+    }).toThrow(
+      /Governance violation: Direct commits on protected branch 'master' are strictly forbidden/,
+    );
+  });
+
+  it("automatically permits the first foundational commit on an unborn branch (0 commits bootstrap)", () => {
+    const freshDir = mkdtempSync(join(tmpdir(), "unborn-test-"));
+    try {
+      execSync("git init", { cwd: freshDir, stdio: "ignore" });
+      execSync('git config user.name "Test Runner"', { cwd: freshDir, stdio: "ignore" });
+      execSync('git config user.email "test@example.com"', { cwd: freshDir, stdio: "ignore" });
+      execSync('git config commit.gpgsign "false"', { cwd: freshDir, stdio: "ignore" });
+      writeFileSync(join(freshDir, "init.txt"), "first", "utf8");
+      execSync("git add init.txt", { cwd: freshDir, stdio: "ignore" });
+
+      const result = executeAtomicCommit({
+        message: "chore: foundational commit on unborn branch",
+        author: "gemini/flash",
+        targetDir: freshDir,
+      });
+
+      expect(result.noteAttached).toBe(true);
+      expect(result.subject).toBe("chore: foundational commit on unborn branch");
+    } finally {
+      rmSync(freshDir, { recursive: true, force: true });
+    }
+  });
+
+  it("permits direct commits on protected branches when _internalTestAllowMain is explicitly enabled", () => {
+    execSync("git checkout -B main", { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "direct.txt"), "allowed with override", "utf8");
+    execSync("git add direct.txt", { cwd: tempDir, stdio: "ignore" });
+
+    const result = executeAtomicCommit({
+      message: "chore: bootstrap commit on main",
+      author: "gemini/flash",
+      _internalTestAllowMain: true,
+      targetDir: tempDir,
+    });
+
+    expect(result.noteAttached).toBe(true);
+    expect(result.subject).toBe("chore: bootstrap commit on main");
   });
 });
 

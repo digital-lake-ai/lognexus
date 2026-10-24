@@ -34,7 +34,7 @@ export LOGNEXUS_TELEMETRY_DISABLED=1
 | Category | ✅ What We Collect (Anonymous & Aggregate) | ❌ What We NEVER Collect (Forbidden) |
 | :--- | :--- | :--- |
 | **Identity** | An anonymous, randomly generated `UUIDv4` identifier (`anonymousProjectId`). | Usernames, real names, email addresses, GitHub handles, hostnames, IP addresses. |
-| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js major version (`v22`), LogNexus version (`1.2.1`). | File system directory paths, home directories, environment variables, installed personal apps. |
+| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js major version (`v22`), LogNexus version (`1.2.2`). | File system directory paths, home directories, environment variables, installed personal apps. |
 | **Project Stack** | Detected stack categories (e.g., `["typescript", "nodejs"]`, `["python"]`). File extensions only (`.ts`, `.py`, `.rs`). | Source code, file names, directory names, package names, internal library names. |
 | **AI Models** | Model family (`gemini`, `claude`, `deepseek`, `openai`, `kimi`) and operational tier (`tier-1`, `tier-2`, `tier-3`). | Prompts, completions, reasoning tokens, system instructions, API keys. |
 | **Metrics** | Numeric counters: lines added count (`+120`), lines deleted count (`-15`), subtask duration in seconds, audit pass/fail boolean, blocked review gate count, estimated % cost saved. | Commit subjects, commit bodies, diff contents, git branches, PR descriptions. |
@@ -62,7 +62,7 @@ Example payload:
   "environment": {
     "os": "win32",
     "nodeVersion": "v22.11.0",
-    "lognexusVersion": "1.2.1",
+    "lognexusVersion": "1.2.2",
     "detectedStacks": ["typescript", "nodejs"]
   },
   "summary": {

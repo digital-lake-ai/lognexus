@@ -45,6 +45,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
     writeFileSync(join(tempDir, "file.txt"), "hello world", "utf8");
     execSync("git add file.txt", { cwd: tempDir, stdio: "ignore" });
     execSync('git commit -m "initial commit"', { cwd: tempDir, stdio: "ignore" });
+    execSync("git checkout -b issue/15-mcp-branch", { cwd: tempDir, stdio: "ignore" });
   });
 
   afterEach(() => {

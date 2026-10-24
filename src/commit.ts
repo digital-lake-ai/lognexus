@@ -14,6 +14,8 @@ export interface CommitOptions {
   finishTask?: boolean;
   targetDir?: string;
   allowEmpty?: boolean;
+  /** Internal test-only escape hatch for isolated unit tests. Never exposed via CLI or MCP. */
+  _internalTestAllowMain?: boolean;
 }
 
 export interface ParsedCommitArgs {
@@ -130,7 +132,34 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     throw new Error("Commit message cannot be empty.");
   }
 
-  // 1. Resolve author and reviewer
+  // 1. Branch governance guard: forbid direct commits on main / master once repository has commits
+  let currentBranch = "";
+  try {
+    currentBranch = runGit("branch --show-current", cwd);
+  } catch {
+    // Non-git or detached HEAD
+  }
+
+  let hasExistingCommits = true;
+  try {
+    runGit("rev-parse --verify HEAD", cwd);
+  } catch {
+    hasExistingCommits = false;
+  }
+
+  const PROTECTED_BRANCHES = new Set(["main", "master"]);
+  if (
+    PROTECTED_BRANCHES.has(currentBranch) &&
+    hasExistingCommits &&
+    !options._internalTestAllowMain
+  ) {
+    recordReviewGateBlock(cwd);
+    throw new Error(
+      `Governance violation: Direct commits on protected branch '${currentBranch}' are strictly forbidden. Switch to a scoped branch first: git checkout -b issue/<id>-<slug>`,
+    );
+  }
+
+  // 2. Resolve author and reviewer
   let author = options.author?.trim();
   if (!author) {
     author = process.env.LOGNEXUS_AUTHOR?.trim();
