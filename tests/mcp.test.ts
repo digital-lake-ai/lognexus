@@ -216,6 +216,53 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(afterFinish.completedSubtasks).toContain("T1");
     });
 
+    it("sets a subtask contract and tier through lognexus_state_set_task", async () => {
+      const res = await rpc(
+        "tools/call",
+        {
+          name: "lognexus_state_set_task",
+          arguments: {
+            taskId: "T2",
+            title: "Contract via MCP",
+            tier: "tier-2",
+            allowedFiles: ["src/state/manager.ts"],
+            forbiddenFiles: ["package.json"],
+            decisionBudget: "narrow",
+            verificationCmd: "npm test",
+          },
+        },
+        tempDir,
+      );
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBeUndefined();
+
+      const state = JSON.parse(result.content[0].text) as {
+        activeIssue: { id: number; tier: string } | null;
+        currentSubtask: { id: string; contract: Record<string, unknown> } | null;
+      };
+
+      expect(state.currentSubtask?.id).toBe("T2");
+      expect(state.currentSubtask?.contract).toEqual({
+        allowedFiles: ["src/state/manager.ts"],
+        forbiddenFiles: ["package.json"],
+        decisionBudget: "narrow",
+        verificationCmd: "npm test",
+      });
+      expect(state.activeIssue?.id).toBe(15);
+      expect(state.activeIssue?.tier).toBe("tier-2");
+    });
+
+    it("rejects an invalid tier for lognexus_state_set_task", async () => {
+      const res = await rpc(
+        "tools/call",
+        { name: "lognexus_state_set_task", arguments: { taskId: "T1", tier: "tier-9" } },
+        tempDir,
+      );
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBe(true);
+      expect(toolText(result)).toContain("tier");
+    });
+
     it("rejects lognexus_state_set_task without a taskId", async () => {
       const res = await rpc(
         "tools/call",

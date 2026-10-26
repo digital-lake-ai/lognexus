@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { SCOPED_BRANCH_PATTERN } from "../branch.js";
+import { parseScopedBranch, SCOPED_BRANCH_PATTERN } from "../branch.js";
 import { loadState, saveState } from "./manager.js";
 import type { ActiveIssueState, LognexusState } from "./schema.js";
 
@@ -15,6 +15,31 @@ export function getBranchName(targetDir: string = process.cwd()): string | null 
   } catch {
     return null;
   }
+}
+
+export function inferActiveIssueFromBranch(
+  targetDir: string = process.cwd(),
+): ActiveIssueState | null {
+  const branch = getBranchName(targetDir);
+  if (!branch || branch === "main" || branch === "master") {
+    return null;
+  }
+
+  const scoped = parseScopedBranch(branch);
+  if (!scoped) {
+    return null;
+  }
+
+  const title = scoped.slug ? scoped.slug.replace(/-/g, " ") : `Issue #${scoped.issueId}`;
+
+  return {
+    id: scoped.issueId,
+    title,
+    branch,
+    phase: "execute",
+    tier: "tier-3",
+    readiness: "ready",
+  };
 }
 
 export function fetchIssueMeta(
