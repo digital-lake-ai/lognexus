@@ -1,0 +1,34 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-26T20:48:45.454Z",
+  "issue": {
+    "id": 24,
+    "title": "feat: field telemetry & state hardening (CLI contract flags, non-destructive loadState, tier routing & v1.2.5)"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "State schema resilience, non-destructive loadState, auto branch sync & set-task contract flags",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/state/schema.ts",
+        "src/state/sync.ts",
+        "src/state/manager.ts",
+        "src/cli.ts",
+        "src/mcp/tools.ts",
+        "tests/state.test.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/audit/audit.ts",
+        "src/telemetry/report.ts",
+        "package.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
