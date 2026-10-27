@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { checkSelfApproval, extractTrailers } from "../audit/audit.js";
+import { getCliVersion } from "../cli.js";
 import { validateGitReference } from "../git/safe.js";
 import { loadState } from "../state/manager.js";
 import { attachNote, type NoteOptions } from "./notes.js";
@@ -36,7 +37,7 @@ export function buildStateNotePayload(
   const payload: GitNotePayload = {
     $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
     generator: "LogNexus",
-    version: "1.1.0",
+    version: getCliVersion(),
     timestamp: new Date().toISOString(),
     issue: state.activeIssue ? { id: state.activeIssue.id, title: state.activeIssue.title } : null,
     subtask: state.currentSubtask
