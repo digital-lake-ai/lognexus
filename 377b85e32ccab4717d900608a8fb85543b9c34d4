@@ -1,0 +1,37 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-27T08:33:37.506Z",
+  "issue": {
+    "id": 24,
+    "title": "feat: field telemetry & state hardening (CLI contract flags, non-destructive loadState, tier routing & v1.2.5)"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Unify subtask ID regex, infer commit tier from author and enforce tier routing audit",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/audit/audit.ts",
+        "src/timeline/timeline.ts",
+        "src/commit.ts",
+        "src/notes/attach.ts",
+        "src/telemetry/detector.ts",
+        "src/telemetry/collector.ts",
+        "src/cli.ts",
+        "src/mcp/tools.ts",
+        "tests/audit.test.ts",
+        "tests/commit.test.ts",
+        "tests/timeline.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/telemetry/report.ts",
+        "package.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
