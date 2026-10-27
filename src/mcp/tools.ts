@@ -181,6 +181,17 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "boolean",
           description: "If true, allows creating an empty commit.",
         },
+        tier: {
+          type: "string",
+          enum: TIER_VALUES,
+          description:
+            "Optional routing tier override. Defaults to the tier inferred from the author identity.",
+        },
+        escalated: {
+          type: "boolean",
+          description:
+            "If true, acknowledges a tier-1 author working on a tier-3 subtask (records 'escalated: true' in the Git Note).",
+        },
       },
       required: ["message"],
     },
@@ -445,12 +456,18 @@ export async function callMcpTool(
         const reviewer = readStringArg(args, "reviewer");
         const finishTask = Boolean(args.finishTask);
         const allowEmpty = Boolean(args.allowEmpty);
+        const tierValue = readStringArg(args, "tier");
+        if (tierValue !== undefined && !TIER_VALUES.includes(tierValue)) {
+          throw new McpToolError("Argument 'tier' must be one of 'tier-1', 'tier-2', 'tier-3'.");
+        }
         const res = executeAtomicCommit({
           message,
           author,
           reviewer,
           finishTask,
           allowEmpty,
+          tier: tierValue as ActiveIssueState["tier"] | undefined,
+          escalated: Boolean(args.escalated),
           targetDir,
         });
         return textResult(res);

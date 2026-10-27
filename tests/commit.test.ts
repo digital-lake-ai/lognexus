@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { executeAtomicCommit, parseCommitArgs } from "../src/commit.js";
 import { getNote } from "../src/notes/notes.js";
 import { loadState, setSubtask } from "../src/state/manager.js";
@@ -300,5 +300,159 @@ describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
     expect(() => {
       parseCommitArgs(["-F"]);
     }).toThrow(/Flag -F \/ --file requires a file path argument/);
+  });
+
+  it("parses --tier and --escalated routing flags", () => {
+    const parsed = parseCommitArgs([
+      "-m",
+      "feat(#15/T1): routing flags",
+      "--author",
+      "gemini/pro (antigravity)",
+      "--tier",
+      "tier-1",
+      "--escalated",
+    ]);
+
+    expect(parsed.tier).toBe("tier-1");
+    expect(parsed.escalated).toBe(true);
+  });
+
+  it("normalizes --tier values to lowercase and defaults escalated to false", () => {
+    const parsed = parseCommitArgs(["-m", "feat(#15/T1): routing flags", "--tier", "TIER-2"]);
+
+    expect(parsed.tier).toBe("tier-2");
+    expect(parsed.escalated).toBe(false);
+  });
+
+  it("throws a descriptive error when --tier is provided without a value or with an invalid one", () => {
+    expect(() => {
+      parseCommitArgs(["-m", "feat(#15/T1): routing flags", "--tier"]);
+    }).toThrow(/Flag --tier requires a value/);
+
+    expect(() => {
+      parseCommitArgs(["-m", "feat(#15/T1): routing flags", "--tier", "tier-9"]);
+    }).toThrow(/Invalid --tier value 'tier-9'/);
+  });
+});
+
+describe("Commit tier routing (inference, escalation and audit trail)", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "lognexus-tier-test-"));
+    execSync("git init", { cwd: tempDir, stdio: "ignore" });
+    execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+    execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+    execSync('git config commit.gpgsign "false"', { cwd: tempDir, stdio: "ignore" });
+
+    writeFileSync(join(tempDir, "initial.txt"), "hello", "utf8");
+    execSync("git add initial.txt", { cwd: tempDir, stdio: "ignore" });
+    execSync('git commit -m "chore: initial commit"', { cwd: tempDir, stdio: "ignore" });
+    execSync("git checkout -b issue/15-test-branch", { cwd: tempDir, stdio: "ignore" });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function stageFeature(): void {
+    setSubtask(
+      "T1",
+      "Tier routing",
+      { allowedFiles: ["feature.ts"], forbiddenFiles: [], decisionBudget: "none" },
+      tempDir,
+    );
+    writeFileSync(join(tempDir, "feature.ts"), "export const ok = true;", "utf8");
+    execSync("git add feature.ts", { cwd: tempDir, stdio: "ignore" });
+  }
+
+  function readNote(): Record<string, unknown> {
+    const note = getNote("HEAD", { cwd: tempDir });
+    expect(note).not.toBeNull();
+    return JSON.parse(note as string) as Record<string, unknown>;
+  }
+
+  it("infers the tier from the author when no --tier override is given", () => {
+    stageFeature();
+
+    executeAtomicCommit({
+      message: "feat(#15/T1): author tier inference",
+      author: "gemini/flash (antigravity)",
+      targetDir: tempDir,
+    });
+
+    expect(readNote().tier).toBe("tier-2");
+  });
+
+  it("warns on stderr when a tier-1 author modifies implementation files without --escalated", () => {
+    stageFeature();
+    const stderrChunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      executeAtomicCommit({
+        message: "feat(#15/T1): tier-1 author on a contracted subtask",
+        author: "gemini/pro (antigravity)",
+        targetDir: tempDir,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+
+    const output = stderrChunks.join("");
+    expect(output).toContain("tier-routing-violation");
+    expect(output).toContain("gemini/pro (antigravity)");
+    expect(output).toContain("--escalated");
+    expect(readNote().escalated).toBeUndefined();
+  });
+
+  it("silences the warning and records the escalation when --escalated is set", () => {
+    stageFeature();
+    const stderrChunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      executeAtomicCommit({
+        message: "feat(#15/T1): acknowledged tier-1 escalation",
+        author: "gemini/pro (antigravity)",
+        escalated: true,
+        targetDir: tempDir,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(stderrChunks.join("")).not.toContain("tier-routing-violation");
+    const note = readNote();
+    expect(note.tier).toBe("tier-1");
+    expect(note.escalated).toBe(true);
+  });
+
+  it("does not warn tier-1 authors when only documentation is staged", () => {
+    writeFileSync(join(tempDir, "NOTES.md"), "# docs", "utf8");
+    execSync("git add NOTES.md", { cwd: tempDir, stdio: "ignore" });
+    const stderrChunks: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+      stderrChunks.push(String(chunk));
+      return true;
+    });
+
+    try {
+      executeAtomicCommit({
+        message: "docs(#15/T1): document tier routing",
+        author: "gemini/pro (antigravity)",
+        targetDir: tempDir,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(stderrChunks.join("")).not.toContain("tier-routing-violation");
   });
 });

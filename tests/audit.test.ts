@@ -1,10 +1,11 @@
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { auditBranch } from "../src/audit/audit.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
+import { attachNote } from "../src/notes/notes.js";
 
 function git(args: string, targetDir: string): string {
   return execSync(`git ${args}`, { cwd: targetDir, encoding: "utf8" }).trim();
@@ -148,6 +149,110 @@ describe("Traceability audit", () => {
     const result = auditBranch(baseBranch, tempDir);
     expect(result.violations.some((v) => v.rule === "commit-format")).toBe(false);
     expect(result.passed).toBe(true);
+  });
+
+  it("accepts alphanumeric subtask suffixes (e.g. #9/T0-v2) without a commit-format warning", () => {
+    commitFile(
+      tempDir,
+      "feature.txt",
+      "feature",
+      "feat(#9/T0-v2): keep suffixed subtask ids\n\nAuthored-by: deepseek/chat (kimi-code)\n",
+    );
+    attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "commit-format")).toBe(false);
+    expect(result.passed).toBe(true);
+  });
+
+  it("warns when a tier-1 author changes implementation files on a contracted subtask", () => {
+    commitFile(
+      tempDir,
+      "feature.ts",
+      "export const ok = true;",
+      "feat(#9/T1): implement journey timeline\n\nAuthored-by: gemini/pro (antigravity)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        subtask: { id: "T1", contract: { allowedFiles: ["feature.ts"] } },
+        tier: "tier-3",
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    const violation = result.violations.find((v) => v.rule === "tier-routing-violation");
+
+    expect(violation).toBeDefined();
+    expect(violation?.severity).toBe("warn");
+    expect(violation?.message).toContain("gemini/pro (antigravity)");
+    expect(violation?.message).toContain("feature.ts");
+    expect(result.passed).toBe(true);
+  });
+
+  it("does not warn about tier routing when the escalation is acknowledged", () => {
+    commitFile(
+      tempDir,
+      "feature.ts",
+      "export const ok = true;",
+      "feat(#9/T1): implement journey timeline [escalated]\n\nAuthored-by: gemini/pro (antigravity)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        subtask: { id: "T1", contract: { allowedFiles: ["feature.ts"] } },
+        tier: "tier-3",
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const escalatedThroughSubject = auditBranch(baseBranch, tempDir);
+    expect(
+      escalatedThroughSubject.violations.some((v) => v.rule === "tier-routing-violation"),
+    ).toBe(false);
+
+    commitFile(
+      tempDir,
+      "feature.ts",
+      "export const ok = false;",
+      "feat(#9/T2): adjust journey timeline\n\nAuthored-by: gemini/pro (antigravity)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        subtask: { id: "T2", contract: { allowedFiles: ["feature.ts"] } },
+        tier: "tier-1",
+        escalated: true,
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const escalatedThroughPayload = auditBranch(baseBranch, tempDir);
+    expect(
+      escalatedThroughPayload.violations.some((v) => v.rule === "tier-routing-violation"),
+    ).toBe(false);
+  });
+
+  it("does not warn about tier routing when a tier-1 author only touches documentation", () => {
+    mkdirSync(join(tempDir, "docs"), { recursive: true });
+    commitFile(
+      tempDir,
+      join("docs", "notes.md"),
+      "# notes",
+      "docs(#9/T1): document journey timeline\n\nAuthored-by: gemini/pro (antigravity)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        subtask: { id: "T1", contract: { allowedFiles: [join("docs", "notes.md")] } },
+        tier: "tier-3",
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "tier-routing-violation")).toBe(false);
   });
 
   it("fails audit when run directly on base branch with 0 commit range (base-branch-range error)", () => {

@@ -148,3 +148,37 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   const firstWord = trimmed.split(/\s+/)[0];
   return firstWord || "unknown/other";
 }
+
+export type AuthorTier = "tier-1" | "tier-2" | "tier-3";
+
+const TIER_1_MARKERS = [
+  "gemini/pro",
+  "claude/opus",
+  "opus",
+  "openai/o1",
+  "openai/o3",
+  "/o1",
+  "/o3",
+];
+
+const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash-lite"];
+
+const TIER_2_MARKERS = ["gemini/flash", "claude/sonnet", "sonnet", "gpt-4o", "openai/gpt"];
+
+/**
+ * Infers the routing tier of an author identity, so commit telemetry and the audit
+ * can detect tier-1 models working outside their scope.
+ */
+export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | null {
+  if (!identityStr) return null;
+
+  const trimmed = identityStr.trim().toLowerCase();
+  if (trimmed === "") return null;
+
+  // tier-3 markers win over tier-2 so 'gemini/flash-lite' never escalates to tier-2
+  if (TIER_3_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-3";
+  if (TIER_1_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-1";
+  if (TIER_2_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-2";
+
+  return null;
+}

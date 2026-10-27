@@ -91,6 +91,8 @@ Commit Command:
     --reviewer "<identity>"         Optional reviewer trailer (e.g. gemini/pro)
     --finish-task                   Mark active subtask as completed in state
     --allow-empty                   Allow creating empty commits
+    --tier <tier-1|tier-2|tier-3>   Override the routing tier (defaults to the author tier)
+    --escalated                     Acknowledge a tier-1 author working on a tier-3 subtask
 
 State Subcommands:
   lognexus state [show]             Display current active issue and task state
@@ -474,6 +476,8 @@ async function handleCommit(args: string[]) {
       reviewer: parsed.reviewer,
       finishTask: parsed.finishTask,
       allowEmpty: parsed.allowEmpty,
+      tier: parsed.tier,
+      escalated: parsed.escalated,
     });
 
     console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);
