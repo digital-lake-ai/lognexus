@@ -1,0 +1,30 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.1.0",
+  "timestamp": "2026-10-27T08:42:41.487Z",
+  "issue": {
+    "id": 24,
+    "title": "feat: field telemetry & state hardening (CLI contract flags, non-destructive loadState, tier routing & v1.2.5)"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Preserve custom notes in telemetry report and detect PowerShell and Batch stacks",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/report.ts",
+        "src/telemetry/detector.ts",
+        "src/telemetry/index.ts",
+        "tests/telemetry.test.ts"
+      ],
+      "forbiddenFiles": [
+        "package.json",
+        "src/mcp/server.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
