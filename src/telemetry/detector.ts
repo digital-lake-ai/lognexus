@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { validateGitReference } from "../git/safe.js";
 
@@ -7,6 +7,50 @@ export interface DiffStatItem {
   ext: string;
   linesAdded: number;
   linesDeleted: number;
+}
+
+const SHELL_STACK_EXTENSIONS: Record<string, string> = {
+  ".ps1": "powershell",
+  ".psm1": "powershell",
+  ".psd1": "powershell",
+  ".bat": "batch",
+  ".cmd": "batch",
+};
+
+const SHELL_SCAN_MAX_DEPTH = 2;
+
+const SHELL_SCAN_IGNORED_DIRS = new Set([".git", "node_modules", "dist", ".lognexus"]);
+
+/**
+ * Walks the project tree up to two levels deep looking for shell scripts, so projects whose
+ * PowerShell/Batch automation lives in subdirectories are still classified correctly.
+ */
+function detectShellStacks(targetDir: string, stacks: Set<string>, depth = 0): void {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(targetDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    const stack = SHELL_STACK_EXTENSIONS[extname(entry.name).toLowerCase()];
+    if (stack === undefined) continue;
+
+    // Symlinks are skipped to avoid cycles and reads outside the scanned project.
+    if (entry.isFile() && !entry.isSymbolicLink()) {
+      stacks.add(stack);
+    }
+  }
+
+  if (depth >= SHELL_SCAN_MAX_DEPTH) return;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    if (SHELL_SCAN_IGNORED_DIRS.has(entry.name)) continue;
+
+    detectShellStacks(join(targetDir, entry.name), stacks, depth + 1);
+  }
 }
 
 export function detectProjectStacks(targetDir: string = process.cwd()): string[] {
@@ -49,6 +93,8 @@ export function detectProjectStacks(targetDir: string = process.cwd()): string[]
     if (existsSync(join(targetDir, "CMakeLists.txt")) || existsSync(join(targetDir, "Makefile"))) {
       stacks.add("c/cpp");
     }
+
+    detectShellStacks(targetDir, stacks);
   } catch {
     // Ignore read errors
   }

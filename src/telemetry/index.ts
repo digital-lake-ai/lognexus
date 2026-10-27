@@ -23,6 +23,7 @@ export {
   extractModelFamilyCategory,
 } from "./detector.js";
 export {
+  CUSTOM_NOTES_MARKER,
   formatTelemetryMarkdownReport,
   generateTelemetryReportFile,
 } from "./report.js";

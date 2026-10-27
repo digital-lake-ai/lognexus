@@ -1,7 +1,11 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { loadTelemetry } from "./collector.js";
 import type { TelemetryStore } from "./schema.js";
+
+export const CUSTOM_NOTES_MARKER = "<!-- lognexus:custom-notes -->";
+
+const LEGACY_CUSTOM_NOTES_PATTERN = /\n(##\s+5\b[\s\S]*)$/;
 
 export function formatTelemetryMarkdownReport(store: TelemetryStore): string {
   const sum = store.summary;
@@ -92,7 +96,32 @@ By delegating scoped subtasks to lightweight execution models (\`tier-3\`) while
 
 ---
 *Report generated automatically by **LogNexus** (\`@digital-lake/lognexus\`)*
+
+${CUSTOM_NOTES_MARKER}
 `;
+}
+
+function extractCustomNotes(existingContent: string | null): string {
+  if (existingContent === null) return "";
+
+  const markerIndex = existingContent.indexOf(CUSTOM_NOTES_MARKER);
+  if (markerIndex !== -1) {
+    return existingContent.slice(markerIndex + CUSTOM_NOTES_MARKER.length);
+  }
+
+  const legacy = existingContent.match(LEGACY_CUSTOM_NOTES_PATTERN);
+  return legacy ? `\n${legacy[1]}` : "";
+}
+
+function readPreviousReport(filePath: string): string | null {
+  if (!existsSync(filePath)) return null;
+
+  try {
+    return readFileSync(filePath, "utf8");
+  } catch {
+    // An unreadable previous report must never block report regeneration.
+    return null;
+  }
 }
 
 export function resolveConfinedOutputPath(targetDir: string, outputPath: string): string {
@@ -134,6 +163,9 @@ export function generateTelemetryReportFile(
     mkdirSync(parentDir, { recursive: true });
   }
 
-  writeFileSync(filePath, content, "utf8");
-  return { filePath, content };
+  const customNotes = extractCustomNotes(readPreviousReport(filePath));
+  const rendered = `${content}${customNotes}`;
+
+  writeFileSync(filePath, rendered, "utf8");
+  return { filePath, content: rendered };
 }

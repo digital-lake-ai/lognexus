@@ -1,11 +1,12 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AnonymousCommunityPayloadSchema,
   buildAnonymousCommunityPayload,
+  CUSTOM_NOTES_MARKER,
   clearTelemetry,
   detectProjectStacks,
   disableTelemetry,
@@ -132,6 +133,43 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("deepseek/deepseek-coder")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
     });
+
+    it("detects PowerShell and Batch stacks from scripts in nested folders", () => {
+      mkdirSync(join(tempDir, "scripts"), { recursive: true });
+      mkdirSync(join(tempDir, "tools", "win"), { recursive: true });
+      writeFileSync(join(tempDir, "scripts", "deploy.ps1"), "Write-Host 'deploy'\n", "utf8");
+      writeFileSync(join(tempDir, "tools", "win", "task.cmd"), "@echo off\n", "utf8");
+
+      const stacks = detectProjectStacks(tempDir);
+      expect(stacks).toContain("powershell");
+      expect(stacks).toContain("batch");
+    });
+
+    it("detects PowerShell modules and data files at the project root", () => {
+      writeFileSync(join(tempDir, "Module.psm1"), "function Invoke-Thing {}\n", "utf8");
+      writeFileSync(join(tempDir, "Module.psd1"), "@{ ModuleVersion = '1.0' }\n", "utf8");
+      writeFileSync(join(tempDir, "build.bat"), "@echo off\n", "utf8");
+
+      const stacks = detectProjectStacks(tempDir);
+      expect(stacks).toContain("powershell");
+      expect(stacks).toContain("batch");
+    });
+
+    it("ignores PowerShell and Batch scripts in ignored folders and beyond depth 2", () => {
+      mkdirSync(join(tempDir, "node_modules", "pkg"), { recursive: true });
+      mkdirSync(join(tempDir, "dist"), { recursive: true });
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      mkdirSync(join(tempDir, "a", "b", "c"), { recursive: true });
+
+      writeFileSync(join(tempDir, "node_modules", "pkg", "hook.ps1"), "exit 0\n", "utf8");
+      writeFileSync(join(tempDir, "dist", "bundle.ps1"), "exit 0\n", "utf8");
+      writeFileSync(join(tempDir, ".lognexus", "tool.cmd"), "exit 0\n", "utf8");
+      writeFileSync(join(tempDir, "a", "b", "c", "deep.ps1"), "exit 0\n", "utf8");
+
+      const stacks = detectProjectStacks(tempDir);
+      expect(stacks).not.toContain("powershell");
+      expect(stacks).not.toContain("batch");
+    });
   });
 
   describe("Zero-PII Metric Collection & ROI Calculation", () => {
@@ -248,6 +286,74 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(() => generateTelemetryReportFile(tempDir, ".")).toThrow(
         /Governance violation: Path traversal detected/,
       );
+    });
+
+    it("ends the generated report with the custom notes marker", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const { content } = generateTelemetryReportFile(tempDir);
+      expect(content).toContain(CUSTOM_NOTES_MARKER);
+      expect(content.trimEnd().endsWith(CUSTOM_NOTES_MARKER)).toBe(true);
+    });
+
+    it("preserves user authored custom notes across report regeneration", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const first = generateTelemetryReportFile(tempDir);
+      const notes =
+        "\n## 5. Team Notes\n\n- Deploy freeze until Friday.\n- Reviewed by security.\n";
+      writeFileSync(first.filePath, `${first.content}${notes}`, "utf8");
+
+      const second = generateTelemetryReportFile(tempDir);
+      expect(second.content).toContain("Team Notes");
+      expect(second.content).toContain("Deploy freeze until Friday.");
+      expect(second.content).toContain("Reviewed by security.");
+
+      const markerIndex = second.content.indexOf(CUSTOM_NOTES_MARKER);
+      expect(second.content.indexOf("Team Notes")).toBeGreaterThan(markerIndex);
+
+      // Notes survive a second regeneration without being duplicated.
+      const third = generateTelemetryReportFile(tempDir);
+      expect(third.content.split("Deploy freeze until Friday.").length - 1).toBe(1);
+    });
+
+    it("migrates custom notes from legacy v1.2.4 reports without a marker", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const { filePath } = generateTelemetryReportFile(tempDir);
+      const legacyReport = [
+        "# ⚡ LogNexus Telemetry & ROI Performance Report",
+        "",
+        "## 4. Cost Efficiency & Model-Tier ROI Evaluation",
+        "",
+        "Legacy metrics body.",
+        "",
+        "## 5. Engineering Notes",
+        "",
+        "- Keep the release train green.",
+        "",
+      ].join("\n");
+      writeFileSync(filePath, legacyReport, "utf8");
+
+      const regenerated = generateTelemetryReportFile(tempDir);
+      expect(regenerated.content).toContain(CUSTOM_NOTES_MARKER);
+      expect(regenerated.content).toContain("Engineering Notes");
+      expect(regenerated.content).toContain("Keep the release train green.");
+      expect(regenerated.content.indexOf("Engineering Notes")).toBeGreaterThan(
+        regenerated.content.indexOf(CUSTOM_NOTES_MARKER),
+      );
+    });
+
+    it("does not invent custom notes when the existing report has none", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const { filePath, content } = generateTelemetryReportFile(tempDir);
+      const stripped = content.split(CUSTOM_NOTES_MARKER)[0].replace(/\n*$/, "\n");
+      writeFileSync(filePath, stripped, "utf8");
+
+      const regenerated = generateTelemetryReportFile(tempDir);
+      expect(regenerated.content.trimEnd().endsWith(CUSTOM_NOTES_MARKER)).toBe(true);
+      expect(regenerated.content).not.toContain("## 5");
     });
 
     it("builds a valid GDPR/CCPA compliant anonymous community payload", () => {
