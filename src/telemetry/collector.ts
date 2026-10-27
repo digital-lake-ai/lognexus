@@ -262,6 +262,7 @@ export function recordCommitTelemetry(options: {
     totalDurationSec: 0,
     avgSubtaskDurationSec: 0,
   };
+  existingModel.tier = tier;
   existingModel.commits += 1;
   store.models[modelKey] = existingModel;
 

@@ -1,11 +1,11 @@
 import { execSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { listMcpPrompts, PromptResult } from "../src/mcp/prompts.js";
 import type { listMcpResources, ResourceReadResult } from "../src/mcp/resources.js";
-import { MCP_PROTOCOL_VERSION, processMcpMessage } from "../src/mcp/server.js";
+import { MCP_PROTOCOL_VERSION, MCP_SERVER_VERSION, processMcpMessage } from "../src/mcp/server.js";
 import type { listMcpTools, ToolCallResult } from "../src/mcp/tools.js";
 import { saveState } from "../src/state/manager.js";
 
@@ -70,7 +70,16 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(result.capabilities).toHaveProperty("resources");
       expect(result.capabilities).toHaveProperty("prompts");
       expect(result.serverInfo.name).toBe("lognexus");
-      expect(typeof result.serverInfo.version).toBe("string");
+      expect(result.serverInfo.version).toBe("1.2.5");
+    });
+
+    it("advertises the same version as the published package manifest", async () => {
+      const res = await rpc("initialize", { protocolVersion: MCP_PROTOCOL_VERSION }, tempDir);
+      const result = res.result as { serverInfo: { version: string } };
+      const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+
+      expect(result.serverInfo.version).toBe(pkg.version);
+      expect(MCP_SERVER_VERSION).toBe(pkg.version);
     });
 
     it("does not respond to the notifications/initialized notification", async () => {
@@ -214,6 +223,53 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       };
       expect(afterFinish.currentSubtask?.status).toBe("completed");
       expect(afterFinish.completedSubtasks).toContain("T1");
+    });
+
+    it("sets a subtask contract and tier through lognexus_state_set_task", async () => {
+      const res = await rpc(
+        "tools/call",
+        {
+          name: "lognexus_state_set_task",
+          arguments: {
+            taskId: "T2",
+            title: "Contract via MCP",
+            tier: "tier-2",
+            allowedFiles: ["src/state/manager.ts"],
+            forbiddenFiles: ["package.json"],
+            decisionBudget: "narrow",
+            verificationCmd: "npm test",
+          },
+        },
+        tempDir,
+      );
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBeUndefined();
+
+      const state = JSON.parse(result.content[0].text) as {
+        activeIssue: { id: number; tier: string } | null;
+        currentSubtask: { id: string; contract: Record<string, unknown> } | null;
+      };
+
+      expect(state.currentSubtask?.id).toBe("T2");
+      expect(state.currentSubtask?.contract).toEqual({
+        allowedFiles: ["src/state/manager.ts"],
+        forbiddenFiles: ["package.json"],
+        decisionBudget: "narrow",
+        verificationCmd: "npm test",
+      });
+      expect(state.activeIssue?.id).toBe(15);
+      expect(state.activeIssue?.tier).toBe("tier-2");
+    });
+
+    it("rejects an invalid tier for lognexus_state_set_task", async () => {
+      const res = await rpc(
+        "tools/call",
+        { name: "lognexus_state_set_task", arguments: { taskId: "T1", tier: "tier-9" } },
+        tempDir,
+      );
+      const result = res.result as ToolCallResult;
+      expect(result.isError).toBe(true);
+      expect(toolText(result)).toContain("tier");
     });
 
     it("rejects lognexus_state_set_task without a taskId", async () => {

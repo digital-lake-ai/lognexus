@@ -38,8 +38,8 @@ export interface JourneyTimelineResult {
 }
 
 const TRAILER_PATTERN = /^\s*(Authored-by|Reviewed-by|Last-code-by|Updated-by):\s*(.+)$/gim;
-const TASK_ID_PATTERN = /\((?:#\d+|[A-Z][A-Z0-9]*-\d+)\/(T[\d]+(?:-T?[\d]+)?)\)/i;
-const SUBJECT_TASK_PATTERN = /\b(T\d+(?:-T?\d+)?)\b/;
+const TASK_ID_PATTERN = /\((?:#\d+|[A-Z][A-Z0-9]*-\d+)\/(T\d+(?:-[a-zA-Z0-9]+)?)\)/i;
+const SUBJECT_TASK_PATTERN = /\b(T\d+(?:-[a-zA-Z0-9]+)?)\b/;
 const TIER_PATTERN = /\[(tier-\d)\]|(?:^|\s)(tier-\d)(?:\s|$)/i;
 const FIELD_SEPARATOR = "\x1f";
 const RECORD_SEPARATOR = "\x1e";
@@ -161,12 +161,16 @@ function parseNotePayload(note: string | null): NotePayload | null {
   }
 }
 
+function normalizeTaskId(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function extractTaskId(subject: string): string | null {
   const scoped = subject.match(TASK_ID_PATTERN);
-  if (scoped) return scoped[1].toUpperCase();
+  if (scoped) return normalizeTaskId(scoped[1]);
 
   const loose = subject.match(SUBJECT_TASK_PATTERN);
-  if (loose) return loose[1].toUpperCase();
+  if (loose) return normalizeTaskId(loose[1]);
 
   return null;
 }

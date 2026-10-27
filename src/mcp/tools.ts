@@ -4,6 +4,7 @@ import { executeAtomicCommit } from "../commit.js";
 import { attachCurrentStateToCommit } from "../notes/attach.js";
 import { getNote } from "../notes/notes.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "../state/manager.js";
+import type { ActiveIssueState, SubtaskContract } from "../state/schema.js";
 import { syncStateFromGit } from "../state/sync.js";
 import { getProjectStatus } from "../status.js";
 import {
@@ -18,6 +19,9 @@ import { generateTelemetryReportFile } from "../telemetry/report.js";
 import { getJourneyTimeline } from "../timeline/timeline.js";
 
 export const MCP_SERVER_NAME = "lognexus";
+
+const TIER_VALUES: readonly string[] = ["tier-1", "tier-2", "tier-3"];
+const DECISION_BUDGET_VALUES: readonly string[] = ["none", "narrow", "full"];
 
 export interface ToolDefinition {
   name: string;
@@ -94,6 +98,30 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           description: "Optional human-readable subtask title.",
         },
+        tier: {
+          type: "string",
+          enum: ["tier-1", "tier-2", "tier-3"],
+          description: "Optional routing tier to assign to the active issue.",
+        },
+        allowedFiles: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional list of files the subtask may modify.",
+        },
+        forbiddenFiles: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional list of files the subtask must not modify.",
+        },
+        decisionBudget: {
+          type: "string",
+          enum: ["none", "narrow", "full"],
+          description: "Optional decision budget for the subtask contract.",
+        },
+        verificationCmd: {
+          type: "string",
+          description: "Optional verification command for the subtask contract.",
+        },
       },
       required: ["taskId"],
     },
@@ -152,6 +180,17 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         allowEmpty: {
           type: "boolean",
           description: "If true, allows creating an empty commit.",
+        },
+        tier: {
+          type: "string",
+          enum: TIER_VALUES,
+          description:
+            "Optional routing tier override. Defaults to the tier inferred from the author identity.",
+        },
+        escalated: {
+          type: "boolean",
+          description:
+            "If true, acknowledges a tier-1 author working on a tier-3 subtask (records 'escalated: true' in the Git Note).",
         },
       },
       required: ["message"],
@@ -296,6 +335,17 @@ function readStringArg(
   return trimmed;
 }
 
+function readStringArrayArg(args: Record<string, unknown>, key: string): string[] | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+    throw new McpToolError(`Argument '${key}' must be an array of strings.`);
+  }
+  return value.map((entry) => (entry as string).trim()).filter((entry) => entry.length > 0);
+}
+
 function resolveCommitRef(args: Record<string, unknown>): string {
   return readStringArg(args, "commitRef") ?? "HEAD";
 }
@@ -354,7 +404,35 @@ export async function callMcpTool(
       case "lognexus_state_set_task": {
         const taskId = readStringArg(args, "taskId", { required: true }) as string;
         const title = readStringArg(args, "title") ?? "";
-        return textResult(setSubtask(taskId, title, undefined, targetDir));
+        const tierValue = readStringArg(args, "tier");
+        if (tierValue !== undefined && !TIER_VALUES.includes(tierValue)) {
+          throw new McpToolError("Argument 'tier' must be one of 'tier-1', 'tier-2', 'tier-3'.");
+        }
+        const tier = tierValue as ActiveIssueState["tier"] | undefined;
+        const allowedFiles = readStringArrayArg(args, "allowedFiles");
+        const forbiddenFiles = readStringArrayArg(args, "forbiddenFiles");
+        const decisionBudget = readStringArg(args, "decisionBudget");
+        if (decisionBudget !== undefined && !DECISION_BUDGET_VALUES.includes(decisionBudget)) {
+          throw new McpToolError(
+            "Argument 'decisionBudget' must be one of 'none', 'narrow', 'full'.",
+          );
+        }
+        const verificationCmd = readStringArg(args, "verificationCmd");
+
+        const contract =
+          allowedFiles !== undefined ||
+          forbiddenFiles !== undefined ||
+          decisionBudget !== undefined ||
+          verificationCmd !== undefined
+            ? {
+                allowedFiles: allowedFiles ?? [],
+                forbiddenFiles: forbiddenFiles ?? [],
+                decisionBudget: (decisionBudget as SubtaskContract["decisionBudget"]) ?? "none",
+                verificationCmd,
+              }
+            : undefined;
+
+        return textResult(setSubtask(taskId, title, contract, targetDir, { tier }));
       }
 
       case "lognexus_state_finish_task": {
@@ -378,12 +456,18 @@ export async function callMcpTool(
         const reviewer = readStringArg(args, "reviewer");
         const finishTask = Boolean(args.finishTask);
         const allowEmpty = Boolean(args.allowEmpty);
+        const tierValue = readStringArg(args, "tier");
+        if (tierValue !== undefined && !TIER_VALUES.includes(tierValue)) {
+          throw new McpToolError("Argument 'tier' must be one of 'tier-1', 'tier-2', 'tier-3'.");
+        }
         const res = executeAtomicCommit({
           message,
           author,
           reviewer,
           finishTask,
           allowEmpty,
+          tier: tierValue as ActiveIssueState["tier"] | undefined,
+          escalated: Boolean(args.escalated),
           targetDir,
         });
         return textResult(res);

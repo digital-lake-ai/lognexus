@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { rejectNotesReference, validateGitReference } from "../git/safe.js";
 import { getNote } from "../notes/notes.js";
+import { inferTierFromAuthor } from "../telemetry/detector.js";
 import { getJourneyTimeline, type TimelineItem } from "../timeline/timeline.js";
 
 export interface AuditViolation {
@@ -12,7 +13,8 @@ export interface AuditViolation {
     | "git-note-presence"
     | "contract-files"
     | "review-gate-separation"
-    | "base-branch-range";
+    | "base-branch-range"
+    | "tier-routing-violation";
   message: string;
   severity: "error" | "warn";
 }
@@ -29,11 +31,12 @@ export interface AuditResult {
 
 const VALID_TYPES = "feat, fix, docs, refactor, test, chore, style, perf";
 export const TICKET_PATTERN_SOURCE = "(?:#\\d+|[A-Z][A-Z0-9]*-\\d+)";
+export const SUBTASK_PATTERN_SOURCE = "T\\d+(?:-[a-zA-Z0-9]+)?";
 export const COMMIT_FORMAT_PATTERN = new RegExp(
-  `^(feat|fix|docs|refactor|test|chore|style|perf)\\(${TICKET_PATTERN_SOURCE}(\\/T\\d+(?:-T?\\d+)?)?\\): \\S+`,
+  `^(feat|fix|docs|refactor|test|chore|style|perf)\\(${TICKET_PATTERN_SOURCE}(\\/${SUBTASK_PATTERN_SOURCE})?\\): \\S+`,
 );
 export const SUBJECT_TASK_PATTERN = new RegExp(
-  `\\(${TICKET_PATTERN_SOURCE}\\/(T\\d+(?:-T?\\d+)?)\\)`,
+  `\\(${TICKET_PATTERN_SOURCE}\\/(${SUBTASK_PATTERN_SOURCE})\\)`,
   "i",
 );
 const IDENTITY_PATTERN = /(\S+\/\S+)/;
@@ -46,6 +49,7 @@ interface NoteContract {
 
 interface NotePayload {
   subtask?: { contract?: NoteContract | null } | null;
+  escalated?: unknown;
 }
 
 export interface Identity {
@@ -163,6 +167,21 @@ function readContract(note: string | null): NoteContract | null {
   }
 }
 
+function isEscalationAcknowledged(note: string | null, subject: string): boolean {
+  if (/\[escalated\]/i.test(subject)) return true;
+  if (note === null) return false;
+  try {
+    const parsed = JSON.parse(note) as NotePayload;
+    return parsed?.escalated === true;
+  } catch {
+    return false;
+  }
+}
+
+function isImplementationFile(file: string): boolean {
+  return !file.endsWith(".md") && !file.startsWith(".lognexus/");
+}
+
 function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
   const violations: AuditViolation[] = [];
   const base = { commitSha: item.sha, shortSha: item.shortSha };
@@ -242,6 +261,21 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
           rule: "contract-files",
           message: `Commit touches file(s) outside the allowed set: ${outside.join(", ")}.`,
           severity: "error",
+        });
+      }
+    }
+
+    if (
+      inferTierFromAuthor(item.author) === "tier-1" &&
+      !isEscalationAcknowledged(note, item.subject)
+    ) {
+      const implementationFiles = changedFiles.filter(isImplementationFile);
+      if (implementationFiles.length > 0) {
+        violations.push({
+          ...base,
+          rule: "tier-routing-violation",
+          message: `Tier-1 author '${item.author}' modified implementation file(s) on a contracted subtask without an escalation acknowledgement: ${implementationFiles.join(", ")}.`,
+          severity: "warn",
         });
       }
     }

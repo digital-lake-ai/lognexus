@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { validateGitReference } from "../git/safe.js";
 
@@ -7,6 +7,50 @@ export interface DiffStatItem {
   ext: string;
   linesAdded: number;
   linesDeleted: number;
+}
+
+const SHELL_STACK_EXTENSIONS: Record<string, string> = {
+  ".ps1": "powershell",
+  ".psm1": "powershell",
+  ".psd1": "powershell",
+  ".bat": "batch",
+  ".cmd": "batch",
+};
+
+const SHELL_SCAN_MAX_DEPTH = 2;
+
+const SHELL_SCAN_IGNORED_DIRS = new Set([".git", "node_modules", "dist", ".lognexus"]);
+
+/**
+ * Walks the project tree up to two levels deep looking for shell scripts, so projects whose
+ * PowerShell/Batch automation lives in subdirectories are still classified correctly.
+ */
+function detectShellStacks(targetDir: string, stacks: Set<string>, depth = 0): void {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(targetDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    const stack = SHELL_STACK_EXTENSIONS[extname(entry.name).toLowerCase()];
+    if (stack === undefined) continue;
+
+    // Symlinks are skipped to avoid cycles and reads outside the scanned project.
+    if (entry.isFile() && !entry.isSymbolicLink()) {
+      stacks.add(stack);
+    }
+  }
+
+  if (depth >= SHELL_SCAN_MAX_DEPTH) return;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    if (SHELL_SCAN_IGNORED_DIRS.has(entry.name)) continue;
+
+    detectShellStacks(join(targetDir, entry.name), stacks, depth + 1);
+  }
 }
 
 export function detectProjectStacks(targetDir: string = process.cwd()): string[] {
@@ -49,6 +93,8 @@ export function detectProjectStacks(targetDir: string = process.cwd()): string[]
     if (existsSync(join(targetDir, "CMakeLists.txt")) || existsSync(join(targetDir, "Makefile"))) {
       stacks.add("c/cpp");
     }
+
+    detectShellStacks(targetDir, stacks);
   } catch {
     // Ignore read errors
   }
@@ -147,4 +193,38 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
 
   const firstWord = trimmed.split(/\s+/)[0];
   return firstWord || "unknown/other";
+}
+
+export type AuthorTier = "tier-1" | "tier-2" | "tier-3";
+
+const TIER_1_MARKERS = [
+  "gemini/pro",
+  "claude/opus",
+  "opus",
+  "openai/o1",
+  "openai/o3",
+  "/o1",
+  "/o3",
+];
+
+const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash-lite"];
+
+const TIER_2_MARKERS = ["gemini/flash", "claude/sonnet", "sonnet", "gpt-4o", "openai/gpt"];
+
+/**
+ * Infers the routing tier of an author identity, so commit telemetry and the audit
+ * can detect tier-1 models working outside their scope.
+ */
+export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | null {
+  if (!identityStr) return null;
+
+  const trimmed = identityStr.trim().toLowerCase();
+  if (trimmed === "") return null;
+
+  // tier-3 markers win over tier-2 so 'gemini/flash-lite' never escalates to tier-2
+  if (TIER_3_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-3";
+  if (TIER_1_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-1";
+  if (TIER_2_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-2";
+
+  return null;
 }

@@ -1,11 +1,12 @@
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { auditBranch } from "../src/audit/audit.js";
+import { getCliVersion } from "../src/cli.js";
 import { runDiagnostics } from "../src/doctor.js";
-import { processMcpMessage } from "../src/mcp/server.js";
+import { MCP_SERVER_VERSION, processMcpMessage } from "../src/mcp/server.js";
 import type { ToolCallResult } from "../src/mcp/tools.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
 import { getNote } from "../src/notes/notes.js";
@@ -90,6 +91,7 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     const notePayload = attachCurrentStateToCommit("HEAD", { cwd: tempDir });
     expect(notePayload.generator).toBe("LogNexus");
     expect(notePayload.subtask?.id).toBe("T1");
+    expect(notePayload.version).toBe("1.2.5");
 
     const noteRaw = getNote("HEAD", { cwd: tempDir });
     expect(noteRaw).not.toBeNull();
@@ -144,6 +146,17 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     expect(mcpTimelineRaw).not.toBeNull();
     const mcpTimeline = JSON.parse(mcpTimelineRaw as string);
     expect((mcpTimeline.result as ToolCallResult).content[0].text).toContain("`T1`");
+
+    // 9b. Every published surface must advertise the same version (Glama handshake parity)
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    const mcpInitializeRaw = await processMcpMessage(
+      JSON.stringify({ jsonrpc: "2.0", id: 3, method: "initialize", params: {} }),
+      tempDir,
+    );
+    const mcpInitialize = JSON.parse(mcpInitializeRaw as string);
+    expect(mcpInitialize.result.serverInfo.version).toBe(pkg.version);
+    expect(MCP_SERVER_VERSION).toBe(pkg.version);
+    expect(getCliVersion()).toBe(pkg.version);
 
     // 10. Clear persistent state post-merge
     clearState(tempDir);

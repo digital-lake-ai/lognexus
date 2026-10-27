@@ -128,6 +128,23 @@ describe("Journey Timeline", () => {
     expect(timeline.markdownTable.split("\n")[2]).toMatch(/\| No \|$/);
   });
 
+  it("preserves alphanumeric subtask suffixes (e.g. T0-v2) when extracting the task ID", () => {
+    createBranch(tempDir, "issue/9-timeline-audit");
+
+    commitFile(
+      tempDir,
+      "feature.txt",
+      "feature",
+      "feat(#9/T0-v2): keep suffixed subtask ids\n\nAuthored-by: deepseek/chat (kimi-code)\n",
+    );
+
+    const timeline = getJourneyTimeline(baseBranch, tempDir);
+    const [item] = timeline.items;
+
+    expect(item.taskId).toBe("T0-v2");
+    expect(timeline.markdownTable.split("\n")[2]).toContain("`T0-v2`");
+  });
+
   it("generates a structured PR body draft", () => {
     createBranch(tempDir, "issue/9-timeline-audit");
 

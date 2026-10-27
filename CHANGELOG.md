@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.5] - 2026-10-26
+
+### Summary
+Field-hardening cycle driven by real multi-model usage: subtask contracts are now settable from the CLI, state loading no longer destroys local edits, tier routing is enforced in the audit, telemetry reports preserve user notes, and every published surface reports a single synchronized version.
+
+### Added
+- **Non-interactive subtask contracts (`lognexus state set-task`):** new flags to register a subtask contract directly from automation, with `allowedFiles`, `forbiddenFiles`, `decisionBudget` and `verificationCmd`, plus tier validation and automatic branch synchronization.
+- **Tier routing audit (`src/audit/audit.ts`):** new `tier-routing-violation` rule warns when a `tier-1` author touches implementation files without an `[escalated]` marker or `escalated: true` in the Git Note.
+- **Author tier in Git Notes (`src/notes/attach.ts`, `src/telemetry/collector.ts`):** notes record the effective author tier (and `escalated: true` when applicable); commit telemetry attributes each model entry to its author tier.
+- **PowerShell and Batch stack detection (`src/telemetry/detector.ts`):** `detectProjectStacks` now scans up to two levels deep for `.ps1`, `.psm1`, `.psd1` (`powershell`) and `.bat`, `.cmd` (`batch`), skipping `.git`, `node_modules`, `dist` and `.lognexus`.
+
+### Changed
+- **Subtask ID parsing:** a single unified regex now handles subtask identifiers across the engine, so `T1`-style IDs are recognized consistently.
+- **Commit tier inference:** the CLI infers the author tier from the `Authored-by` trailer instead of relying on a hardcoded default.
+- **MCP server version (`src/mcp/server.ts`):** `MCP_SERVER_VERSION` is derived from `getCliVersion()` instead of a hardcoded `1.0.0`, so the handshake always advertises the published package version (addresses Glama registration).
+- **Git Note payload version (`src/notes/attach.ts`):** the `version` field now reports the real LogNexus version instead of a static `1.1.0`.
+
+### Fixed
+- **Destructive `loadState`:** reading the state file no longer rewrites or drops user edits on disk.
+- **Custom notes preservation (`src/telemetry/report.ts`):** telemetry reports end with a `<!-- lognexus:custom-notes -->` marker, and regeneration preserves anything written after it — including notes from legacy `v1.2.4` reports that used a `## 5.` section, which are migrated forward.
+
 ## [1.0.0] - 2026-10-21
 
 ### Summary

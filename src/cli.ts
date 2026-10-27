@@ -10,7 +10,14 @@ import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { fetchNotes, getNote, listNotes, pushNotes } from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
-import { clearState, finishSubtask, loadState, setSubtask } from "./state/manager.js";
+import {
+  clearState,
+  finishSubtask,
+  loadState,
+  type ParsedSetTaskArgs,
+  parseSetTaskArgs,
+  setSubtask,
+} from "./state/manager.js";
 import { syncStateFromGit } from "./state/sync.js";
 import { getProjectStatus } from "./status.js";
 import {
@@ -38,7 +45,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.2.4";
+  return "1.2.5";
 }
 
 function printHeader() {
@@ -84,6 +91,8 @@ Commit Command:
     --reviewer "<identity>"         Optional reviewer trailer (e.g. gemini/pro)
     --finish-task                   Mark active subtask as completed in state
     --allow-empty                   Allow creating empty commits
+    --tier <tier-1|tier-2|tier-3>   Override the routing tier (defaults to the author tier)
+    --escalated                     Acknowledge a tier-1 author working on a tier-3 subtask
 
 State Subcommands:
   lognexus state [show]             Display current active issue and task state
@@ -243,17 +252,25 @@ async function handleState(args: string[]) {
     }
 
     case "set-task": {
-      const taskId = args[1];
-      const title = args.slice(2).join(" ");
-      if (!taskId) {
+      if (!args[1]) {
         console.error(
           "Error: Subtask ID is required (e.g. lognexus state set-task T1 'Add schema')\n",
         );
         process.exit(1);
       }
+      let parsed: ParsedSetTaskArgs;
+      try {
+        parsed = parseSetTaskArgs(args.slice(1));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Error: ${msg}\n`);
+        process.exit(1);
+      }
       printHeader();
-      setSubtask(taskId, title);
-      console.log(`[OK] Active subtask set to: ${taskId}${title ? ` — ${title}` : ""}\n`);
+      setSubtask(parsed.taskId, parsed.title, parsed.contract, undefined, { tier: parsed.tier });
+      console.log(
+        `[OK] Active subtask set to: ${parsed.taskId}${parsed.title ? ` — ${parsed.title}` : ""}\n`,
+      );
       break;
     }
 
@@ -459,6 +476,8 @@ async function handleCommit(args: string[]) {
       reviewer: parsed.reviewer,
       finishTask: parsed.finishTask,
       allowEmpty: parsed.allowEmpty,
+      tier: parsed.tier,
+      escalated: parsed.escalated,
     });
 
     console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);

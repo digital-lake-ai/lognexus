@@ -6,7 +6,15 @@ import { checkSelfApproval } from "./audit/audit.js";
 import { SCOPED_BRANCH_TEMPLATE } from "./branch.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { finishSubtask, loadState } from "./state/manager.js";
+import { inferActiveIssueFromBranch } from "./state/sync.js";
 import { recordCommitTelemetry, recordReviewGateBlock } from "./telemetry/collector.js";
+import { type AuthorTier, inferTierFromAuthor } from "./telemetry/detector.js";
+
+export const TIER_VALUES = ["tier-1", "tier-2", "tier-3"] as const;
+
+export function isAuthorTier(value: string): value is AuthorTier {
+  return (TIER_VALUES as readonly string[]).includes(value);
+}
 
 export interface CommitOptions {
   message: string;
@@ -15,6 +23,10 @@ export interface CommitOptions {
   finishTask?: boolean;
   targetDir?: string;
   allowEmpty?: boolean;
+  /** Explicit routing tier override; defaults to the tier inferred from the author. */
+  tier?: AuthorTier;
+  /** Acknowledges a tier-1 author working on a tier-3 subtask. */
+  escalated?: boolean;
   /** Internal test-only escape hatch for isolated unit tests. Never exposed via CLI or MCP. */
   _internalTestAllowMain?: boolean;
 }
@@ -25,6 +37,8 @@ export interface ParsedCommitArgs {
   reviewer?: string;
   finishTask: boolean;
   allowEmpty: boolean;
+  tier?: AuthorTier;
+  escalated: boolean;
 }
 
 export function parseCommitArgs(args: string[]): ParsedCommitArgs {
@@ -33,6 +47,8 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
   let reviewer: string | undefined;
   let finishTask = false;
   let allowEmpty = false;
+  let tier: AuthorTier | undefined;
+  let escalated = false;
 
   const isFlag = (token: string | undefined): boolean => {
     if (!token) return false;
@@ -76,6 +92,17 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
       finishTask = true;
     } else if (arg === "--allow-empty") {
       allowEmpty = true;
+    } else if (arg === "--tier") {
+      const value = args[++i]?.toLowerCase();
+      if (!value) {
+        throw new Error("Flag --tier requires a value: tier-1, tier-2 or tier-3.");
+      }
+      if (!isAuthorTier(value)) {
+        throw new Error(`Invalid --tier value '${value}'. Expected tier-1, tier-2 or tier-3.`);
+      }
+      tier = value;
+    } else if (arg === "--escalated") {
+      escalated = true;
     }
   }
 
@@ -85,6 +112,8 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
     reviewer,
     finishTask,
     allowEmpty,
+    tier,
+    escalated,
   };
 }
 
@@ -124,6 +153,18 @@ function matchesPath(file: string, rule: string): boolean {
     return pattern.test(file);
   }
   return file === rule;
+}
+
+function listStagedFiles(cwd: string): string[] {
+  try {
+    return runGit(["diff", "--cached", "--name-only"], cwd)
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map(normalizePath)
+      .filter((file) => file !== "");
+  } catch {
+    return [];
+  }
 }
 
 export function executeAtomicCommit(options: CommitOptions): CommitResult {
@@ -189,22 +230,35 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
 
   // 3. Pre-flight check: subtask contract file constraints against staged changes
   const state = loadState(cwd);
+  if (state.activeIssue === null) {
+    state.activeIssue = inferActiveIssueFromBranch(cwd);
+  }
+
+  const stagedFiles = listStagedFiles(cwd);
+
+  // 3.1 Tier routing guard: tier-1 authors must acknowledge working outside their scope
+  const effectiveTier: AuthorTier =
+    options.tier ?? inferTierFromAuthor(author) ?? state.activeIssue?.tier ?? "tier-3";
+
+  if (
+    effectiveTier === "tier-1" &&
+    (state.activeIssue?.tier === "tier-3" || state.currentSubtask?.contract) &&
+    !options.escalated
+  ) {
+    const implementationFiles = stagedFiles.filter(
+      (file) => !file.endsWith(".md") && !file.startsWith(".lognexus/"),
+    );
+    if (implementationFiles.length > 0) {
+      process.stderr.write(
+        `[WARN] tier-routing-violation: tier-1 author '${author}' is modifying implementation files on a tier-3 subtask without '--escalated'.\n`,
+      );
+    }
+  }
+
   if (state.currentSubtask?.contract) {
     const contract = state.currentSubtask.contract;
     const allowed = (contract.allowedFiles ?? []).map(normalizePath);
     const forbidden = (contract.forbiddenFiles ?? []).map(normalizePath);
-
-    let stagedFiles: string[] = [];
-    try {
-      const output = runGit(["diff", "--cached", "--name-only"], cwd);
-      stagedFiles = output
-        .replace(/\r\n/g, "\n")
-        .split("\n")
-        .map(normalizePath)
-        .filter((f) => f !== "");
-    } catch {
-      // not in git or nothing staged
-    }
 
     const forbiddenTouched = stagedFiles.filter((file) =>
       forbidden.some((rule) => matchesPath(file, rule)),
@@ -274,13 +328,17 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   }
 
   // 8. Attach current state Git Note (with completed status preserved)
-  attachCurrentStateToCommit("HEAD", { cwd });
+  attachCurrentStateToCommit("HEAD", {
+    cwd,
+    tier: effectiveTier,
+    escalated: Boolean(options.escalated),
+  });
 
   // 9. Passive telemetry hook (only active if user opted in)
   recordCommitTelemetry({
     sha,
     author,
-    tier: state.activeIssue?.tier ?? "tier-3",
+    tier: effectiveTier,
     targetDir: cwd,
   });
 

@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline";
+import { getCliVersion } from "../cli.js";
 import { getMcpPrompt, listMcpPrompts, McpPromptError, type PromptResult } from "./prompts.js";
 import { listMcpResources, McpResourceError, readMcpResource } from "./resources.js";
 import {
@@ -10,7 +11,7 @@ import {
 } from "./tools.js";
 
 export const MCP_PROTOCOL_VERSION = "2024-11-05";
-export const MCP_SERVER_VERSION = "1.0.0";
+export const MCP_SERVER_VERSION = getCliVersion();
 
 const JSON_RPC_PARSE_ERROR = -32700;
 const JSON_RPC_INVALID_REQUEST = -32600;
