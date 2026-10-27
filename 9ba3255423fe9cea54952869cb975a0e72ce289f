@@ -1,0 +1,30 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.5",
+  "timestamp": "2026-10-27T13:03:59.402Z",
+  "issue": {
+    "id": 24,
+    "title": "feat: field telemetry & state hardening (CLI contract flags, non-destructive loadState, tier routing & v1.2.5)"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Sync MCP server version and bump atomic version contract to 1.2.5",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/mcp/server.ts",
+        "src/notes/attach.ts",
+        "src/cli.ts",
+        "package.json",
+        "CHANGELOG.md",
+        "tests/mcp.test.ts",
+        "tests/e2e.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
