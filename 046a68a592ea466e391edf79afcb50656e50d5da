@@ -1,0 +1,31 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.6",
+  "timestamp": "2026-10-28T15:29:03.204Z",
+  "issue": {
+    "id": 26,
+    "title": "security: socket supply-chain hardening (local-only telemetry) & TDQS restoration to A"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Bump atomic version contract to 1.2.6",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        "src/cli.ts",
+        ".claude-plugin/plugin.json",
+        "docs/TELEMETRY_PRIVACY.md",
+        "CHANGELOG.md",
+        "tests/mcp.test.ts",
+        "tests/e2e.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
