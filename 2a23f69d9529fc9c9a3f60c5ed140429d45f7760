@@ -1,0 +1,28 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.5",
+  "timestamp": "2026-10-28T15:18:23.518Z",
+  "issue": {
+    "id": 26,
+    "title": "security: socket supply-chain hardening (local-only telemetry) & TDQS restoration to A"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Align telemetry privacy policy with local-only mode",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "docs/TELEMETRY_PRIVACY.md",
+        "README.md"
+      ],
+      "forbiddenFiles": [
+        "package.json",
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
