@@ -1,0 +1,29 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.5",
+  "timestamp": "2026-10-28T15:25:55.347Z",
+  "issue": {
+    "id": 26,
+    "title": "security: socket supply-chain hardening (local-only telemetry) & TDQS restoration to A"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Normalize MCP tool titles, descriptions and schema examples",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/mcp/tools.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "package.json",
+        "README.md",
+        "src/commit.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
