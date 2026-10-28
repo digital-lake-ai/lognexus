@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.6] - 2026-10-28
+
+### Summary
+Supply-chain hardening of the telemetry surface and a quality pass over the MCP tool contract. Telemetry is now verifiably local-only — the dead community dispatch path and its network environment variables are gone — and every MCP tool advertises a consistent title, an unambiguous `Use when` / `Not for` description and a schema example, so agents pick the right tool instead of guessing.
+
+### Security
+- **Dead community telemetry network dispatch removed:** the unused upload path and its associated environment variables are deleted. LogNexus performs zero telemetry network calls; all metrics stay in `.lognexus/telemetry.json` inside the working directory.
+
+### Changed
+- **MCP tool titles:** all 12 tools now follow the `LogNexus <Family>: <Action>` convention.
+- **MCP tool descriptions:** every description states what the tool is for (`Use when`) and what it is not for (`Not for`), disambiguating the pairs that agents confused most — `state_get` vs `state_sync` and `commit` vs `note_attach`.
+- **MCP input schemas:** each tool exposes an `examples` array with a valid sample payload, and the `tier` parameter of `lognexus_state_set_task` and `lognexus_commit` now shares a single canonical description.
+
+### Documentation
+- **Telemetry privacy policy:** rewritten to describe the 100% offline, local-only architecture explicitly, including the capability boundaries of the system.
+
 ## [1.2.5] - 2026-10-26
 
 ### Summary

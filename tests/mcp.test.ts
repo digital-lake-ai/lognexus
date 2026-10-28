@@ -70,7 +70,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(result.capabilities).toHaveProperty("resources");
       expect(result.capabilities).toHaveProperty("prompts");
       expect(result.serverInfo.name).toBe("lognexus");
-      expect(result.serverInfo.version).toBe("1.2.5");
+      expect(result.serverInfo.version).toBe("1.2.6");
     });
 
     it("advertises the same version as the published package manifest", async () => {

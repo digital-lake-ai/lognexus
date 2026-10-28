@@ -49,7 +49,7 @@ Under a kill switch, the store reports mode `off`, no metrics file is written, a
 | Category | ✅ What Is Stored Locally (`local` mode only) | ❌ What Is Never Stored (Forbidden) |
 | :--- | :--- | :--- |
 | **Identity** | An anonymous, randomly generated `UUIDv4` (`anonymousProjectId`) scoped to the project. | Usernames, real names, email addresses, GitHub handles, hostnames, IP addresses. |
-| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.2.5`). | Absolute file system paths, home directories, environment variable values. |
+| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.2.6`). | Absolute file system paths, home directories, environment variable values. |
 | **Project Stack** | Detected stack categories (e.g. `["typescript", "nodejs"]`) and file-extension counters (`.ts`, `.py`, `.ps1`). | Source code, file names, directory names, package names, internal library names. |
 | **AI Models** | Model family (`gemini`, `claude`, `deepseek`, `openai`, `kimi`) and operational tier (`tier-1`, `tier-2`, `tier-3`), derived from commit trailers. | Prompts, completions, reasoning tokens, system instructions, API keys. |
 | **Metrics** | Numeric counters: lines added, lines deleted, subtask duration in seconds, blocked review gate count, estimated % cost saved. | Commit subjects, commit bodies, diff contents, git branches, PR descriptions, secrets. |
@@ -77,7 +77,7 @@ Example payload:
   "environment": {
     "os": "win32",
     "nodeVersion": "v22.11.0",
-    "lognexusVersion": "1.2.5",
+    "lognexusVersion": "1.2.6",
     "detectedStacks": ["typescript", "nodejs"]
   },
   "summary": {
