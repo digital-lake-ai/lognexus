@@ -26,6 +26,7 @@ import {
   disableTelemetry,
   enableTelemetry,
   isTelemetryGloballyDisabled,
+  LOCAL_ONLY_TELEMETRY_ERROR,
   loadTelemetry,
 } from "./telemetry/collector.js";
 import { generateTelemetryReportFile } from "./telemetry/report.js";
@@ -45,7 +46,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.2.5";
+  return "1.2.6";
 }
 
 function printHeader() {
@@ -74,9 +75,7 @@ Commands:
 
 Telemetry Subcommands:
   lognexus telemetry [status]       Show current telemetry mode and project metrics
-  lognexus telemetry enable         Enable local telemetry (zero network calls)
-  lognexus telemetry enable --share --accept-terms
-                                    Enable anonymous community telemetry (GDPR opt-in)
+  lognexus telemetry enable         Enable local telemetry (zero network calls, strictly local storage)
   lognexus telemetry inspect        Inspect the exact Zero-PII payload before sending
   lognexus telemetry report [-o f]  Generate .lognexus/telemetry.md report with ROI metrics
   lognexus telemetry disable        Disable all telemetry immediately
@@ -531,21 +530,18 @@ async function handleTelemetry(args: string[]) {
       const share = args.includes("--share");
       const acceptTerms = args.includes("--accept-terms");
 
+      if (share || acceptTerms) {
+        console.error(`[FAIL] ${LOCAL_ONLY_TELEMETRY_ERROR}\n`);
+        process.exit(1);
+      }
+
       try {
-        const res = enableTelemetry({ share, acceptTerms });
-        if (res.mode === "community") {
-          console.log("[OK] Telemetry enabled in COMMUNITY mode.");
-          console.log(
-            "     Terms accepted. Anonymous non-sensitive metrics will help mature MCP & routing.",
-          );
-          console.log("     Full policy & payload schema: docs/TELEMETRY_PRIVACY.md\n");
-        } else {
-          console.log("[OK] Telemetry enabled in LOCAL mode.");
-          console.log("     Metrics are stored strictly locally in .lognexus/telemetry.json.");
-          console.log(
-            "     Zero network calls are made. Run 'lognexus telemetry report' to generate a report.\n",
-          );
-        }
+        enableTelemetry({ cwd: process.cwd() });
+        console.log("[OK] Telemetry enabled in LOCAL mode.");
+        console.log("     Metrics are stored strictly locally in .lognexus/telemetry.json.");
+        console.log(
+          "     Zero network calls are made. Run 'lognexus telemetry report' to generate a report.\n",
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[FAIL] ${msg}\n`);

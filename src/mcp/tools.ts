@@ -31,6 +31,7 @@ export interface ToolDefinition {
     type: "object";
     properties: Record<string, unknown>;
     required?: string[];
+    examples?: Record<string, unknown>[];
   };
 }
 
@@ -51,42 +52,47 @@ export class McpToolError extends Error {
   }
 }
 
+const TIER_DESCRIPTION = "Operational routing tier ('tier-1', 'tier-2', 'tier-3').";
+
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "lognexus_status",
-    title: "LogNexus project status",
+    title: "LogNexus Status: Inspect workspace and Git branch state",
     description:
-      "Inspect the current Git branch, whether the directory is a Git repository, the active issue, the routing mode and the recommended model tier.",
+      "Inspect the current Git branch, whether the directory is a Git repository, the active issue, the routing mode and the recommended model tier. Use when you need a cheap read-only snapshot before choosing a branch, a tier, or a next action. Not for reading the subtask contract (use lognexus_state_get) or for refreshing the state from Git and GitHub (use lognexus_state_sync).",
     inputSchema: {
       type: "object",
       properties: {},
+      examples: [{}],
     },
   },
   {
     name: "lognexus_state_get",
-    title: "Get agent state",
+    title: "LogNexus State: Get persistent session state",
     description:
-      "Return the persistent LogNexus agent state (.lognexus/state.json): active issue, current subtask, completed subtasks and last synchronization timestamp.",
+      "Return the persistent LogNexus agent state (.lognexus/state.json) as stored on disk: active issue, current subtask and its file contract, completed subtasks and last synchronization timestamp. Use when you need the current contract or completion list and nothing has changed the branch since the last sync. Not for validating the state against the Git branch or GitHub (use lognexus_state_sync), and not for starting or finishing subtasks (use lognexus_state_set_task or lognexus_state_finish_task).",
     inputSchema: {
       type: "object",
       properties: {},
+      examples: [{}],
     },
   },
   {
     name: "lognexus_state_sync",
-    title: "Sync state from Git",
+    title: "LogNexus State: Synchronize state from Git branch and GitHub",
     description:
-      "Synchronize the persistent state from the current Git branch and GitHub metadata, then return the updated state.",
+      "Reconcile the persistent state with the current Git branch and GitHub metadata, rewriting .lognexus/state.json and returning the updated state. Use when you just checked out a branch, rebased, opened a PR, or suspect the stored state is stale. Not for a plain read of what is already on disk (use lognexus_state_get); sync mutates the store and runs git and gh.",
     inputSchema: {
       type: "object",
       properties: {},
+      examples: [{}],
     },
   },
   {
     name: "lognexus_state_set_task",
-    title: "Set active subtask",
+    title: "LogNexus State: Set active subtask and file contract",
     description:
-      "Mark a subtask as in progress (equivalent to 'lognexus state set-task <id> [title]') and return the updated state.",
+      "Mark a subtask as in progress and persist its closed delegation contract (allowed files, forbidden files, decision budget, verification command) plus the active issue tier. Equivalent to 'lognexus state set-task <id> [title]'. Use when you begin a new subtask and need the file scope enforced by the commit engine and the audit. Not for marking a subtask complete (use lognexus_state_finish_task) and not for reading the contract (use lognexus_state_get).",
     inputSchema: {
       type: "object",
       properties: {
@@ -101,7 +107,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         tier: {
           type: "string",
           enum: ["tier-1", "tier-2", "tier-3"],
-          description: "Optional routing tier to assign to the active issue.",
+          description: TIER_DESCRIPTION,
         },
         allowedFiles: {
           type: "array",
@@ -124,13 +130,24 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["taskId"],
+      examples: [
+        {
+          taskId: "T1",
+          title: "Remove dead telemetry dispatch",
+          tier: "tier-3",
+          allowedFiles: ["src/telemetry/collector.ts"],
+          forbiddenFiles: ["package.json"],
+          decisionBudget: "none",
+          verificationCmd: "npm test",
+        },
+      ],
     },
   },
   {
     name: "lognexus_state_finish_task",
-    title: "Finish subtask",
+    title: "LogNexus State: Finish subtask and mark completed",
     description:
-      "Mark a subtask as completed (equivalent to 'lognexus state finish-task <id>') and return the updated state.",
+      "Mark a subtask as completed in the persistent state and return the updated state. Equivalent to 'lognexus state finish-task <id>'. Use when the subtask work has already been committed and its Git Note attached. Not for creating the commit itself (use lognexus_commit with finishTask: true, which finishes the task atomically) and not for editing the contract (use lognexus_state_set_task).",
     inputSchema: {
       type: "object",
       properties: {
@@ -140,23 +157,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["taskId"],
+      examples: [{ taskId: "T1" }],
     },
   },
   {
     name: "lognexus_state_clear",
-    title: "Clear agent state",
+    title: "LogNexus State: Clear session state",
     description:
-      "Reset the persistent LogNexus agent state to empty (equivalent to 'lognexus state clear').",
+      "Reset the persistent LogNexus agent state to empty. Equivalent to 'lognexus state clear'. Use when abandoning an issue, switching to an unrelated task, or recovering from a corrupted state file. Not for finishing a single subtask (use lognexus_state_finish_task); clearing is destructive and drops the whole contract.",
     inputSchema: {
       type: "object",
       properties: {},
+      examples: [{}],
     },
   },
   {
     name: "lognexus_commit",
-    title: "Atomic commit",
+    title: "LogNexus Commit: Atomic commit with Git Note and review gate",
     description:
-      "Atomically create a Git commit with conventional commit format, authorship trailers, subtask file contract validation, automatic task finishing, and Git Note attachment in a single operation.",
+      "Atomically create a Git commit with conventional commit format, authorship trailers, subtask file contract validation, optional task finishing, and Git Note attachment in a single operation. Use when creating any commit on a LogNexus branch, including the atomic subtask commits that close a Tn. Not for retro-attaching a note to a commit that already exists (use lognexus_note_attach), and not for bypassing the gate: the commit engine refuses to run on a protected branch and rejects files outside the contract.",
     inputSchema: {
       type: "object",
       properties: {
@@ -184,8 +203,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         tier: {
           type: "string",
           enum: TIER_VALUES,
-          description:
-            "Optional routing tier override. Defaults to the tier inferred from the author identity.",
+          description: TIER_DESCRIPTION,
         },
         escalated: {
           type: "boolean",
@@ -194,13 +212,20 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
       },
       required: ["message"],
+      examples: [
+        {
+          message: "feat(#26/T3): normalize MCP tool titles and schema examples",
+          author: "deepseek/chat (kimi-code)",
+          finishTask: true,
+        },
+      ],
     },
   },
   {
     name: "lognexus_note_show",
-    title: "Show Git Note",
+    title: "LogNexus Note: Show Git Note attached to commit",
     description:
-      "Read the LogNexus Git Note (refs/notes/lognexus) attached to a commit and return its parsed JSON payload. Defaults to HEAD.",
+      "Read the LogNexus Git Note (refs/notes/lognexus) attached to a commit and return its parsed JSON payload. Defaults to HEAD. Use when verifying that a commit carries the expected tier, subtask and contract before a review or a merge. Not for creating or repairing notes (use lognexus_note_attach).",
     inputSchema: {
       type: "object",
       properties: {
@@ -209,13 +234,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Git commit reference (SHA, branch, tag or HEAD). Defaults to HEAD.",
         },
       },
+      examples: [{ commitRef: "HEAD" }],
     },
   },
   {
     name: "lognexus_note_attach",
-    title: "Attach Git Note",
+    title: "LogNexus Note: Attach state as Git Note to commit",
     description:
-      "Attach the current LogNexus state as a Git Note (refs/notes/lognexus) to a commit. Defaults to HEAD.",
+      "Attach the current LogNexus state as a Git Note (refs/notes/lognexus) to a commit that already exists. Defaults to HEAD. Use when backfilling manually on commits created outside the commit engine, or repairing a missing note. Not for normal commits: lognexus_commit already attaches the note as part of the atomic operation, so attaching again is only needed when the note was lost.",
     inputSchema: {
       type: "object",
       properties: {
@@ -224,13 +250,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Git commit reference (SHA, branch, tag or HEAD). Defaults to HEAD.",
         },
       },
+      examples: [{ commitRef: "HEAD" }],
     },
   },
   {
     name: "lognexus_timeline",
-    title: "Journey Timeline",
+    title: "LogNexus Timeline: Generate PR Journey Timeline",
     description:
-      "Reconstruct the branch Journey Timeline against a base branch: commit list enriched with Git Notes, subtask IDs, tiers and Authored-by/Reviewed-by trailers, rendered as a Markdown table, JSON or a PR body draft.",
+      "Reconstruct the branch Journey Timeline against a base branch: commit list enriched with Git Notes, subtask IDs, tiers and Authored-by/Reviewed-by trailers, rendered as a Markdown table, JSON or a PR body draft. Use when preparing a pull request description or reviewing the subtask sequence of a branch. Not for judging compliance (use lognexus_audit, which reports violations rather than a narrative).",
     inputSchema: {
       type: "object",
       properties: {
@@ -244,13 +271,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Output format. Defaults to 'table'.",
         },
       },
+      examples: [{ baseBranch: "main", format: "pr-body" }],
     },
   },
   {
     name: "lognexus_audit",
-    title: "Traceability audit",
+    title: "LogNexus Audit: Audit review gate and commit traceability",
     description:
-      "Audit the branch commits against the LogNexus review gate: commit format, Authored-by trailer, Git Note presence, subtask file contracts and reviewer/author separation.",
+      "Audit the branch commits against the LogNexus review gate: commit format, Authored-by trailer, Git Notes coverage, subtask file contracts, and author/reviewer separation including self-approval detection. Use when you need the pass/fail gate before merging or before opening a pull request. Not for producing the PR narrative (use lognexus_timeline); audit reports violations and never fixes them.",
     inputSchema: {
       type: "object",
       properties: {
@@ -259,13 +287,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: "Base branch to compare against. Defaults to 'main' with origin fallback.",
         },
       },
+      examples: [{ baseBranch: "main" }],
     },
   },
   {
     name: "lognexus_telemetry",
-    title: "Opt-in telemetry & ROI report engine",
+    title: "LogNexus Telemetry: Local performance and ROI cost report",
     description:
-      "Inspect telemetry status, enable local or anonymous community telemetry, disable tracking, inspect zero-PII payload, generate telemetry markdown reports, or clear metrics store.",
+      "Inspect local telemetry status, enable strictly local performance metrics (zero network calls), disable tracking, inspect the zero-PII local payload, generate telemetry markdown reports, or clear the metrics store. Use when measuring subtask duration, Git Notes coverage and estimated cost savings. Not for any form of upload: telemetry is local-only, stored in .lognexus/telemetry.json, and no data leaves the working directory.",
     inputSchema: {
       type: "object",
       properties: {
@@ -274,21 +303,13 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           enum: ["status", "enable", "disable", "inspect", "report", "clear"],
           description: "Telemetry action to perform. Defaults to 'status'.",
         },
-        share: {
-          type: "boolean",
-          description:
-            "When action is 'enable', set to true to enable anonymous community telemetry.",
-        },
-        acceptTerms: {
-          type: "boolean",
-          description: "Explicit acceptance of telemetry terms (required when share is true).",
-        },
         outputPath: {
           type: "string",
           description:
             "Target file path when generating report (defaults to .lognexus/telemetry.md).",
         },
       },
+      examples: [{ action: "report" }],
     },
   },
 ];
@@ -508,7 +529,7 @@ export async function callMcpTool(
           const store = loadTelemetry(targetDir);
           const disabled = isTelemetryGloballyDisabled();
           return textResult({
-            active: !disabled && (store.mode === "local" || store.mode === "community"),
+            active: !disabled && store.mode === "local",
             mode: store.mode,
             globallyDisabled: disabled,
             detectedStacks: store.detectedStacks,
@@ -518,9 +539,7 @@ export async function callMcpTool(
           });
         }
         if (action === "enable") {
-          const share = Boolean(args.share);
-          const acceptTerms = Boolean(args.acceptTerms);
-          const result = enableTelemetry({ share, acceptTerms, cwd: targetDir });
+          const result = enableTelemetry({ cwd: targetDir });
           return textResult({
             message: `Telemetry enabled in '${result.mode}' mode.`,
             ...result,

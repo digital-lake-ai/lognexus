@@ -173,7 +173,7 @@ npx @digital-lake/lognexus timeline main --pr-body
 npx @digital-lake/lognexus audit main
 ```
 
-Opt-in Telemetry, Stack Profiling & ROI Cost-Savings Engine:
+Opt-in Telemetry, Stack Profiling & ROI Cost-Savings Engine (100% local, zero network calls):
 ```bash
 # Check telemetry status (disabled by default, 0% overhead)
 npx @digital-lake/lognexus telemetry status
@@ -181,19 +181,18 @@ npx @digital-lake/lognexus telemetry status
 # Enable local telemetry (stores metrics only in .lognexus/telemetry.json)
 npx @digital-lake/lognexus telemetry enable
 
-# Or enable anonymous community telemetry (explicit GDPR opt-in)
-npx @digital-lake/lognexus telemetry enable --share --accept-terms
-
 # Generate .lognexus/telemetry.md report with ROI metrics
 npx @digital-lake/lognexus telemetry report
 
-# Inspect the exact Zero-PII payload before sending
+# Inspect the exact local payload structure
 npx @digital-lake/lognexus telemetry inspect
 
 # Disable telemetry immediately
 npx @digital-lake/lognexus telemetry disable
 ```
-*Read our strict Zero-PII policy in [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md).*
+Telemetry is **strictly local-only**: no endpoint, no dispatch, no upload. The retired `--share --accept-terms` flags now fail with an explicit error, and pre-2.0.0 stores in `community` mode are migrated to `local` on read.
+
+*Read our strict Zero-PII, zero-network policy in [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md).*
 
 ### 2. Connect via Model Context Protocol (MCP)
 

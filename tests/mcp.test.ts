@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { listMcpPrompts, PromptResult } from "../src/mcp/prompts.js";
 import type { listMcpResources, ResourceReadResult } from "../src/mcp/resources.js";
 import { MCP_PROTOCOL_VERSION, MCP_SERVER_VERSION, processMcpMessage } from "../src/mcp/server.js";
-import type { listMcpTools, ToolCallResult } from "../src/mcp/tools.js";
+import { listMcpTools, type ToolCallResult } from "../src/mcp/tools.js";
 import { saveState } from "../src/state/manager.js";
 
 interface JsonRpcResponse<T = unknown> {
@@ -70,7 +70,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(result.capabilities).toHaveProperty("resources");
       expect(result.capabilities).toHaveProperty("prompts");
       expect(result.serverInfo.name).toBe("lognexus");
-      expect(result.serverInfo.version).toBe("1.2.5");
+      expect(result.serverInfo.version).toBe("1.2.6");
     });
 
     it("advertises the same version as the published package manifest", async () => {
@@ -127,6 +127,63 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
 
       const setTask = tools.find((t) => t.name === "lognexus_state_set_task");
       expect(setTask?.inputSchema.required).toEqual(["taskId"]);
+    });
+
+    it("uses the 'LogNexus <Family>: <Action>' title convention for every tool", () => {
+      for (const tool of listMcpTools()) {
+        expect(tool.title).toMatch(/^LogNexus [A-Za-z]+: .+$/);
+      }
+    });
+
+    it("states 'Use when' and 'Not for' disambiguation in every description", () => {
+      for (const tool of listMcpTools()) {
+        expect(tool.description).toContain("Use when");
+        expect(tool.description).toContain("Not for");
+      }
+    });
+
+    it("exposes at least one schema example per tool", () => {
+      for (const tool of listMcpTools()) {
+        const examples = tool.inputSchema.examples;
+        expect(Array.isArray(examples)).toBe(true);
+        expect(examples?.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("keeps schema examples shape-compatible with declared properties and enums", () => {
+      for (const tool of listMcpTools()) {
+        const props = tool.inputSchema.properties as Record<
+          string,
+          { enum?: string[]; type?: string }
+        >;
+        for (const example of tool.inputSchema.examples ?? []) {
+          for (const [key, value] of Object.entries(example)) {
+            const prop = props[key];
+            expect(prop, `${tool.name}.${key} is not a declared property`).toBeDefined();
+            if (prop?.enum) {
+              expect(prop.enum).toContain(value);
+            }
+            if (prop?.type === "array") {
+              expect(Array.isArray(value)).toBe(true);
+            }
+          }
+          for (const required of tool.inputSchema.required ?? []) {
+            expect(example[required], `${tool.name} example lacks '${required}'`).toBeDefined();
+          }
+        }
+      }
+    });
+
+    it("harmonizes the 'tier' parameter description across set_task and commit", () => {
+      const expected = "Operational routing tier ('tier-1', 'tier-2', 'tier-3').";
+      const setTask = listMcpTools().find((t) => t.name === "lognexus_state_set_task");
+      const commit = listMcpTools().find((t) => t.name === "lognexus_commit");
+
+      const setTaskTier = setTask?.inputSchema.properties.tier as { description?: string };
+      const commitTier = commit?.inputSchema.properties.tier as { description?: string };
+
+      expect(setTaskTier?.description).toBe(expected);
+      expect(commitTier?.description).toBe(expected);
     });
   });
 

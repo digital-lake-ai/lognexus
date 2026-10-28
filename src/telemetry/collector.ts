@@ -16,7 +16,8 @@ import {
   TelemetryStoreSchema,
 } from "./schema.js";
 
-export const DEFAULT_TELEMETRY_ENDPOINT = "https://telemetry.digital-lake.ai/v1/events";
+export const LOCAL_ONLY_TELEMETRY_ERROR =
+  "Community telemetry dispatch has been retired in favor of strict local-only telemetry. Run 'lognexus telemetry enable' for local performance metrics (zero network calls).";
 
 export function isTelemetryGloballyDisabled(): boolean {
   return (
@@ -103,7 +104,7 @@ export function saveTelemetry(store: TelemetryStore, targetDir: string = process
 export function isTelemetryActive(targetDir: string = process.cwd()): boolean {
   if (isTelemetryGloballyDisabled()) return false;
   const store = loadTelemetry(targetDir);
-  return store.mode === "local" || store.mode === "community";
+  return store.mode === "local";
 }
 
 export function enableTelemetry(options: {
@@ -115,18 +116,10 @@ export function enableTelemetry(options: {
   const store = loadTelemetry(cwd);
 
   if (options.share) {
-    if (!options.acceptTerms) {
-      throw new Error(
-        "To enable anonymous community telemetry (--share), you must explicitly accept the terms using '--accept-terms'. View terms at: docs/TELEMETRY_PRIVACY.md",
-      );
-    }
-    store.mode = "community";
-    store.consent.accepted = true;
-    store.consent.acceptedAt = new Date().toISOString();
-  } else {
-    store.mode = "local";
+    throw new Error(LOCAL_ONLY_TELEMETRY_ERROR);
   }
 
+  store.mode = "local";
   saveTelemetry(store, cwd);
   return { mode: store.mode, anonymousProjectId: store.anonymousProjectId };
 }
@@ -268,13 +261,6 @@ export function recordCommitTelemetry(options: {
 
   updateCostSavingsEstimate(store);
   saveTelemetry(store, cwd);
-
-  // Dispatch community payload asynchronously if in community mode
-  if (store.mode === "community" && store.consent.accepted) {
-    dispatchCommunityTelemetry(store).catch(() => {
-      // Non-blocking silent catch
-    });
-  }
 }
 
 export function buildAnonymousCommunityPayload(store: TelemetryStore): AnonymousCommunityPayload {
@@ -293,27 +279,4 @@ export function buildAnonymousCommunityPayload(store: TelemetryStore): Anonymous
     modelBreakdown: Object.values(store.models),
     dispatchedAt: new Date().toISOString(),
   };
-}
-
-export async function dispatchCommunityTelemetry(
-  store: TelemetryStore,
-  endpoint: string = process.env.LOGNEXUS_TELEMETRY_URL || DEFAULT_TELEMETRY_ENDPOINT,
-): Promise<boolean> {
-  if (isTelemetryGloballyDisabled() || store.mode !== "community" || !store.consent.accepted) {
-    return false;
-  }
-
-  const payload = buildAnonymousCommunityPayload(store);
-
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(1500),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
