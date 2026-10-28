@@ -1,7 +1,8 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AnonymousCommunityPayloadSchema,
@@ -10,7 +11,6 @@ import {
   clearTelemetry,
   detectProjectStacks,
   disableTelemetry,
-  dispatchCommunityTelemetry,
   enableTelemetry,
   extractCommitDiffStats,
   extractModelFamilyCategory,
@@ -24,6 +24,8 @@ import {
   recordTaskFinish,
   recordTaskStart,
 } from "../src/telemetry/index.js";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
   let tempDir: string;
@@ -81,21 +83,23 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(store.consent.accepted).toBe(false);
     });
 
-    it("rejects community telemetry without explicit terms acceptance", () => {
+    it("rejects retired community telemetry dispatch with a descriptive error", () => {
       expect(() => {
-        enableTelemetry({ share: true, acceptTerms: false, cwd: tempDir });
-      }).toThrow(/--accept-terms/);
+        enableTelemetry({ share: true, acceptTerms: true, cwd: tempDir });
+      }).toThrow(/strict local-only telemetry/);
+
+      expect(isTelemetryActive(tempDir)).toBe(false);
     });
 
-    it("enables community telemetry when explicit terms are accepted", () => {
-      const res = enableTelemetry({ share: true, acceptTerms: true, cwd: tempDir });
-      expect(res.mode).toBe("community");
-      expect(isTelemetryActive(tempDir)).toBe(true);
-
+    it("migrates a legacy community store to local mode on load", () => {
       const store = loadTelemetry(tempDir);
-      expect(store.mode).toBe("community");
-      expect(store.consent.accepted).toBe(true);
-      expect(typeof store.consent.acceptedAt).toBe("string");
+      store.mode = "community";
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      writeFileSync(getTelemetryPath(tempDir), JSON.stringify(store, null, 2), "utf8");
+
+      const migrated = loadTelemetry(tempDir);
+      expect(migrated.mode).toBe("local");
+      expect(isTelemetryActive(tempDir)).toBe(true);
     });
 
     it("can disable and clear telemetry store cleanly", () => {
@@ -356,8 +360,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(regenerated.content).not.toContain("## 5");
     });
 
-    it("builds a valid GDPR/CCPA compliant anonymous community payload", () => {
-      enableTelemetry({ share: true, acceptTerms: true, cwd: tempDir });
+    it("builds a valid GDPR/CCPA compliant zero-PII local payload", () => {
+      enableTelemetry({ cwd: tempDir });
       const store = loadTelemetry(tempDir);
 
       const payload = buildAnonymousCommunityPayload(store);
@@ -384,14 +388,33 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(isTelemetryActive(tempDir)).toBe(false);
     });
 
-    it("does not dispatch community telemetry when globally disabled", async () => {
+    it("keeps telemetry inactive under the kill switch even with a migrated legacy store", () => {
       process.env.LOGNEXUS_TELEMETRY_DISABLED = "1";
       const store = loadTelemetry(tempDir);
-      store.mode = "community";
+      store.mode = "local";
       store.consent.accepted = true;
 
-      const sent = await dispatchCommunityTelemetry(store);
-      expect(sent).toBe(false);
+      expect(isTelemetryActive(tempDir)).toBe(false);
+    });
+  });
+
+  describe("Offline Guarantee", () => {
+    const readSource = (file: string) =>
+      readFileSync(join(repoRoot, "src", "telemetry", file), "utf8");
+
+    it("contains no fetch() calls to remote endpoints in telemetry sources", () => {
+      for (const file of ["collector.ts", "detector.ts", "index.ts", "report.ts", "schema.ts"]) {
+        const source = readSource(file);
+        expect(source).not.toMatch(/\bfetch\s*\(/);
+        expect(source).not.toMatch(/https?:\/\/[^\s"'`]+/);
+        expect(source).not.toMatch(/LOGNEXUS_TELEMETRY_URL/);
+      }
+    });
+
+    it("exports no network dispatch helpers from the telemetry barrel", async () => {
+      const barrel = await import("../src/telemetry/index.js");
+      expect("dispatchCommunityTelemetry" in barrel).toBe(false);
+      expect("DEFAULT_TELEMETRY_ENDPOINT" in barrel).toBe(false);
     });
   });
 });

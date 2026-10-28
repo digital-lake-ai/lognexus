@@ -265,7 +265,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     name: "lognexus_telemetry",
     title: "Opt-in telemetry & ROI report engine",
     description:
-      "Inspect telemetry status, enable local or anonymous community telemetry, disable tracking, inspect zero-PII payload, generate telemetry markdown reports, or clear metrics store.",
+      "Inspect local telemetry status, enable strictly local performance metrics (zero network calls), disable tracking, inspect the zero-PII local payload, generate telemetry markdown reports, or clear the metrics store.",
     inputSchema: {
       type: "object",
       properties: {
@@ -273,15 +273,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           type: "string",
           enum: ["status", "enable", "disable", "inspect", "report", "clear"],
           description: "Telemetry action to perform. Defaults to 'status'.",
-        },
-        share: {
-          type: "boolean",
-          description:
-            "When action is 'enable', set to true to enable anonymous community telemetry.",
-        },
-        acceptTerms: {
-          type: "boolean",
-          description: "Explicit acceptance of telemetry terms (required when share is true).",
         },
         outputPath: {
           type: "string",
@@ -508,7 +499,7 @@ export async function callMcpTool(
           const store = loadTelemetry(targetDir);
           const disabled = isTelemetryGloballyDisabled();
           return textResult({
-            active: !disabled && (store.mode === "local" || store.mode === "community"),
+            active: !disabled && store.mode === "local",
             mode: store.mode,
             globallyDisabled: disabled,
             detectedStacks: store.detectedStacks,
@@ -518,9 +509,7 @@ export async function callMcpTool(
           });
         }
         if (action === "enable") {
-          const share = Boolean(args.share);
-          const acceptTerms = Boolean(args.acceptTerms);
-          const result = enableTelemetry({ share, acceptTerms, cwd: targetDir });
+          const result = enableTelemetry({ cwd: targetDir });
           return textResult({
             message: `Telemetry enabled in '${result.mode}' mode.`,
             ...result,

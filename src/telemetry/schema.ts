@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-export const TelemetryModeSchema = z.enum(["off", "local", "community"]);
+const LEGACY_COMMUNITY_MODE = "community";
+
+export const TelemetryModeSchema = z
+  .enum(["off", "local", LEGACY_COMMUNITY_MODE])
+  .transform((mode): "off" | "local" => (mode === "off" ? "off" : "local"));
 export type TelemetryMode = z.infer<typeof TelemetryModeSchema>;
 
 export const TelemetryConsentSchema = z.object({
