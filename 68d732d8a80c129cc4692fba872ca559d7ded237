@@ -1,0 +1,34 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.5",
+  "timestamp": "2026-10-28T15:15:05.018Z",
+  "issue": {
+    "id": 26,
+    "title": "security: socket supply-chain hardening (local-only telemetry) & TDQS restoration to A"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Remove dead community telemetry network dispatch",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/collector.ts",
+        "src/telemetry/schema.ts",
+        "src/telemetry/index.ts",
+        "src/cli.ts",
+        "src/mcp/tools.ts",
+        "tests/telemetry.test.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "package.json",
+        "src/audit/audit.ts",
+        "README.md"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
