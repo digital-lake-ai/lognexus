@@ -331,6 +331,18 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content.trimEnd().endsWith(CUSTOM_NOTES_MARKER)).toBe(true);
     });
 
+    it("documents opt-in diagnostic sharing without performing any upload", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const { content } = generateTelemetryReportFile(tempDir);
+      const sharingIndex = content.indexOf("## 5. Opt-in Diagnostic Sharing (100% Local-First)");
+      expect(sharingIndex).toBeGreaterThan(-1);
+      expect(sharingIndex).toBeLessThan(content.indexOf(CUSTOM_NOTES_MARKER));
+      expect(content).toContain("gh issue create");
+      expect(content).toContain("diagnostic-report.yml");
+      expect(content).toMatch(/never automatic/i);
+    });
+
     it("preserves user authored custom notes across report regeneration", () => {
       enableTelemetry({ cwd: tempDir });
 
@@ -352,7 +364,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(third.content.split("Deploy freeze until Friday.").length - 1).toBe(1);
     });
 
-    it("migrates custom notes from legacy v1.2.4 reports without a marker", () => {
+    it("migrates custom notes from legacy reports without a marker", () => {
       enableTelemetry({ cwd: tempDir });
 
       const { filePath } = generateTelemetryReportFile(tempDir);
@@ -363,7 +375,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         "",
         "Legacy metrics body.",
         "",
-        "## 5. Engineering Notes",
+        "## 6. Engineering Notes",
         "",
         "- Keep the release train green.",
         "",
@@ -384,11 +396,14 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       const { filePath, content } = generateTelemetryReportFile(tempDir);
       const stripped = content.split(CUSTOM_NOTES_MARKER)[0].replace(/\n*$/, "\n");
+      expect(stripped).not.toContain(CUSTOM_NOTES_MARKER);
       writeFileSync(filePath, stripped, "utf8");
 
       const regenerated = generateTelemetryReportFile(tempDir);
       expect(regenerated.content.trimEnd().endsWith(CUSTOM_NOTES_MARKER)).toBe(true);
-      expect(regenerated.content).not.toContain("## 5");
+      expect(regenerated.content.split(CUSTOM_NOTES_MARKER).length - 1).toBe(1);
+      expect(regenerated.content.indexOf("Team Notes")).toBe(-1);
+      expect(regenerated.content.indexOf("## 5. Opt-in Diagnostic Sharing")).toBeGreaterThan(-1);
     });
 
     it("builds a valid GDPR/CCPA compliant zero-PII local payload", () => {

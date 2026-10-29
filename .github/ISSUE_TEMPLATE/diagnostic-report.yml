@@ -1,0 +1,107 @@
+name: Diagnostic report
+description: Share opt-in LogNexus local telemetry/ROI output to help diagnose an issue.
+title: "diagnostic: "
+labels: ["lognexus/plan"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Local-first diagnostic report
+
+        LogNexus makes **zero network calls** and stores everything on your machine. A diagnostic report only travels if **you** decide to open this issue.
+
+        Before submitting, please confirm:
+        - You are pasting **only** LogNexus output (`lognexus telemetry report`, `lognexus doctor`, `lognexus status`).
+        - You are **not** pasting source code, commit messages, absolute or relative file paths, repository remotes, branch URLs, or credentials.
+        - You may redact anything you are unsure about. A partial report is more useful than a leaked one.
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Express confirmation (required)
+      description: This report is published publicly on GitHub. Nothing is collected automatically.
+      options:
+        - label: I confirm I am publishing this report voluntarily and have removed all source code, file paths and secrets.
+          required: true
+        - label: I confirm the Git username included below (if any) is public information I choose to disclose.
+          required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: LogNexus version
+      description: Output of `npx @digital-lake/lognexus --version`.
+      placeholder: "1.2.7"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: Agent client
+      description: Where LogNexus is running.
+      options:
+        - Claude Code
+        - Cursor
+        - Codex
+        - Google Antigravity
+        - Kimi Code
+        - VS Code
+        - Zed
+        - Plain terminal / CI
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Node.js version and operating system family, for example `Node 22.11 / Windows 11`.
+      placeholder: "Node 22.x / macOS 15"
+    validations:
+      required: true
+
+  - type: textarea
+    id: telemetry-report
+    attributes:
+      label: Local telemetry report (optional)
+      description: Paste the output of `lognexus telemetry report` or the contents of `.lognexus/telemetry.md`. Metrics only.
+      render: markdown
+      placeholder: |
+        ## 1. Executive Metrics Dashboard
+        | Metric | Measured Value | Notes |
+        ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Environment diagnostics (optional)
+      description: Paste the output of `lognexus doctor` and `lognexus status`. Redact paths and remotes.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: What happened
+      description: Describe the behaviour without pasting proprietary code. Describe the failing command and the observed result.
+      placeholder: |
+        Steps:
+        1. Run `lognexus commit -m "feat(#12/T1): ..." --finish-task`
+        2. Expected: commit created and Git Note attached
+        3. Observed: governance error ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error output (optional)
+      description: Paste only the LogNexus error text. Remove stack frames that reveal private paths if you prefer.
+      render: shell
+    validations:
+      required: false

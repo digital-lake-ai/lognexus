@@ -5,7 +5,7 @@ import type { TelemetryStore } from "./schema.js";
 
 export const CUSTOM_NOTES_MARKER = "<!-- lognexus:custom-notes -->";
 
-const LEGACY_CUSTOM_NOTES_PATTERN = /\n(##\s+5\b[\s\S]*)$/;
+const LEGACY_CUSTOM_NOTES_PATTERN = /\n(##\s+6\b[\s\S]*)$/;
 
 export function formatTelemetryMarkdownReport(store: TelemetryStore): string {
   const sum = store.summary;
@@ -95,10 +95,28 @@ By delegating scoped subtasks to lightweight execution models (\`tier-3\`) while
 - **Net Budget Saved:** **~$${sum.estimatedCostSavingsUsd.toFixed(3)} USD (${sum.estimatedCostSavingsPct}%)**
 
 ---
+
+## 5. Opt-in Diagnostic Sharing (100% Local-First)
+
+Sharing is **never automatic**. LogNexus makes no network calls, contains no endpoint, and uploads nothing. If — and only if — you decide that a maintainer should see this report, you can publish it yourself with the GitHub CLI after a manual review:
+
+1. Re-read this file and delete anything you consider private (paths, remotes, branch names, notes).
+2. Confirm you are not pasting source code, commit messages, or credentials.
+3. Open the issue from the repository root you are already authenticated against:
+\`\`\`bash
+gh issue create \\
+  --template diagnostic-report.yml \\
+  --title "diagnostic: <one-line summary>" \\
+  --body-file .lognexus/telemetry.md
+\`\`\`
+4. Keep the local copy in version control only if it contains nothing private; otherwise delete it after submitting.
+
+\`gh issue create\` runs under **your** GitHub credentials and is executed by **you**. LogNexus only prints this guidance; it never invokes a network client on your behalf.
+
+---
 *Report generated automatically by **LogNexus** (\`@digital-lake/lognexus\`)*
 
-${CUSTOM_NOTES_MARKER}
-`;
+${CUSTOM_NOTES_MARKER}`;
 }
 
 function extractCustomNotes(existingContent: string | null): string {
