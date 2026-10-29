@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { inferTierFromAuthor } from "../src/telemetry/detector.js";
 import {
   AnonymousCommunityPayloadSchema,
   buildAnonymousCommunityPayload,
@@ -136,6 +137,36 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("openai/gpt-4o (antigravity)")).toBe("openai/gpt");
       expect(extractModelFamilyCategory("deepseek/deepseek-coder")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
+    });
+
+    it("categorizes frontier agent identities", () => {
+      expect(
+        extractModelFamilyCategory("Gemini 4 Argon (Master Architecture & Security Orchestrator)"),
+      ).toBe("gemini/argon");
+      expect(extractModelFamilyCategory("Gemini 4 Carbon (Independent Reviewer)")).toBe(
+        "gemini/carbon",
+      );
+      expect(extractModelFamilyCategory("google/gemini-3.8-flash-high (antigravity)")).toBe(
+        "gemini/flash-high",
+      );
+      expect(extractModelFamilyCategory("google/gemini-3.8-pro (antigravity)")).toBe("gemini/pro");
+      expect(extractModelFamilyCategory("moonshot/kimi-k3")).toBe("moonshot/kimi");
+      expect(extractModelFamilyCategory("Kimi K3 (Moonshot AI)")).toBe("moonshot/kimi");
+    });
+
+    it("infers the routing tier of frontier agent identities", () => {
+      expect(
+        inferTierFromAuthor("Gemini 4 Argon (Master Architecture & Security Orchestrator)"),
+      ).toBe("tier-1");
+      expect(inferTierFromAuthor("Gemini 4 Carbon (Independent Reviewer)")).toBe("tier-1");
+      expect(inferTierFromAuthor("google/gemini-3.8-flash-high (antigravity)")).toBe("tier-2");
+      expect(inferTierFromAuthor("google/gemini-3.8-pro (antigravity)")).toBe("tier-1");
+      expect(inferTierFromAuthor("deepseek/chat (kimi-code)")).toBe("tier-3");
+      expect(inferTierFromAuthor("moonshot/kimi-k3")).toBe("tier-3");
+      expect(inferTierFromAuthor("Kimi K3 (Moonshot AI)")).toBe("tier-3");
+      expect(inferTierFromAuthor("gemini/flash-lite (antigravity)")).toBe("tier-3");
+      expect(inferTierFromAuthor("")).toBeNull();
+      expect(inferTierFromAuthor(null)).toBeNull();
     });
 
     it("detects PowerShell and Batch stacks from scripts in nested folders", () => {
