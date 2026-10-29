@@ -1,0 +1,31 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.7",
+  "timestamp": "2026-10-29T23:33:09.419Z",
+  "issue": {
+    "id": 28,
+    "title": "feat(v1.2.7): frontier model support (Gemini 4 Argon/Carbon, Kimi K3), ecosystem badges, closed-PR policy & opt-in diagnostic templates"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Atomic version bump to 1.2.7",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "src/cli.ts",
+        "docs/TELEMETRY_PRIVACY.md",
+        "CHANGELOG.md",
+        "tests/mcp.test.ts",
+        "tests/e2e.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "none",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
