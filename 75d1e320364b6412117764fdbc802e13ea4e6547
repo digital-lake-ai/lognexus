@@ -1,0 +1,26 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.6",
+  "timestamp": "2026-10-29T23:21:11.066Z",
+  "issue": {
+    "id": 28,
+    "title": "feat(v1.2.7): frontier model support (Gemini 4 Argon/Carbon, Kimi K3), ecosystem badges, closed-PR policy & opt-in diagnostic templates"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Isolate shell execution from MCP tool definitions into safe git wrapper",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/git/safe.ts",
+        "src/mcp/tools.ts",
+        "tests/git-safe.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
