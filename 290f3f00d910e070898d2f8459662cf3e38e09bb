@@ -1,0 +1,35 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.6",
+  "timestamp": "2026-10-29T23:31:57.965Z",
+  "issue": {
+    "id": 28,
+    "title": "feat(v1.2.7): frontier model support (Gemini 4 Argon/Carbon, Kimi K3), ecosystem badges, closed-PR policy & opt-in diagnostic templates"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Ecosystem badges, issue templates and governance guidelines",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".agents/rules.md",
+        "skills/lognexus/pr.md",
+        ".github/ISSUE_TEMPLATE/diagnostic-report.yml",
+        ".github/ISSUE_TEMPLATE/feedback-proposal.yml",
+        "src/telemetry/report.ts",
+        "src/cli.ts",
+        "tests/telemetry.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
