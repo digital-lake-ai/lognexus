@@ -1,0 +1,26 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.6",
+  "timestamp": "2026-10-29T23:25:36.451Z",
+  "issue": {
+    "id": 28,
+    "title": "feat(v1.2.7): frontier model support (Gemini 4 Argon/Carbon, Kimi K3), ecosystem badges, closed-PR policy & opt-in diagnostic templates"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Add frontier agent recognition (Gemini 4 Argon/Carbon, Kimi K3) to telemetry detector",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/detector.ts",
+        "src/telemetry/report.ts",
+        "tests/telemetry.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
