@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { rejectNotesReference, validateGitReference, verifyCommitish } from "../src/git/safe.js";
+import {
+  detectBaseBranch,
+  rejectNotesReference,
+  validateGitReference,
+  verifyCommitish,
+} from "../src/git/safe.js";
 
 describe("Unified Git reference guard (src/git/safe.ts)", () => {
   describe("validateGitReference — accepted references", () => {
@@ -130,6 +135,41 @@ describe("Unified Git reference guard (src/git/safe.ts)", () => {
     it("rejects an unsafe reference before ever shelling out", () => {
       expect(() => verifyCommitish("main..HEAD", repoDir)).toThrow(/Governance violation/);
       expect(() => verifyCommitish("--help", repoDir)).toThrow(/Governance violation/);
+    });
+  });
+
+  describe("detectBaseBranch", () => {
+    let repoDir: string;
+
+    beforeEach(() => {
+      repoDir = mkdtempSync(join(tmpdir(), "lognexus-detect-base-"));
+      execSync("git init -q", { cwd: repoDir, stdio: "ignore" });
+      execSync("git config user.email safe@example.com", { cwd: repoDir, stdio: "ignore" });
+      execSync("git config user.name 'Safe Runner'", { cwd: repoDir, stdio: "ignore" });
+      execSync("git config commit.gpgsign false", { cwd: repoDir, stdio: "ignore" });
+      writeFileSync(join(repoDir, "README.md"), "# safe\n", "utf8");
+      execSync("git add README.md", { cwd: repoDir, stdio: "ignore" });
+      execSync('git commit -qm "docs: init"', { cwd: repoDir, stdio: "ignore" });
+    });
+
+    afterEach(() => {
+      rmSync(repoDir, { recursive: true, force: true });
+    });
+
+    it("prefers main when both main and master exist", () => {
+      execSync("git branch -m master", { cwd: repoDir, stdio: "ignore" });
+      execSync("git branch main", { cwd: repoDir, stdio: "ignore" });
+      expect(detectBaseBranch(repoDir)).toBe("main");
+    });
+
+    it("falls back to master when only master exists", () => {
+      execSync("git branch -m master", { cwd: repoDir, stdio: "ignore" });
+      expect(detectBaseBranch(repoDir)).toBe("master");
+    });
+
+    it("defaults to main when neither candidate exists", () => {
+      execSync("git branch -m trunk", { cwd: repoDir, stdio: "ignore" });
+      expect(detectBaseBranch(repoDir)).toBe("main");
     });
   });
 });

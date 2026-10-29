@@ -169,8 +169,14 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   const trimmed = identityStr.trim().toLowerCase();
 
   // Well-known model family heuristics
+  if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
+  if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
+  if (trimmed.includes("gemini") && (trimmed.includes("flash-high") || trimmed.includes("high"))) {
+    return "gemini/flash-high";
+  }
   if (trimmed.includes("gemini") && trimmed.includes("flash")) return "gemini/flash";
   if (trimmed.includes("gemini") && trimmed.includes("pro")) return "gemini/pro";
+  if (trimmed.includes("gemini")) return "gemini/generic";
   if (trimmed.includes("claude") && trimmed.includes("sonnet")) return "claude/sonnet";
   if (trimmed.includes("claude") && trimmed.includes("haiku")) return "claude/haiku";
   if (trimmed.includes("claude") && trimmed.includes("opus")) return "claude/opus";
@@ -197,8 +203,26 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
 
 export type AuthorTier = "tier-1" | "tier-2" | "tier-3";
 
+/**
+ * Lowercases an identity, drops version numbers and folds slug separators into
+ * slashes, so `gemini-3.8-pro`, `google/gemini-3.8-flash-high` and `Gemini 4 Argon`
+ * all compare against the same marker vocabulary. Trailing free text is untouched.
+ */
+function normalizeIdentity(identityStr: string): string {
+  return identityStr
+    .trim()
+    .toLowerCase()
+    .replace(/\d+(?:\.\d+)*/g, "")
+    .replace(/[\s_-]+/g, "/")
+    .replace(/\/{2,}/g, "/");
+}
+
 const TIER_1_MARKERS = [
   "gemini/pro",
+  "gemini/argon",
+  "gemini/carbon",
+  "argon",
+  "carbon",
   "claude/opus",
   "opus",
   "openai/o1",
@@ -207,9 +231,16 @@ const TIER_1_MARKERS = [
   "/o3",
 ];
 
-const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash-lite"];
+const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash/lite"];
 
-const TIER_2_MARKERS = ["gemini/flash", "claude/sonnet", "sonnet", "gpt-4o", "openai/gpt"];
+const TIER_2_MARKERS = [
+  "gemini/flash/high",
+  "gemini/flash",
+  "claude/sonnet",
+  "sonnet",
+  "gpt-4o",
+  "openai/gpt",
+];
 
 /**
  * Infers the routing tier of an author identity, so commit telemetry and the audit
@@ -218,13 +249,14 @@ const TIER_2_MARKERS = ["gemini/flash", "claude/sonnet", "sonnet", "gpt-4o", "op
 export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | null {
   if (!identityStr) return null;
 
-  const trimmed = identityStr.trim().toLowerCase();
-  if (trimmed === "") return null;
+  // Collapse slug separators so 'gemini-3.8-pro' matches the 'gemini/pro' marker.
+  const normalized = normalizeIdentity(identityStr);
+  if (normalized === "") return null;
 
   // tier-3 markers win over tier-2 so 'gemini/flash-lite' never escalates to tier-2
-  if (TIER_3_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-3";
-  if (TIER_1_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-1";
-  if (TIER_2_MARKERS.some((marker) => trimmed.includes(marker))) return "tier-2";
+  if (TIER_3_MARKERS.some((marker) => normalized.includes(marker))) return "tier-3";
+  if (TIER_1_MARKERS.some((marker) => normalized.includes(marker))) return "tier-1";
+  if (TIER_2_MARKERS.some((marker) => normalized.includes(marker))) return "tier-2";
 
   return null;
 }

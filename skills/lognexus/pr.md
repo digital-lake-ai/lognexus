@@ -18,6 +18,8 @@ description: "Phase 5: Create PR with timeline body, handle review gate, and lin
 
    When a master plan drafted outside this repository drove the work, register it in the signature block with a `Planned-by:` trailer naming the external planner and its plan identifier. The authoring identity goes in `Authored-by:` and stays distinct from any reviewer.
 
+   Sign with canonical model identities only. The principal architect is always declared as **`Gemini 4 Argon`** (`gemini/argon`), never abbreviated as `Gemini/Pro` or `Pro`. Other canonical frontier identities are `gemini/carbon` (tier-1), `gemini/flash-high` (tier-2), `moonshot/kimi-k3` (tier-3) and `deepseek/chat` (tier-3).
+
 3. **Review gate & Merge Execution.**
    - Every PR requires cross-model review before merge (`Authored-by` != `Reviewed-by`). Use the execution ladder in `references/closure-and-review.md`. Local parallel tool fan-out does not count as an independent reviewer identity.
    - **Anti-Spoofing Rule (hard boundary):** the authoring agent never writes a `Reviewed-by:` trailer and never runs `gh pr merge`. Both actions belong exclusively to the reviewing identity. An author who signs its own review gate is a governance violation, not a shortcut.
@@ -27,6 +29,7 @@ description: "Phase 5: Create PR with timeline body, handle review gate, and lin
      gh pr merge <num> --merge --delete-branch
      ```
      Squash merge (`--squash`) and rebase merge (`--rebase`) are strictly prohibited because they destroy the discrete `T1..Tn` commit history and orphan attached LogNexus Git Notes (`refs/notes/lognexus`) on discarded SHAs.
+   - **Closed-PR policy:** a merged or closed PR is never reused. Do not reopen it, force-push onto its branch, or re-target it to another issue — open a new issue and a new scoped branch from `main` instead.
 
 4. **Link and store.** PR body includes `Closes #<issue>` when the PR fully resolves the issue. For partial delivery, use `Addresses #<issue> (completes T1, T2, ...)` - see the partial-delivery template below and `references/closure-and-review.md` Section 1. Store key learning in knowledge graph.
 

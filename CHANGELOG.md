@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.7] - 2026-10-30
+
+### Summary
+Frontier-model coverage and governance hardening. The MCP surface no longer shells out from the tool layer, the telemetry detector recognizes the current frontier model families (Gemini 4 Argon / Carbon, Gemini 3.8 Pro & Flash High, Kimi K3), and the repository formalizes a provenance trailer, a canonical architect identity and a core-maintained contribution policy. The README now advertises the audited quality posture with a two-row badge header and a dedicated trust section.
+
+### Added
+- **Frontier model detection (`src/telemetry/detector.ts`):** `extractModelFamilyCategory` and `inferTierFromAuthor` recognize `Gemini 4 Argon` and `Gemini 4 Carbon` (`tier-1`), `Gemini 3.8 Flash (High)` (`tier-2`), `Gemini 3.8 Pro`, and `Kimi K3` / `Moonshot K3` (`tier-3`).
+- **Opt-in diagnostic sharing (`src/telemetry/report.ts`):** the report ends with a non-invasive guide that shows how to file a diagnostic issue with `gh issue create` under the developer's explicit authorization. No `fetch`, no upload, no URL is contacted.
+- **Issue templates (`.github/ISSUE_TEMPLATE/`):** `diagnostic-report.yml` and `feedback-proposal.yml`, both local-first by design — no source code and no private paths, only LogNexus metrics and the Git user identity under express confirmation.
+- **Verified quality section (`README.md`):** `## Verified Quality & Supply-Chain Security` documents the Glama card, the MCP TDQS grade and the Socket, SLSA and licence posture.
+
+### Changed
+- **README badge header:** replaced with a two-row, thirteen-badge block covering CI, npm, Glama TDQS, SLSA provenance, Socket, TypeScript, Node.js, privacy and licence.
+- **README frontier models:** the supported model list now names `Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`, `Kimi K3` (Kimi Code), `DeepSeek R1 / V3 / Chat`, `Anthropic Claude` and `OpenAI`, and credits the *Master Architecture & Security Plan* to `Gemini 4 Argon`.
+
+### Security
+- **`child_process` isolated from the MCP tool layer:** `detectBaseBranch` moved to `src/git/safe.ts`, so `src/mcp/tools.ts` no longer imports `node:child_process` and the compiled `dist/mcp/tools.js` carries no process-spawning surface.
+
+### Documentation
+- **`Planned-by:` trailer:** formalized as an optional provenance trailer for plans authored outside the repository, documented in `AGENTS.md`, `GEMINI.md`, `CLAUDE.md`, `.agents/rules.md` and `skills/lognexus/pr.md`. It grants no review authority and no merge rights.
+- **Canonical architect identity:** the lead architect is always declared as `Gemini 4 Argon` — never abbreviated to `Gemini/Pro`.
+- **Contribution policy (`CONTRIBUTING.md`):** Open Source (MIT), Core-Maintained (Closed to Unsolicited External PRs). Feedback and reports are channelled through GitHub Issues.
+
 ## [1.2.6] - 2026-10-28
 
 ### Summary

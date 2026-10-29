@@ -56,6 +56,23 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
     Reviewed-by: <family>/<version> (<client>)
     ```
   - `Planned-by` documents where the plan came from; it does **not** grant review authority, merge rights, or any exception from the rules above.
+  - The trailer is **mandatory** whenever an external plan drove the work: an untrailered PR that implements an out-of-repo master plan fails the governance audit.
+
+- **Canonical architect identity:**
+  - The principal architect is always declared with its canonical full name **`Gemini 4 Argon`**. Abbreviated, ambiguous forms such as `Gemini/Pro`, `gemini-pro (lead)`, or `Pro` are **not** valid signatures and are rejected at review time.
+  - Canonical signing examples:
+    | Model | Tier | Canonical signature |
+    |---|---|---|
+    | Google Gemini 4 Argon | `tier-1` | `gemini/argon (antigravity)` |
+    | Google Gemini 4 Carbon | `tier-1` | `gemini/carbon (antigravity)` |
+    | Google Gemini 3.8 Flash High | `tier-2` | `gemini/flash-high (antigravity)` |
+    | Moonshot Kimi K3 | `tier-3` | `moonshot/kimi-k3 (kimi-code)` |
+    | DeepSeek Chat | `tier-3` | `deepseek/chat (kimi-code)` |
+  - `src/telemetry/detector.ts` maps these identities onto their routing tiers, so a signature outside this vocabulary degrades tier attribution in the ROI report.
+
+- **Closed-PR policy (branch hygiene):**
+  - A Pull Request that has been **merged or closed is never reused**. Follow-up work requires a new issue and a new `issue/<id>-<slug>` or `security/<id>-<slug>` branch cut from `main`.
+  - Reopening a closed PR, force-pushing onto its branch, or re-targeting it to a different issue is prohibited: it breaks the subtask timeline and detaches LogNexus Git Notes (`refs/notes/lognexus`) from the audited commit graph.
 
 ---
 

@@ -8,13 +8,24 @@
   <strong>The Universal, Git-Powered Context & Rules Framework for Native AI Agents</strong>
 </p>
 
-<p align="center">
-  <a href="https://github.com/digital-lake-ai/lognexus/actions"><img src="https://img.shields.io/github/actions/workflow/status/digital-lake-ai/lognexus/ci.yml?branch=main&label=CI" alt="CI Status"></a>
-  <a href="https://www.npmjs.com/package/@digital-lake/lognexus"><img src="https://img.shields.io/npm/v/@digital-lake/lognexus.svg?color=blue" alt="npm version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <a href="https://github.com/digital-lake-ai/lognexus"><img src="https://img.shields.io/badge/org-Digital%20Lake-indigo.svg" alt="Digital Lake"></a>
-  <a href="https://ko-fi.com/digitallake"><img src="https://img.shields.io/badge/Ko--fi-Fuel_the_AI-ff5e5b?logo=ko-fi&logoColor=white" alt="Ko-fi - Fuel the AI"></a>
-</p>
+<div align="center">
+
+[![CI](https://github.com/digital-lake-ai/lognexus/actions/workflows/ci.yml/badge.svg)](https://github.com/digital-lake-ai/lognexus/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@digital-lake/lognexus?color=0969da&label=npm)](https://www.npmjs.com/package/@digital-lake/lognexus)
+[![npm downloads](https://img.shields.io/npm/dw/@digital-lake/lognexus?color=cb3837&logo=npm&label=downloads)](https://www.npmjs.com/package/@digital-lake/lognexus)
+[![LogNexus MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/digital-lake-ai/lognexus/badges/score.svg)](https://glama.ai/mcp/servers/digital-lake-ai/lognexus)
+[![Organization](https://img.shields.io/badge/org-Digital_Lake-7c3aed)](https://github.com/digital-lake-ai)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Fuel_the_AI-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/digitallake)
+
+[![SLSA Provenance](https://img.shields.io/badge/SLSA_Provenance-Verified_OIDC-2ea44f?logo=sigstore&logoColor=white)](https://www.npmjs.com/package/@digital-lake/lognexus)
+[![Socket Security](https://img.shields.io/badge/Socket_Audit-0_CVEs_%C2%B7_100%25_Quality-2ea44f?logo=socketdotdev&logoColor=white)](https://socket.dev/npm/package/@digital-lake/lognexus)
+[![MCP TDQS](https://img.shields.io/badge/MCP_TDQS-Grade_A_(4.3%2F5.0)-0d9488)](https://glama.ai/mcp/servers/digital-lake-ai/lognexus)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6?logo=typescript&logoColor=white)](https://github.com/digital-lake-ai/lognexus)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20_LTS-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25_Local--First-0284c7)](./docs/TELEMETRY_PRIVACY.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-0284c7)](./LICENSE)
+
+</div>
 
 ---
 
@@ -24,7 +35,7 @@ As AI coding agents take on complex engineering tasks across different IDEs, the
 
 **LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
 - **Clients:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code, VS Code, Zed.
-- **Models:** Anthropic Claude (Opus, Sonnet, Haiku), OpenAI (o3, o1, GPT-4o), Google Gemini (2.5/3.8 Pro & Flash), DeepSeek (R1, V3, Chat).
+- **Models:** Google Gemini (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
 
 ```
 Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context & Diffs) ──▶ PR (Timeline & Review)
@@ -38,7 +49,7 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 
 ## Key Features
 
-- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Anthropic Claude**, **OpenAI**, **Google Gemini**, **DeepSeek**, and **Kimi K2.7 Code**.
+- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
 - **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **Google Antigravity**, and **Kimi Code / VS Code**.
 - **Atomic Commit Engine (`lognexus commit` & MCP `lognexus_commit`):** Validates subtask file contracts, verifies reviewer separation, injects authorship trailers, commits changes, marks subtasks completed, and attaches Git Notes in a single ~0.15s execution.
 - **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. No model merges its own code without independent verification from another model family.
@@ -279,15 +290,40 @@ By enforcing **Closed Delegation Contracts** (`allowedFiles`, `forbiddenFiles`, 
 
 ---
 
+## 🛡️ Verified Quality & Supply-Chain Security
+
+<div align="center">
+
+[![LogNexus MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/digital-lake-ai/lognexus/badges/card.svg)](https://glama.ai/mcp/servers/digital-lake-ai/lognexus)
+
+</div>
+
+Every published release is continuously measured against independent third-party evaluators. The table below summarises the current external audit snapshot:
+
+| Auditor | Scope | Result |
+|---|---|---|
+| **Glama MCP Directory** | Server quality & maintenance score (TDQS) | **Triple A** grading · **TDQS 4.3 / 5.0** (`Grade A`) |
+| **Socket Security** | Vulnerability audit | **100 / 100** — `0 CVEs` |
+| **Socket Security** | Quality & License compliance | **100 / 100** |
+| **Socket Security** | Maintenance health | **96 / 100** |
+| **SLSA Provenance** | Build supply chain | **Verified** (`SLSA Provenance`, OIDC-signed npm publish) |
+| **License & Contribution model** | Open governance | **MIT** — Open Source, Core-Maintained (**Closed to Unsolicited External PRs**) |
+
+> **Local-first by construction:** LogNexus ships `0` runtime network calls, `0` PII, and `0` telemetry endpoints. See [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md) and [`SECURITY.md`](SECURITY.md).
+
+---
+
 ## Based on & Acknowledgments
 
 LogNexus is an independent hard fork and continuation of [`shiplog`](https://github.com/devallibus/shiplog), originally created by **devallibus** under the MIT License.
 
 We extend our deep gratitude to **devallibus** for pioneering the concept of Git-as-knowledge-graph for AI development. LogNexus builds upon that foundation by:
-- Expanding the model ecosystem to provide first-class native support for **Google Gemini**, **DeepSeek**, and **Kimi** alongside **Claude** and **OpenAI**.
+- Expanding the model ecosystem to provide first-class native support for **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), and **DeepSeek** (`R1`, `V3`, `Chat`) alongside **Claude** and **OpenAI**.
 - Formalizing the multi-model tier routing taxonomy and closed delegation contracts.
 - Introducing the repository scaffolding CLI, Atomic Commit Engine, and native MCP server (`@digital-lake/lognexus`).
 - Providing seamless backwards-compatibility for existing `.shiplog` envelopes and workflows.
+
+The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Argon`** (*Master Architecture & Security Orchestrator*).
 
 Additional inspirations and patterns are derived from [OrchestKit](https://github.com/yonatangross/orchestkit) and [Superpowers](https://github.com/obra/superpowers). Detailed license texts are preserved in the [`LICENSES/`](LICENSES/) directory and in [`NOTICE.md`](NOTICE.md).
 

@@ -8,3 +8,5 @@ Refer to [AGENTS.md](./AGENTS.md) for full governance and execution rules.
 3. **Cross-Model Review:** You cannot approve your own PR. A different model family (e.g. Claude, DeepSeek, OpenAI) must perform the review.
 4. **Anti-Spoofing:** As the author you must never write a `Reviewed-by:` trailer and never run `gh pr merge`. Writing your own review sign-off — even under another model's name — forges the gate and is prohibited.
 5. **Use LogNexus Engine:** Stage specific files, execute atomic commits via `lognexus commit` with `-m` or `-F`, and ensure Git Notes are preserved.
+6. **Canonical identity:** The principal architect signs as **`Gemini 4 Argon`** — never as `Gemini/Pro`, `Pro`, or any abbreviated variant. Register external master plans with a `Planned-by:` trailer in the PR body.
+7. **Closed-PR policy:** A merged or closed PR is never reused. Follow-up work starts from a new issue and a new scoped branch cut from `main`.

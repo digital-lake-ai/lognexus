@@ -1,6 +1,6 @@
-import { execFileSync } from "node:child_process";
 import { auditBranch, formatAuditResult } from "../audit/audit.js";
 import { executeAtomicCommit } from "../commit.js";
+import { detectBaseBranch } from "../git/safe.js";
 import { attachCurrentStateToCommit } from "../notes/attach.js";
 import { getNote } from "../notes/notes.js";
 import { clearState, finishSubtask, loadState, setSubtask } from "../state/manager.js";
@@ -387,23 +387,6 @@ function resolveTimelineFormat(args: Record<string, unknown>): TimelineFormat {
 
 function resolveBaseBranch(args: Record<string, unknown>, targetDir: string): string {
   return readStringArg(args, "baseBranch") ?? detectBaseBranch(targetDir);
-}
-
-function detectBaseBranch(targetDir: string): string {
-  for (const candidate of ["main", "master"]) {
-    try {
-      execFileSync("git", ["rev-parse", "--verify", "--quiet", `${candidate}^{commit}`], {
-        cwd: targetDir,
-        stdio: ["pipe", "pipe", "pipe"],
-        shell: false,
-      });
-      return candidate;
-    } catch {
-      // Candidate branch does not exist in this repository.
-    }
-  }
-
-  return "main";
 }
 
 export async function callMcpTool(

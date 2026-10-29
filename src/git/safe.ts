@@ -30,6 +30,27 @@ export function validateGitReference(ref: string): string {
 }
 
 /**
+ * Resolves candidate base branches (main, master) safely checking existence
+ * without exposing raw child_process execution outside the safe git module.
+ */
+export function detectBaseBranch(targetDir: string): string {
+  for (const candidate of ["main", "master"]) {
+    try {
+      execFileSync("git", ["rev-parse", "--verify", "--quiet", `${candidate}^{commit}`], {
+        cwd: targetDir,
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      });
+      return candidate;
+    } catch {
+      // Candidate branch does not exist in this repository.
+    }
+  }
+
+  return "main";
+}
+
+/**
  * Rejects refs that live under `refs/notes/`. Notes are metadata, not ancestry:
  * using one as a base branch would diff a commit against a note tree.
  */

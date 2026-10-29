@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { inferTierFromAuthor } from "../src/telemetry/detector.js";
 import {
   AnonymousCommunityPayloadSchema,
   buildAnonymousCommunityPayload,
@@ -136,6 +137,36 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("openai/gpt-4o (antigravity)")).toBe("openai/gpt");
       expect(extractModelFamilyCategory("deepseek/deepseek-coder")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
+    });
+
+    it("categorizes frontier agent identities", () => {
+      expect(
+        extractModelFamilyCategory("Gemini 4 Argon (Master Architecture & Security Orchestrator)"),
+      ).toBe("gemini/argon");
+      expect(extractModelFamilyCategory("Gemini 4 Carbon (Independent Reviewer)")).toBe(
+        "gemini/carbon",
+      );
+      expect(extractModelFamilyCategory("google/gemini-3.8-flash-high (antigravity)")).toBe(
+        "gemini/flash-high",
+      );
+      expect(extractModelFamilyCategory("google/gemini-3.8-pro (antigravity)")).toBe("gemini/pro");
+      expect(extractModelFamilyCategory("moonshot/kimi-k3")).toBe("moonshot/kimi");
+      expect(extractModelFamilyCategory("Kimi K3 (Moonshot AI)")).toBe("moonshot/kimi");
+    });
+
+    it("infers the routing tier of frontier agent identities", () => {
+      expect(
+        inferTierFromAuthor("Gemini 4 Argon (Master Architecture & Security Orchestrator)"),
+      ).toBe("tier-1");
+      expect(inferTierFromAuthor("Gemini 4 Carbon (Independent Reviewer)")).toBe("tier-1");
+      expect(inferTierFromAuthor("google/gemini-3.8-flash-high (antigravity)")).toBe("tier-2");
+      expect(inferTierFromAuthor("google/gemini-3.8-pro (antigravity)")).toBe("tier-1");
+      expect(inferTierFromAuthor("deepseek/chat (kimi-code)")).toBe("tier-3");
+      expect(inferTierFromAuthor("moonshot/kimi-k3")).toBe("tier-3");
+      expect(inferTierFromAuthor("Kimi K3 (Moonshot AI)")).toBe("tier-3");
+      expect(inferTierFromAuthor("gemini/flash-lite (antigravity)")).toBe("tier-3");
+      expect(inferTierFromAuthor("")).toBeNull();
+      expect(inferTierFromAuthor(null)).toBeNull();
     });
 
     it("detects PowerShell and Batch stacks from scripts in nested folders", () => {
@@ -300,6 +331,18 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content.trimEnd().endsWith(CUSTOM_NOTES_MARKER)).toBe(true);
     });
 
+    it("documents opt-in diagnostic sharing without performing any upload", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const { content } = generateTelemetryReportFile(tempDir);
+      const sharingIndex = content.indexOf("## 5. Opt-in Diagnostic Sharing (100% Local-First)");
+      expect(sharingIndex).toBeGreaterThan(-1);
+      expect(sharingIndex).toBeLessThan(content.indexOf(CUSTOM_NOTES_MARKER));
+      expect(content).toContain("gh issue create");
+      expect(content).toContain("diagnostic-report.yml");
+      expect(content).toMatch(/never automatic/i);
+    });
+
     it("preserves user authored custom notes across report regeneration", () => {
       enableTelemetry({ cwd: tempDir });
 
@@ -321,7 +364,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(third.content.split("Deploy freeze until Friday.").length - 1).toBe(1);
     });
 
-    it("migrates custom notes from legacy v1.2.4 reports without a marker", () => {
+    it("migrates custom notes from legacy reports without a marker", () => {
       enableTelemetry({ cwd: tempDir });
 
       const { filePath } = generateTelemetryReportFile(tempDir);
@@ -332,7 +375,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         "",
         "Legacy metrics body.",
         "",
-        "## 5. Engineering Notes",
+        "## 6. Engineering Notes",
         "",
         "- Keep the release train green.",
         "",
@@ -353,11 +396,14 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       const { filePath, content } = generateTelemetryReportFile(tempDir);
       const stripped = content.split(CUSTOM_NOTES_MARKER)[0].replace(/\n*$/, "\n");
+      expect(stripped).not.toContain(CUSTOM_NOTES_MARKER);
       writeFileSync(filePath, stripped, "utf8");
 
       const regenerated = generateTelemetryReportFile(tempDir);
       expect(regenerated.content.trimEnd().endsWith(CUSTOM_NOTES_MARKER)).toBe(true);
-      expect(regenerated.content).not.toContain("## 5");
+      expect(regenerated.content.split(CUSTOM_NOTES_MARKER).length - 1).toBe(1);
+      expect(regenerated.content.indexOf("Team Notes")).toBe(-1);
+      expect(regenerated.content.indexOf("## 5. Opt-in Diagnostic Sharing")).toBeGreaterThan(-1);
     });
 
     it("builds a valid GDPR/CCPA compliant zero-PII local payload", () => {

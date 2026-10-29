@@ -46,7 +46,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.2.6";
+  return "1.2.7";
 }
 
 function printHeader() {
@@ -578,7 +578,11 @@ async function handleTelemetry(args: string[]) {
       }
       const res = generateTelemetryReportFile(process.cwd(), outputPath);
       console.log("[OK] Telemetry & ROI Performance Report generated:");
-      console.log(`     Output file: ${res.filePath}\n`);
+      console.log(`     Output file: ${res.filePath}`);
+      console.log(
+        "     Sharing is opt-in: nothing is uploaded. Review the file, then publish it yourself with",
+      );
+      console.log("     'gh issue create --template diagnostic-report.yml --body-file <file>'.\n");
       console.log(res.content);
       break;
     }

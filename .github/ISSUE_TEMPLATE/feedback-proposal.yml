@@ -1,0 +1,80 @@
+name: Feedback or proposal
+description: Report a bug, request a feature, or criticise a design decision. Feedback only, no pull requests.
+title: "feedback: "
+labels: ["lognexus/plan"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feedback and proposals
+
+        LogNexus is **Open Source (MIT), Core-Maintained (Closed to Unsolicited External PRs)**. Every idea, bug and design critique is welcome here as an issue; accepted items are implemented inside the core-maintained pipeline.
+
+        Please keep the report **local-first**: no source code dumps, no absolute paths, no repository remotes, no credentials.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type of feedback
+      options:
+        - Bug report
+        - Feature request
+        - Documentation gap
+        - Design or governance critique
+        - Model / client compatibility
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What is missing, wrong, or confusing today? Describe the outcome you need, not the patch you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction (optional)
+      description: If you have a concrete idea, describe it in prose. Pseudocode is fine; production code is not needed.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Best guess is enough.
+      multiple: true
+      options:
+        - Atomic commit engine
+        - Git Notes (refs/notes/lognexus)
+        - State engine / contracts
+        - MCP server
+        - Telemetry & ROI report
+        - CLI / scaffolding
+        - Skills & slash commands
+        - Documentation
+        - Governance & review gates
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: LogNexus version
+      description: Output of `npx @digital-lake/lognexus --version`, if relevant.
+      placeholder: "1.2.7"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Express confirmation (required)
+      options:
+        - label: I confirm this report contains no source code, private file paths, remotes or secrets.
+          required: true
+        - label: I understand unsolicited pull requests are not accepted and that accepted ideas are implemented by the maintainers.
+          required: true
