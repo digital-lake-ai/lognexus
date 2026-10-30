@@ -8,7 +8,7 @@ import { executeAtomicCommit, type ParsedCommitArgs, parseCommitArgs } from "./c
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
-import { fetchNotes, getNote, listNotes, pushNotes } from "./notes/notes.js";
+import { fetchNotes, getNote, listNotes, pushNotes, searchNotesMemory } from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
 import {
   generateContextHandoff,
@@ -176,6 +176,9 @@ Note Subcommands:
   lognexus note [show] [commit]     Display LogNexus Git Note for commit (default: HEAD)
   lognexus note attach [commit]     Attach current session state as Git Note to commit
   lognexus note list                List all commits with LogNexus Git Notes
+  lognexus note search [query]      Recall past decisions stored in refs/notes/lognexus
+                                    [--file <path>] [--author <model>] [--issue <num>]
+                                    [--limit <n>] [--json] (strictly local, 0 network calls)
   lognexus note push [remote]       Push refs/notes/lognexus to remote (default: origin)
   lognexus note fetch [remote]      Fetch refs/notes/lognexus from remote
 
@@ -418,6 +421,111 @@ async function handleNote(args: string[]) {
       } else {
         for (const n of notes) {
           console.log(`  • Commit: ${n.commitSha} (blob: ${n.noteBlob})`);
+        }
+      }
+      console.log("");
+      break;
+    }
+
+    case "search": {
+      const positional: string[] = [];
+      let file: string | undefined;
+      let author: string | undefined;
+      let issue: number | undefined;
+      let limit: number | undefined;
+      let asJson = false;
+
+      for (let index = 1; index < args.length; index += 1) {
+        const arg = args[index];
+        switch (arg) {
+          case "--json":
+            asJson = true;
+            break;
+          case "--file":
+          case "--author":
+          case "--issue":
+          case "--limit": {
+            const value = args[index + 1];
+            if (value === undefined || value.startsWith("--")) {
+              console.error(`Missing value for '${arg}'.\n`);
+              process.exit(1);
+            }
+            if (arg === "--file") file = value;
+            else if (arg === "--author") author = value;
+            else if (arg === "--issue") {
+              const parsed = Number.parseInt(value, 10);
+              if (Number.isNaN(parsed)) {
+                console.error(`Invalid --issue value '${value}': expected a number.\n`);
+                process.exit(1);
+              }
+              issue = parsed;
+            } else {
+              const parsed = Number.parseInt(value, 10);
+              if (Number.isNaN(parsed) || parsed <= 0) {
+                console.error(`Invalid --limit value '${value}': expected a positive number.\n`);
+                process.exit(1);
+              }
+              limit = parsed;
+            }
+            index += 1;
+            break;
+          }
+          default:
+            if (arg.startsWith("--")) {
+              console.error(`Unknown option for note search: ${arg}\n`);
+              printUsage();
+              process.exit(1);
+            }
+            positional.push(arg);
+        }
+      }
+
+      const query = positional.join(" ").trim();
+      const results = searchNotesMemory(process.cwd(), { query, file, author, issue, limit });
+
+      if (asJson) {
+        console.log(JSON.stringify(results, null, 2));
+        break;
+      }
+
+      printHeader();
+      const filterSummary = [
+        query !== "" ? `query="${query}"` : null,
+        file ? `file=${file}` : null,
+        author ? `author=${author}` : null,
+        issue !== undefined ? `issue=#${issue}` : null,
+      ].filter((part): part is string => part !== null);
+
+      console.log(
+        `Memory Recall (refs/notes/lognexus) — ${results.length} match(es)${
+          filterSummary.length > 0 ? ` for ${filterSummary.join(", ")}` : ""
+        }:\n`,
+      );
+
+      if (results.length === 0) {
+        console.log("No LogNexus note matches this filter.");
+        console.log("Tip: run 'lognexus note list' to inspect every recorded note.\n");
+        break;
+      }
+
+      for (const result of results) {
+        console.log(`  • [${result.shortSha}] ${result.subject}`);
+        const provenance = [
+          result.issueId !== null ? `issue #${result.issueId}` : null,
+          result.subtaskId ?? null,
+          result.tier,
+          result.author !== "" ? `by ${result.author}` : null,
+        ].filter((part): part is string => part !== null);
+        if (provenance.length > 0) {
+          console.log(`      ${provenance.join(" · ")}`);
+        }
+        if (result.subtaskTitle) {
+          console.log(`      ${result.subtaskTitle}`);
+        }
+        if (result.files.length > 0) {
+          const shown = result.files.slice(0, 5).join(", ");
+          const extra = result.files.length > 5 ? ` (+${result.files.length - 5} more)` : "";
+          console.log(`      files: ${shown}${extra}`);
         }
       }
       console.log("");
