@@ -8,8 +8,13 @@ import { executeAtomicCommit, type ParsedCommitArgs, parseCommitArgs } from "./c
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
-import { fetchNotes, getNote, listNotes, pushNotes } from "./notes/notes.js";
+import { fetchNotes, getNote, listNotes, pushNotes, searchNotesMemory } from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
+import {
+  generateContextHandoff,
+  renderContextHandoff,
+  writeContextHandoffFile,
+} from "./state/handoff.js";
 import {
   clearState,
   finishSubtask,
@@ -31,6 +36,13 @@ import {
 } from "./telemetry/collector.js";
 import { generateTelemetryReportFile } from "./telemetry/report.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
+import {
+  acceptTerms,
+  checkUpdateGate,
+  formatUpdateGateResult,
+  readTermsConsent,
+  UPGRADE_COMMAND,
+} from "./update/gate.js";
 
 const __cliDir = dirname(fileURLToPath(import.meta.url));
 
@@ -46,12 +58,70 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.2.7";
+  return "1.3.0";
 }
 
 function printHeader() {
   console.log("\n🔷 LogNexus CLI — Digital Lake");
   console.log("   The Universal Git-Powered Context & Rules Framework for Native AI Agents\n");
+}
+
+/**
+ * Runs the non-interactive startup gate. The MCP transport is exempt because stdout
+ * carries JSON-RPC frames there, and the gate is also skipped for `mcp`, `terms` and
+ * `version` so an operator can always inspect or clear a block.
+ */
+function runStartupGate(command: string | undefined): void {
+  if (command === "mcp" || command === "terms" || command === "version") return;
+
+  const result = checkUpdateGate({ currentVersion: getCliVersion() });
+  const notice = formatUpdateGateResult(result);
+
+  if (result.blocked) {
+    console.error(`${notice}\n`);
+    process.exit(1);
+  }
+
+  if (notice !== "") {
+    console.error(`${notice}\n`);
+  }
+}
+
+async function handleTerms(args: string[]): Promise<void> {
+  const accept = args.includes("--accept");
+  printHeader();
+
+  if (accept) {
+    const termsVersion = readLocalTermsVersion();
+    const consent = acceptTerms(termsVersion);
+    console.log(`[OK] Terms '${consent.acceptedVersion}' accepted at ${consent.acceptedAt}.\n`);
+    return;
+  }
+
+  const consent = readTermsConsent();
+  const termsVersion = readLocalTermsVersion();
+  const status = consent.acceptedVersion === termsVersion ? "Accepted" : "Pending";
+
+  console.log("Legal Terms Status:\n");
+  console.log(`  Terms Version:    ${termsVersion || "(not declared)"}`);
+  console.log(`  Accepted Version: ${consent.acceptedVersion ?? "(none)"}`);
+  console.log(`  Accepted At:      ${consent.acceptedAt ?? "(never)"}`);
+  console.log(`  Consent Status:   ${status}`);
+  console.log(`  Upgrade Command:  ${UPGRADE_COMMAND}\n`);
+}
+
+function readLocalTermsVersion(): string {
+  try {
+    const pkgPath = join(__cliDir, "..", "package.json");
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      const version = pkg?.lognexusPolicy?.termsVersion;
+      if (typeof version === "string") return version;
+    }
+  } catch {
+    // fall through to the empty default
+  }
+  return "";
 }
 
 function printUsage() {
@@ -68,8 +138,10 @@ Commands:
   note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
   timeline     Reconstruct the branch Journey Timeline and draft a PR body
   audit        Audit commit conventions, authorship trailers and review gate
+  handoff      Generate .lognexus/handoff.md with the full cycle context (--json)
   telemetry    Opt-in performance monitoring, stack profiler and ROI report
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
+  terms        Inspect or accept the LogNexus legal terms (--accept, --status)
   version, -v  Display the version of LogNexus
   help, -h     Display this help message
 
@@ -104,6 +176,9 @@ Note Subcommands:
   lognexus note [show] [commit]     Display LogNexus Git Note for commit (default: HEAD)
   lognexus note attach [commit]     Attach current session state as Git Note to commit
   lognexus note list                List all commits with LogNexus Git Notes
+  lognexus note search [query]      Recall past decisions stored in refs/notes/lognexus
+                                    [--file <path>] [--author <model>] [--issue <num>]
+                                    [--limit <n>] [--json] (strictly local, 0 network calls)
   lognexus note push [remote]       Push refs/notes/lognexus to remote (default: origin)
   lognexus note fetch [remote]      Fetch refs/notes/lognexus from remote
 
@@ -114,6 +189,10 @@ Timeline & Audit:
   lognexus audit [base]             Audit commit format, Authored-by trailer, Git Notes,
                                     subtask file contracts and reviewer separation
                                     (exits with code 1 on errors)
+
+Context Handoff:
+  lognexus handoff                  Write .lognexus/handoff.md and print the cycle handoff
+    --json                          Emit the ContextHandoff JSON (no banner)
 
 MCP Server:
   lognexus mcp                      Start MCP server on stdio (JSON-RPC 2.0) for Claude Code,
@@ -348,6 +427,111 @@ async function handleNote(args: string[]) {
       break;
     }
 
+    case "search": {
+      const positional: string[] = [];
+      let file: string | undefined;
+      let author: string | undefined;
+      let issue: number | undefined;
+      let limit: number | undefined;
+      let asJson = false;
+
+      for (let index = 1; index < args.length; index += 1) {
+        const arg = args[index];
+        switch (arg) {
+          case "--json":
+            asJson = true;
+            break;
+          case "--file":
+          case "--author":
+          case "--issue":
+          case "--limit": {
+            const value = args[index + 1];
+            if (value === undefined || value.startsWith("--")) {
+              console.error(`Missing value for '${arg}'.\n`);
+              process.exit(1);
+            }
+            if (arg === "--file") file = value;
+            else if (arg === "--author") author = value;
+            else if (arg === "--issue") {
+              const parsed = Number.parseInt(value, 10);
+              if (Number.isNaN(parsed)) {
+                console.error(`Invalid --issue value '${value}': expected a number.\n`);
+                process.exit(1);
+              }
+              issue = parsed;
+            } else {
+              const parsed = Number.parseInt(value, 10);
+              if (Number.isNaN(parsed) || parsed <= 0) {
+                console.error(`Invalid --limit value '${value}': expected a positive number.\n`);
+                process.exit(1);
+              }
+              limit = parsed;
+            }
+            index += 1;
+            break;
+          }
+          default:
+            if (arg.startsWith("--")) {
+              console.error(`Unknown option for note search: ${arg}\n`);
+              printUsage();
+              process.exit(1);
+            }
+            positional.push(arg);
+        }
+      }
+
+      const query = positional.join(" ").trim();
+      const results = searchNotesMemory(process.cwd(), { query, file, author, issue, limit });
+
+      if (asJson) {
+        console.log(JSON.stringify(results, null, 2));
+        break;
+      }
+
+      printHeader();
+      const filterSummary = [
+        query !== "" ? `query="${query}"` : null,
+        file ? `file=${file}` : null,
+        author ? `author=${author}` : null,
+        issue !== undefined ? `issue=#${issue}` : null,
+      ].filter((part): part is string => part !== null);
+
+      console.log(
+        `Memory Recall (refs/notes/lognexus) — ${results.length} match(es)${
+          filterSummary.length > 0 ? ` for ${filterSummary.join(", ")}` : ""
+        }:\n`,
+      );
+
+      if (results.length === 0) {
+        console.log("No LogNexus note matches this filter.");
+        console.log("Tip: run 'lognexus note list' to inspect every recorded note.\n");
+        break;
+      }
+
+      for (const result of results) {
+        console.log(`  • [${result.shortSha}] ${result.subject}`);
+        const provenance = [
+          result.issueId !== null ? `issue #${result.issueId}` : null,
+          result.subtaskId ?? null,
+          result.tier,
+          result.author !== "" ? `by ${result.author}` : null,
+        ].filter((part): part is string => part !== null);
+        if (provenance.length > 0) {
+          console.log(`      ${provenance.join(" · ")}`);
+        }
+        if (result.subtaskTitle) {
+          console.log(`      ${result.subtaskTitle}`);
+        }
+        if (result.files.length > 0) {
+          const shown = result.files.slice(0, 5).join(", ");
+          const extra = result.files.length > 5 ? ` (+${result.files.length - 5} more)` : "";
+          console.log(`      files: ${shown}${extra}`);
+        }
+      }
+      console.log("");
+      break;
+    }
+
     case "push": {
       const remote = args[1] || "origin";
       printHeader();
@@ -379,6 +563,29 @@ async function handleNote(args: string[]) {
       printUsage();
       process.exit(1);
   }
+}
+
+async function handleHandoff(args: string[]) {
+  const flags = args.filter((arg) => arg.startsWith("-"));
+  const known = ["--json"];
+  const unknown = flags.filter((flag) => !known.includes(flag));
+  if (unknown.length > 0) {
+    console.error(`Unknown option(s) for handoff: ${unknown.join(", ")}\n`);
+    printUsage();
+    process.exit(1);
+  }
+
+  const asJson = flags.includes("--json");
+  if (asJson) {
+    const handoff = generateContextHandoff();
+    writeContextHandoffFile();
+    console.log(JSON.stringify(handoff, null, 2));
+    return;
+  }
+
+  const handoff = writeContextHandoffFile();
+  printHeader();
+  console.log(renderContextHandoff(handoff));
 }
 
 async function handleTimeline(args: string[]) {
@@ -605,6 +812,8 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
 
+  runStartupGate(command);
+
   switch (command) {
     case "commit":
       await handleCommit(args.slice(1));
@@ -632,6 +841,12 @@ async function main() {
       break;
     case "audit":
       await handleAudit(args.slice(1));
+      break;
+    case "handoff":
+      await handleHandoff(args.slice(1));
+      break;
+    case "terms":
+      await handleTerms(args.slice(1));
       break;
     case "mcp":
       // stdout is reserved for JSON-RPC frames: never print the banner here.

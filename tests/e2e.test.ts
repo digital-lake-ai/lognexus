@@ -91,7 +91,7 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     const notePayload = attachCurrentStateToCommit("HEAD", { cwd: tempDir });
     expect(notePayload.generator).toBe("LogNexus");
     expect(notePayload.subtask?.id).toBe("T1");
-    expect(notePayload.version).toBe("1.2.7");
+    expect(notePayload.version).toBe("1.3.0");
 
     const noteRaw = getNote("HEAD", { cwd: tempDir });
     expect(noteRaw).not.toBeNull();

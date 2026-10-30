@@ -34,7 +34,7 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 - **PROHIBIDO AUTO-APROBAR:**
   - An agent or model cannot review or approve its own code.
   - The PR author and the reviewer MUST belong to different model families:
-    - Example: `Authored-by: gemini/flash (antigravity)` → Reviewed by: `deepseek/chat`, `claude/sonnet`, or `openai/gpt-4o`.
+    - Example: `Authored-by: gemini/flash (antigravity)` → Reviewed by: `deepseek/VS Code`, `claude/sonnet`, or `openai/gpt-4o`.
   - Every PR body must carry the review snapshot and signed provenance trailers:
     ```markdown
     Authored-by: <family>/<version> (<client>)
@@ -67,7 +67,7 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
     | Google Gemini 4 Carbon | `tier-1` | `gemini/carbon (antigravity)` |
     | Google Gemini 3.8 Flash High | `tier-2` | `gemini/flash-high (antigravity)` |
     | Moonshot Kimi K3 | `tier-3` | `moonshot/kimi-k3 (kimi-code)` |
-    | DeepSeek Chat | `tier-3` | `deepseek/chat (kimi-code)` |
+    | DeepSeek Chat | `tier-3` | `deepseek/VS Code (kimi-code)` |
   - `src/telemetry/detector.ts` maps these identities onto their routing tiers, so a signature outside this vocabulary degrades tier attribution in the ROI report.
 
 - **Closed-PR policy (branch hygiene):**

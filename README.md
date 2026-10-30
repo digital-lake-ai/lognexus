@@ -55,6 +55,10 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 - **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. No model merges its own code without independent verification from another model family.
 - **Contract-First Subtasks & Alphanumeric Tickets:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions—supporting both GitHub issues (`feat(#42/T1)`) and Jira/Linear ticket schemes (`feat(SLM-201/T1)`).
 - **Persistent State & Session Recovery:** Local session state engine (`.lognexus/state.json`) prevents amnesia across context compactations and conversation resets, retaining completed subtask metadata through the closing commit.
+- **Automated Context Handoff (`lognexus handoff`):** Regenerates a complete `.lognexus/handoff.md` from local state — cycle state, active subtask contract, live scope-drift report, completed-subtask table and next required action — so a fresh session (or a different model) resumes without re-deriving context. Auto-refreshed on `state set-task` and on every `--finish-task` commit.
+- **Live Scope-Drift Guard (`lognexus status` / `lognexus doctor`):** Diffs the working tree against the `allowedFiles` of the active contract on every status and diagnostic run, catching out-of-contract writes before they reach a commit.
+- **Memory Recall Filter (`lognexus note search`):** Queries the LogNexus Git Notes history by file, model, issue or free text, returning the newest matches first — the reasoning behind a decision stays retrievable months later.
+- **Startup Update & Legal Terms Gate:** A non-interactive gate surfaces update and legal-terms requirements at CLI startup, consulting the npm registry through `execFileSync` with `shell: false` and a 2500 ms timeout. The MCP transport is exempt.
 - **Git Notes Engine (Quiet Mode / `git-ai` v3):** Attaches structured session payloads and contracts to commits under `refs/notes/lognexus` without changing commit SHAs.
 - **Native MCP Stdio Server (`lognexus mcp`):** Zero-dependency JSON-RPC 2.0 stdio server exposing LogNexus tools, live state resources, and prompts to Claude Desktop, Cursor, and any MCP client.
 - **Journey Timeline & Review Gate Audit:** Reconstructs the complete branch journey into structured PR descriptions (`lognexus timeline --pr-body`) and programmatically audits review gate separation (`lognexus audit`).
@@ -184,6 +188,23 @@ npx @digital-lake/lognexus timeline main --pr-body
 npx @digital-lake/lognexus audit main
 ```
 
+Session continuity, scope-drift and memory recall:
+```bash
+# Regenerate .lognexus/handoff.md from live state (--json for machines)
+npx @digital-lake/lognexus handoff
+npx @digital-lake/lognexus handoff --json
+
+# Inspect the working tree against the active subtask contract
+npx @digital-lake/lognexus status
+npx @digital-lake/lognexus doctor
+
+# Recall past reasoning from Git Notes, newest matches first
+npx @digital-lake/lognexus note search "scope drift"
+npx @digital-lake/lognexus note search --file src/cli.ts
+npx @digital-lake/lognexus note search --issue 30 --limit 5
+npx @digital-lake/lognexus note search --author "deepseek" --json
+```
+
 Opt-in Telemetry, Stack Profiling & ROI Cost-Savings Engine (100% local, zero network calls):
 ```bash
 # Check telemetry status (disabled by default, 0% overhead)
@@ -310,6 +331,18 @@ Every published release is continuously measured against independent third-party
 | **License & Contribution model** | Open governance | **MIT** — Open Source, Core-Maintained (**Closed to Unsolicited External PRs**) |
 
 > **Local-first by construction:** LogNexus ships `0` runtime network calls, `0` PII, and `0` telemetry endpoints. See [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md) and [`SECURITY.md`](SECURITY.md).
+
+### Provenance & Identities
+
+Every commit carries signed provenance trailers (`Planned-by:` / `Authored-by:` / `Reviewed-by:`). Identities are declared with their canonical spellings:
+
+| Role | Canonical identity |
+|---|---|
+| Master Architecture & Security Orchestrator | `Gemini 4 Argon` |
+| Implementation (VS Code client) | `deepseek/VS Code (kimi-code)` |
+| Cross-model review (Antigravity) | `google/gemini-3.8-flash-high (antigravity)` |
+
+The `Planned-by:` trailer documents where an externally authored plan came from. It grants no review authority and no merge rights; an author model never writes its own `Reviewed-by:` trailer.
 
 ---
 

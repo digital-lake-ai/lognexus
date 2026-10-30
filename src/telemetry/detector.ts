@@ -162,6 +162,10 @@ export function extractCommitDiffStats(
 
 /**
  * Normalizes author/reviewer strings into generic model family categories (e.g. 'gemini/flash', 'claude/sonnet').
+ *
+ * Client qualifiers may contain spaces (`deepseek/VS Code (kimi-code)`), so the identity is
+ * compacted before the slash check: `deepseek/VS Code` resolves to the `deepseek/v3` family
+ * instead of the truncated `deepseek/vs` segment.
  */
 export function extractModelFamilyCategory(identityStr: string | null | undefined): string {
   if (!identityStr) return "unknown/other";
@@ -192,7 +196,8 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   if (trimmed.includes("kimi") || trimmed.includes("moonshot")) return "moonshot/kimi";
   if (trimmed.includes("qwen")) return "qwen/coder";
 
-  const slashMatch = trimmed.match(/^([a-z0-9_-]+\/[a-z0-9_.-]+)/i);
+  const compact = trimmed.replace(/\s+/g, "");
+  const slashMatch = compact.match(/^([a-z0-9_-]+\/[a-z0-9_.-]+)/i);
   if (slashMatch) {
     return slashMatch[1];
   }

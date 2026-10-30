@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { recordTaskFinish, recordTaskStart } from "../telemetry/collector.js";
+import { refreshContextHandoff } from "./handoff.js";
 import {
   type ActiveIssueState,
   ActiveIssueStateSchema,
@@ -147,6 +148,7 @@ export function setSubtask(
   state.currentSubtask = subtask;
   saveState(state, targetDir);
   recordTaskStart(taskId, targetDir);
+  refreshContextHandoff(targetDir);
   return state;
 }
 

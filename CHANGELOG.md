@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-10-30
+
+### Summary
+Session continuity is now enforced by the toolchain instead of by the operator's memory. LogNexus can regenerate a complete context handoff from local state, refuses to let a subtask write outside its declared file contract, and lets an agent recall past reasoning by filtering Git Notes on file, model, issue or free text. A startup update and legal-terms gate closes the release loop, and the canonical implementer identity for the VS Code client is standardized as `deepseek/VS Code (kimi-code)`.
+
+### Added
+- **Automated Context Handoff (`lognexus handoff`):** a new generator (`src/state/handoff.ts`) renders `.lognexus/handoff.md` from the live state store — cycle state, the active subtask contract, the scope-drift report, a completed-subtask table and the next required action. It is refreshed automatically when a subtask is activated (`state set-task`) and when a commit is closed with `--finish-task`; the commit-path refresh is best-effort and never aborts a commit. Supports `--json` for programmatic consumption.
+- **Live Scope-Drift Guard (`lognexus status` / `lognexus doctor`):** `getScopeDrift()` compares the files touched in the working tree against the `allowedFiles` of the active contract, using `git status --porcelain --untracked-files=all` so that untracked files are never collapsed away. `.lognexus/` and `docs/contexto/` are exempt. Exposed as a `Scope Drift Guard` diagnostic check and embedded in the handoff document, so an out-of-contract write is caught before it reaches a commit.
+- **Memory Recall Filter (`lognexus note search`):** `searchNotesMemory()` in `src/notes/notes.ts` queries the LogNexus Git Notes history by `query` (commit subject, note body, note JSON), `file` (via `git show --name-only`), `author` (commit author and body trailers) and `issue` (from the note payload). Filters combine conjunctively and results are returned newest-first. CLI surface: `lognexus note search [query] --file <path> --author <model> --issue <num> --limit <n> --json`.
+- **Startup Update & Legal Terms Gate (`src/update/gate.ts`):** a non-interactive gate that checks the published npm registry policy (`execFileSync`, `shell: false`, `timeout: 2500`) and surfaces update and legal-terms requirements at CLI startup. The MCP transport is exempt so it never writes to the JSON-RPC stdout channel.
+
+### Changed
+- **Canonical implementer identity:** the VS Code client identity is standardized as `deepseek/VS Code (kimi-code)`. The audit identity extractor (`src/audit/audit.ts`) now normalizes any `family/client` trailer into a stable slug (`deepseek/vs-code`), so identity spellings no longer produce spurious review-separation results.
+- **`lognexus doctor`** reports four checks instead of three: the new `Scope Drift Guard` runs alongside the existing diagnostics.
+
+### Security
+- **Zero network access preserved:** the update gate is the only code path that consults the registry, and it does so through `execFileSync` with `shell: false`. There is still no `fetch` call anywhere under `src/`.
+- **Hard-block regression fixed:** `checkUpdateGate` only enforces the policy published by the registry. The local `package.json` manifest can no longer hard-block the running CLI on its own.
+
 ## [1.2.7] - 2026-10-30
 
 ### Summary

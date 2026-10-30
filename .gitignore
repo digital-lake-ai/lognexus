@@ -19,6 +19,9 @@ npm-debug.log*
 # LogNexus local session state & raw telemetry
 .lognexus/state.json
 .lognexus/telemetry.json
+.lognexus/update-check.json
+.lognexus/terms-consent.json
+.lognexus/handoff.md
 
 # Internal context & planning
 docs/contexto/

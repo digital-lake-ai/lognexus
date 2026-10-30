@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { getScopeDrift } from "./status.js";
 
 export interface DiagnosticCheck {
   name: string;
@@ -126,6 +127,37 @@ export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticC
   };
 }
 
+export function checkScopeDrift(targetDir: string = process.cwd()): DiagnosticCheck {
+  const drift = getScopeDrift(targetDir);
+
+  if (drift.allowedFiles.length === 0) {
+    return {
+      name: "Scope Drift Guard",
+      status: "pass",
+      message: "No contracted subtask is active — nothing to compare against",
+    };
+  }
+
+  if (!drift.detected) {
+    return {
+      name: "Scope Drift Guard",
+      status: "pass",
+      message: `${drift.allowedFiles.length} allowed file(s) — working tree matches the contract`,
+    };
+  }
+
+  return {
+    name: "Scope Drift Guard",
+    status: "warn",
+    message: `${drift.unauthorizedFiles.length} file(s) changed outside the contract: ${drift.unauthorizedFiles.join(", ")}`,
+  };
+}
+
 export function runDiagnostics(targetDir: string = process.cwd()): DiagnosticCheck[] {
-  return [checkGit(targetDir), checkGitHubCli(), checkRulesConfig(targetDir)];
+  return [
+    checkGit(targetDir),
+    checkGitHubCli(),
+    checkRulesConfig(targetDir),
+    checkScopeDrift(targetDir),
+  ];
 }

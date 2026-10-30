@@ -29,6 +29,19 @@ Full transparency about what the LogNexus process can touch:
 | **`shellAccess`** | Local binaries only, argument-safe | `execFileSync` with `shell: false` and array arguments. Only `git` and `gh` are invoked, to read branch, commit, diff, and PR metadata. No user-supplied string is ever interpolated into a shell. |
 | **`processAccess`** | Read-only environment lookups | Reads `DO_NOT_TRACK` and `LOGNEXUS_TELEMETRY_DISABLED` to honor opt-outs. No environment value is persisted or transmitted. |
 
+### 2.1 Capabilities Introduced in 1.3.0
+
+The 1.3.0 release adds session-continuity features that read more local state than earlier versions. Their data surface is disclosed in full below. None of them introduces a network path.
+
+| Capability | What It Reads | Where It Writes | Network |
+| :--- | :--- | :--- | :--- |
+| **Automated Context Handoff** (`lognexus handoff`) | `.lognexus/state.json`, `git status`, `git log`, the scope-drift report. | `.lognexus/handoff.md` only. | None. |
+| **Live Scope-Drift Guard** (`lognexus status` / `doctor`) | `allowedFiles` from `.lognexus/state.json` and `git status --porcelain --untracked-files=all`. File **paths** are compared locally and are never persisted to the telemetry store or written anywhere. | Nothing (read-only). | None. |
+| **Memory Recall Filter** (`lognexus note search`) | Git Notes under `refs/notes/lognexus`, commit subjects, `git show --name-only`. Filter inputs are echoed back in the result set only. | Nothing (read-only). | None. |
+| **Startup Update & Legal Terms Gate** (`src/update/gate.ts`) | The published registry policy, obtained via `execFileSync` (`shell: false`, `timeout: 2500`) — the only component in the package that contacts a remote service. The payload is the package name and version; no identifier, no project data, no telemetry store content is sent. | Nothing. | Registry read only, and only at CLI startup (the MCP transport is exempt). |
+
+> **Note:** the retired pre-2.0.0 hard-block behavior is gone. The gate enforces only the policy returned by the registry and can no longer block a running CLI based on the local `package.json`.
+
 ---
 
 ## 3. Industry Standards & Environment Flags
@@ -49,7 +62,7 @@ Under a kill switch, the store reports mode `off`, no metrics file is written, a
 | Category | ✅ What Is Stored Locally (`local` mode only) | ❌ What Is Never Stored (Forbidden) |
 | :--- | :--- | :--- |
 | **Identity** | An anonymous, randomly generated `UUIDv4` (`anonymousProjectId`) scoped to the project. | Usernames, real names, email addresses, GitHub handles, hostnames, IP addresses. |
-| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.2.7`). | Absolute file system paths, home directories, environment variable values. |
+| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.3.0`). | Absolute file system paths, home directories, environment variable values. |
 | **Project Stack** | Detected stack categories (e.g. `["typescript", "nodejs"]`) and file-extension counters (`.ts`, `.py`, `.ps1`). | Source code, file names, directory names, package names, internal library names. |
 | **AI Models** | Model family (`gemini`, `claude`, `deepseek`, `openai`, `kimi`) and operational tier (`tier-1`, `tier-2`, `tier-3`), derived from commit trailers. | Prompts, completions, reasoning tokens, system instructions, API keys. |
 | **Metrics** | Numeric counters: lines added, lines deleted, subtask duration in seconds, blocked review gate count, estimated % cost saved. | Commit subjects, commit bodies, diff contents, git branches, PR descriptions, secrets. |
@@ -77,7 +90,7 @@ Example payload:
   "environment": {
     "os": "win32",
     "nodeVersion": "v22.11.0",
-    "lognexusVersion": "1.2.7",
+    "lognexusVersion": "1.3.0",
     "detectedStacks": ["typescript", "nodejs"]
   },
   "summary": {

@@ -51,6 +51,60 @@ export function detectBaseBranch(targetDir: string): string {
 }
 
 /**
+ * Reads the published `lognexusPolicy` block for a package from the npm registry.
+ *
+ * The lookup goes through `npm view` rather than an HTTP client to keep the whole
+ * codebase free of `fetch()`. It is best-effort by design: a missing npm binary, no
+ * network, a timeout or a malformed payload all collapse to `null`, so a startup
+ * check can never block on the registry.
+ */
+export function fetchNpmPackagePolicy(
+  packageName: string,
+  targetDir: string = process.cwd(),
+): NpmPackagePolicy | null {
+  if (packageName.trim() === "") return null;
+
+  try {
+    const raw = execFileSync("npm", ["view", packageName, "version", "lognexusPolicy", "--json"], {
+      cwd: targetDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+      timeout: 2500,
+    });
+
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+
+    const record = parsed as Record<string, unknown>;
+    const version = typeof record.version === "string" ? record.version : null;
+    const policy = record.lognexusPolicy;
+
+    if (version === null) return null;
+
+    return {
+      version,
+      lognexusPolicy:
+        policy !== null && typeof policy === "object" && !Array.isArray(policy)
+          ? (policy as NpmPackagePolicy["lognexusPolicy"])
+          : null,
+    };
+  } catch {
+    // Offline, npm missing, timeout or unexpected payload: silently skip the check.
+    return null;
+  }
+}
+
+export interface NpmPackagePolicy {
+  version: string;
+  lognexusPolicy: {
+    minCriticalVersion?: string;
+    termsVersion?: string;
+    requiresTermsAcceptance?: boolean;
+  } | null;
+}
+
+/**
  * Rejects refs that live under `refs/notes/`. Notes are metadata, not ancestry:
  * using one as a base branch would diff a commit against a note tree.
  */

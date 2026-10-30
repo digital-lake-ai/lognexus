@@ -103,6 +103,31 @@ describe("Traceability audit", () => {
     expect(result.violations.some((v) => v.rule === "review-gate-separation")).toBe(false);
   });
 
+  it("parses identities whose client qualifier contains spaces", () => {
+    commitFile(
+      tempDir,
+      "feature.txt",
+      "feature",
+      "feat(#30/T1): standardize vs code identity\n\nAuthored-by: deepseek/VS Code (kimi-code)\nReviewed-by: google/gemini-3.8-flash-high (antigravity)\n",
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "authored-by-presence")).toBe(false);
+    expect(result.violations.some((v) => v.rule === "review-gate-separation")).toBe(false);
+  });
+
+  it("still flags self-approval when the spaced author reviews its own work", () => {
+    commitFile(
+      tempDir,
+      "feature.txt",
+      "feature",
+      "feat(#30/T1): standardize vs code identity\n\nAuthored-by: deepseek/VS Code (kimi-code)\nReviewed-by: deepseek/VS Code (cursor)\n",
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "review-gate-separation")).toBe(true);
+  });
+
   it("emits warnings when Git Notes are missing", () => {
     commitFile(
       tempDir,
