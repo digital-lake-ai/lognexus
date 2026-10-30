@@ -134,12 +134,24 @@ describe("Memory Recall (Git Notes search)", () => {
     return execSync(`git ${args}`, { cwd: tempDir, encoding: "utf8", stdio: "pipe" }).trim();
   }
 
-  function commitFile(file: string, content: string, message: string, author: string): string {
+  function commitFile(
+    file: string,
+    content: string,
+    message: string,
+    author: string,
+    dateIso?: string,
+  ): string {
     const target = join(tempDir, file);
     mkdirSync(join(target, ".."), { recursive: true });
     writeFileSync(target, content, "utf8");
     git("add -A");
-    execSync(`git commit -m "${message}" --author "${author}"`, { cwd: tempDir, stdio: "pipe" });
+    const dateArg = dateIso ? ` --date="${dateIso}"` : "";
+    const env = dateIso ? { ...process.env, GIT_COMMITTER_DATE: dateIso } : process.env;
+    execSync(`git commit -m "${message}" --author "${author}"${dateArg}`, {
+      cwd: tempDir,
+      stdio: "pipe",
+      env,
+    });
     return git("rev-parse HEAD");
   }
 
@@ -170,6 +182,7 @@ describe("Memory Recall (Git Notes search)", () => {
       "export const drift = true;\n",
       "feat(#30/T2): implement live scope-drift guard",
       "deepseek/VS Code <deepseek@example.com>",
+      "2026-10-30T10:00:01Z",
     );
     attachNote(notePayload(30, "T2", "Implement live scope-drift guard"), shaDrift, {
       cwd: tempDir,
@@ -180,6 +193,7 @@ describe("Memory Recall (Git Notes search)", () => {
       "export const handoff = true;\n",
       "feat(#30/T3): implement context handoff generator",
       "deepseek/VS Code <deepseek@example.com>",
+      "2026-10-30T10:00:02Z",
     );
     attachNote(notePayload(30, "T3", "Implement automated context handoff"), shaHandoff, {
       cwd: tempDir,
@@ -190,6 +204,7 @@ describe("Memory Recall (Git Notes search)", () => {
       '{"version":"1.2.6"}\n',
       "chore(#26/T4): bump atomic version contract to 1.2.6",
       "gemini/flash <gemini@example.com>",
+      "2026-10-30T10:00:03Z",
     );
     attachNote(notePayload(26, "T4", "Bump atomic version contract"), shaBump, { cwd: tempDir });
   });
