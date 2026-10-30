@@ -1,7 +1,7 @@
 {
   "name": "lognexus",
   "description": "The Universal, Git-powered context & rules framework for native AI agents (Claude, OpenAI, Gemini, DeepSeek).",
-  "version": "1.2.7",
+  "version": "1.3.0",
   "author": {
     "name": "Digital Lake"
   },
