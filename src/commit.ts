@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { checkSelfApproval } from "./audit/audit.js";
 import { SCOPED_BRANCH_TEMPLATE } from "./branch.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
+import { refreshContextHandoff } from "./state/handoff.js";
 import { finishSubtask, loadState } from "./state/manager.js";
 import { inferActiveIssueFromBranch } from "./state/sync.js";
 import { recordCommitTelemetry, recordReviewGateBlock } from "./telemetry/collector.js";
@@ -334,7 +335,12 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     escalated: Boolean(options.escalated),
   });
 
-  // 9. Passive telemetry hook (only active if user opted in)
+  // 9. Regenerate the context handoff so the next session starts from disk
+  if (options.finishTask && subtaskCompleted !== null) {
+    refreshContextHandoff(cwd);
+  }
+
+  // 10. Passive telemetry hook (only active if user opted in)
   recordCommitTelemetry({
     sha,
     author,

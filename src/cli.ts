@@ -11,6 +11,11 @@ import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { fetchNotes, getNote, listNotes, pushNotes } from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
 import {
+  generateContextHandoff,
+  renderContextHandoff,
+  writeContextHandoffFile,
+} from "./state/handoff.js";
+import {
   clearState,
   finishSubtask,
   loadState,
@@ -133,6 +138,7 @@ Commands:
   note         Manage Git Notes under refs/notes/lognexus (git-ai standard)
   timeline     Reconstruct the branch Journey Timeline and draft a PR body
   audit        Audit commit conventions, authorship trailers and review gate
+  handoff      Generate .lognexus/handoff.md with the full cycle context (--json)
   telemetry    Opt-in performance monitoring, stack profiler and ROI report
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
   terms        Inspect or accept the LogNexus legal terms (--accept, --status)
@@ -180,6 +186,10 @@ Timeline & Audit:
   lognexus audit [base]             Audit commit format, Authored-by trailer, Git Notes,
                                     subtask file contracts and reviewer separation
                                     (exits with code 1 on errors)
+
+Context Handoff:
+  lognexus handoff                  Write .lognexus/handoff.md and print the cycle handoff
+    --json                          Emit the ContextHandoff JSON (no banner)
 
 MCP Server:
   lognexus mcp                      Start MCP server on stdio (JSON-RPC 2.0) for Claude Code,
@@ -447,6 +457,29 @@ async function handleNote(args: string[]) {
   }
 }
 
+async function handleHandoff(args: string[]) {
+  const flags = args.filter((arg) => arg.startsWith("-"));
+  const known = ["--json"];
+  const unknown = flags.filter((flag) => !known.includes(flag));
+  if (unknown.length > 0) {
+    console.error(`Unknown option(s) for handoff: ${unknown.join(", ")}\n`);
+    printUsage();
+    process.exit(1);
+  }
+
+  const asJson = flags.includes("--json");
+  if (asJson) {
+    const handoff = generateContextHandoff();
+    writeContextHandoffFile();
+    console.log(JSON.stringify(handoff, null, 2));
+    return;
+  }
+
+  const handoff = writeContextHandoffFile();
+  printHeader();
+  console.log(renderContextHandoff(handoff));
+}
+
 async function handleTimeline(args: string[]) {
   const flags = args.filter((arg) => arg.startsWith("-"));
   const positional = args.filter((arg) => !arg.startsWith("-"));
@@ -700,6 +733,9 @@ async function main() {
       break;
     case "audit":
       await handleAudit(args.slice(1));
+      break;
+    case "handoff":
+      await handleHandoff(args.slice(1));
       break;
     case "terms":
       await handleTerms(args.slice(1));
