@@ -136,6 +136,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("claude-3-5-haiku")).toBe("claude/haiku");
       expect(extractModelFamilyCategory("openai/gpt-4o (antigravity)")).toBe("openai/gpt");
       expect(extractModelFamilyCategory("deepseek/deepseek-coder")).toBe("deepseek/v3");
+      expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code)")).toBe("deepseek/v3");
+      expect(extractModelFamilyCategory("deepseek/vs-code")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
     });
 
@@ -162,6 +164,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor("google/gemini-3.8-flash-high (antigravity)")).toBe("tier-2");
       expect(inferTierFromAuthor("google/gemini-3.8-pro (antigravity)")).toBe("tier-1");
       expect(inferTierFromAuthor("deepseek/chat (kimi-code)")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek/VS Code (kimi-code)")).toBe("tier-3");
       expect(inferTierFromAuthor("moonshot/kimi-k3")).toBe("tier-3");
       expect(inferTierFromAuthor("Kimi K3 (Moonshot AI)")).toBe("tier-3");
       expect(inferTierFromAuthor("gemini/flash-lite (antigravity)")).toBe("tier-3");

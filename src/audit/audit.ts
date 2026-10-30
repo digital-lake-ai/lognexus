@@ -40,6 +40,7 @@ export const SUBJECT_TASK_PATTERN = new RegExp(
   "i",
 );
 const IDENTITY_PATTERN = /(\S+\/\S+)/;
+const FAMILY_PATTERN = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_. -]+?)\s*$/;
 const TRAILER_PATTERN = /^\s*(Authored-by|Reviewed-by|Last-code-by|Updated-by):\s*(.+)$/gim;
 
 interface NoteContract {
@@ -57,16 +58,28 @@ export interface Identity {
   family: string;
 }
 
+/**
+ * Client qualifiers can carry spaces (`deepseek/VS Code (kimi-code)`), so a naive
+ * first-token match would truncate the family to `deepseek/vs`. The family is the
+ * slash segment before the parenthetical qualifier, with inner whitespace collapsed
+ * to single dashes; `deepseek/chat` keeps resolving to `deepseek/chat`.
+ */
+function extractFamily(value: string): string | null {
+  const match = value.split("(")[0].trim().match(FAMILY_PATTERN) ?? value.match(IDENTITY_PATTERN);
+  if (!match) return null;
+  return match[1].replace(/\s+/g, "-").toLowerCase();
+}
+
 export function parseIdentity(value: string | null): Identity | null {
   if (value === null) return null;
 
-  const match = value.match(IDENTITY_PATTERN);
-  if (!match) {
+  const family = extractFamily(value);
+  if (family === null) {
     const trimmed = value.trim().toLowerCase();
     return trimmed === "" ? null : { full: trimmed, family: trimmed };
   }
 
-  return { full: value.trim().toLowerCase(), family: match[1].toLowerCase() };
+  return { full: value.trim().toLowerCase(), family };
 }
 
 export function extractTrailers(commitBody: string): {

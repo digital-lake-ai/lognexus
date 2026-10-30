@@ -4,16 +4,16 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| 1.3.x   | :white_check_mark: |
+| 1.2.x   | :white_check_mark: |
+| < 1.2   | :x:                |
 
 ## Reporting a Vulnerability
 
 The LogNexus team takes the security of our project and its users seriously. If you discover a security vulnerability, please report it privately rather than opening a public issue.
 
 ### How to Report
-- **GitHub Security Advisory:** Submit a report via the [LogNexus Security Advisory page](https://github.com/digital-lake-ai/lognexus/security/advisories/new).
-- **Direct Contact:** If GitHub Security Advisories is unavailable, contact the maintainers at `security@digital-lake.ai`.
+- **GitHub Security Advisory:** Submit a report via the [LogNexus Security Advisory page](https://github.com/digital-lake-ai/lognexus/security/advisories/new). This is the only supported reporting channel.
 
 ### What to Include
 To help us triage and resolve the issue quickly, please provide:

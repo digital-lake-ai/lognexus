@@ -31,6 +31,13 @@ import {
 } from "./telemetry/collector.js";
 import { generateTelemetryReportFile } from "./telemetry/report.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
+import {
+  acceptTerms,
+  checkUpdateGate,
+  formatUpdateGateResult,
+  readTermsConsent,
+  UPGRADE_COMMAND,
+} from "./update/gate.js";
 
 const __cliDir = dirname(fileURLToPath(import.meta.url));
 
@@ -54,6 +61,64 @@ function printHeader() {
   console.log("   The Universal Git-Powered Context & Rules Framework for Native AI Agents\n");
 }
 
+/**
+ * Runs the non-interactive startup gate. The MCP transport is exempt because stdout
+ * carries JSON-RPC frames there, and the gate is also skipped for `mcp`, `terms` and
+ * `version` so an operator can always inspect or clear a block.
+ */
+function runStartupGate(command: string | undefined): void {
+  if (command === "mcp" || command === "terms" || command === "version") return;
+
+  const result = checkUpdateGate({ currentVersion: getCliVersion() });
+  const notice = formatUpdateGateResult(result);
+
+  if (result.blocked) {
+    console.error(`${notice}\n`);
+    process.exit(1);
+  }
+
+  if (notice !== "") {
+    console.error(`${notice}\n`);
+  }
+}
+
+async function handleTerms(args: string[]): Promise<void> {
+  const accept = args.includes("--accept");
+  printHeader();
+
+  if (accept) {
+    const termsVersion = readLocalTermsVersion();
+    const consent = acceptTerms(termsVersion);
+    console.log(`[OK] Terms '${consent.acceptedVersion}' accepted at ${consent.acceptedAt}.\n`);
+    return;
+  }
+
+  const consent = readTermsConsent();
+  const termsVersion = readLocalTermsVersion();
+  const status = consent.acceptedVersion === termsVersion ? "Accepted" : "Pending";
+
+  console.log("Legal Terms Status:\n");
+  console.log(`  Terms Version:    ${termsVersion || "(not declared)"}`);
+  console.log(`  Accepted Version: ${consent.acceptedVersion ?? "(none)"}`);
+  console.log(`  Accepted At:      ${consent.acceptedAt ?? "(never)"}`);
+  console.log(`  Consent Status:   ${status}`);
+  console.log(`  Upgrade Command:  ${UPGRADE_COMMAND}\n`);
+}
+
+function readLocalTermsVersion(): string {
+  try {
+    const pkgPath = join(__cliDir, "..", "package.json");
+    if (existsSync(pkgPath)) {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      const version = pkg?.lognexusPolicy?.termsVersion;
+      if (typeof version === "string") return version;
+    }
+  } catch {
+    // fall through to the empty default
+  }
+  return "";
+}
+
 function printUsage() {
   printHeader();
   console.log(`Usage:
@@ -70,6 +135,7 @@ Commands:
   audit        Audit commit conventions, authorship trailers and review gate
   telemetry    Opt-in performance monitoring, stack profiler and ROI report
   mcp          Start the LogNexus MCP server (stdio JSON-RPC 2.0) for native AI agents
+  terms        Inspect or accept the LogNexus legal terms (--accept, --status)
   version, -v  Display the version of LogNexus
   help, -h     Display this help message
 
@@ -605,6 +671,8 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0]?.toLowerCase();
 
+  runStartupGate(command);
+
   switch (command) {
     case "commit":
       await handleCommit(args.slice(1));
@@ -632,6 +700,9 @@ async function main() {
       break;
     case "audit":
       await handleAudit(args.slice(1));
+      break;
+    case "terms":
+      await handleTerms(args.slice(1));
       break;
     case "mcp":
       // stdout is reserved for JSON-RPC frames: never print the banner here.

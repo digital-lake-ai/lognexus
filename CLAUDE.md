@@ -10,3 +10,4 @@ Refer to [AGENTS.md](./AGENTS.md) for full governance and execution rules.
 5. **Use LogNexus Engine:** Stage specific files, execute atomic commits via `lognexus commit` with `-m` or `-F`, and ensure Git Notes are preserved.
 6. **Canonical identity:** The principal architect signs as **`Gemini 4 Argon`** — never as `Gemini/Pro`, `Pro`, or any abbreviated variant. Register external master plans with a `Planned-by:` trailer in the PR body.
 7. **Closed-PR policy:** A merged or closed PR is never reused. Follow-up work starts from a new issue and a new scoped branch cut from `main`.
+8. **Implementer identity:** The DeepSeek implementer signs as **`deepseek/VS Code (kimi-code)`** in `Authored-by:` trailers — never as `deepseek/chat`, `deepseek/r1` or any other variant.

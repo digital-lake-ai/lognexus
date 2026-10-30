@@ -18,7 +18,7 @@ description: "Phase 5: Create PR with timeline body, handle review gate, and lin
 
    When a master plan drafted outside this repository drove the work, register it in the signature block with a `Planned-by:` trailer naming the external planner and its plan identifier. The authoring identity goes in `Authored-by:` and stays distinct from any reviewer.
 
-   Sign with canonical model identities only. The principal architect is always declared as **`Gemini 4 Argon`** (`gemini/argon`), never abbreviated as `Gemini/Pro` or `Pro`. Other canonical frontier identities are `gemini/carbon` (tier-1), `gemini/flash-high` (tier-2), `moonshot/kimi-k3` (tier-3) and `deepseek/chat` (tier-3).
+   Sign with canonical model identities only. The principal architect is always declared as **`Gemini 4 Argon`** (`gemini/argon`), never abbreviated as `Gemini/Pro` or `Pro`. Other canonical frontier identities are `gemini/carbon` (tier-1), `gemini/flash-high` (tier-2), `moonshot/kimi-k3` (tier-3) and `deepseek/VS Code` (tier-3).
 
 3. **Review gate & Merge Execution.**
    - Every PR requires cross-model review before merge (`Authored-by` != `Reviewed-by`). Use the execution ladder in `references/closure-and-review.md`. Local parallel tool fan-out does not count as an independent reviewer identity.
