@@ -1,0 +1,28 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.7",
+  "timestamp": "2026-10-30T14:13:48.025Z",
+  "issue": {
+    "id": 30,
+    "title": "feat(v1.3.0): automated context handoff, live scope-drift guard, memory recall filter, startup update/terms gate & VS Code identity"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Implement automated context handoff generator and CLI command",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/state/handoff.ts",
+        "src/state/manager.ts",
+        "src/commit.ts",
+        "src/cli.ts",
+        "tests/handoff.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
