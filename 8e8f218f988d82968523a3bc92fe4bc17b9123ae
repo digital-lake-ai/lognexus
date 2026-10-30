@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.2.7",
+  "timestamp": "2026-10-30T14:08:16.749Z",
+  "issue": {
+    "id": 30,
+    "title": "feat(v1.3.0): automated context handoff, live scope-drift guard, memory recall filter, startup update/terms gate & VS Code identity"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Standardize VS Code identity, sanitize security policy and add startup update/terms gate",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "SECURITY.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        ".agents/rules.md",
+        "skills/lognexus/SKILL.md",
+        "skills/lognexus/pr.md",
+        "src/telemetry/detector.ts",
+        "src/audit/audit.ts",
+        "src/git/safe.ts",
+        "src/update/gate.ts",
+        "src/cli.ts",
+        "package.json",
+        ".gitignore",
+        "tests/telemetry.test.ts",
+        "tests/audit.test.ts",
+        "tests/update-gate.test.ts"
+      ],
+      "forbiddenFiles": [],
+      "decisionBudget": "narrow"
+    }
+  },
+  "tier": "tier-3"
+}
