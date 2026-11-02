@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.1] - 2026-11-02
+
+### Summary
+A hardening patch for the Windows client and for the state store's long-lived accuracy. The startup update gate now resolves the npm CLI correctly outside a POSIX shell, a completed subtask no longer reports scope drift against its own contract, the state sync resets when the cycle moves to another issue, and memory recall searches the subtask payload instead of the shared issue title while attributing authorship to the `Authored-by:` trailer.
+
+### Fixed
+- **Startup update gate on Windows:** `resolveNpmCliScript()` locates `npm-cli.js` through `process.execPath` so the registry policy query no longer fails with `ENOENT` on Windows. The query still runs through `execFileSync` with `shell: false` and `timeout: 2500`, and there is still no `fetch` call under `src/`.
+- **CLI entrypoint guard:** `isDirectCliExecution()` wraps the top-level `main().catch(...)` so importing the CLI module no longer executes the command handler.
+- **Scope drift on a completed subtask:** `getScopeDrift()` and the handoff generator treat a `completed` subtask as holding no contract, so the working tree is no longer reported as drifted against files the closed subtask already delivered. `lognexus status` now prints the drift verdict (and the number of contracted files) instead of staying silent.
+- **State sync across issues:** `syncStateFromGit()` clears `currentSubtask` and `completedSubtasks` when the active branch moves to a different issue, and on a base or unrecognised branch. Returning to the same issue preserves the cursor.
+- **Status path parsing:** `readTouchedFiles()` no longer trims the whole porcelain blob, which previously ate the leading space of the first ` M path` entry, and it follows a rename to its destination path.
+- **Memory recall precision:** `searchNotesMemory()` builds its free-text haystack from the commit subject, body, author, touched files and the subtask block of the note payload. The note's `issue.title` is excluded because every commit of a cycle shares it, which previously matched the entire cycle. Free-form notes remain fully searchable.
+- **Author attribution:** both memory recall and the handoff generator resolve the commit author from the `Authored-by:` body trailer, falling back to `%an` when no trailer is present. The handoff prefers the commit nested under the active issue when resolving a completed subtask.
+
+### Changed
+- **Version contract:** the atomic version contract moves to `1.3.1` across `package.json` (including `lognexusPolicy.minCriticalVersion`), `package-lock.json`, `.claude-plugin/plugin.json`, the CLI fallback and the privacy policy.
+
 ## [1.3.0] - 2026-10-30
 
 ### Summary
