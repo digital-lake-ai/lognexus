@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { auditBranch, formatAuditResult } from "./audit/audit.js";
 import { executeAtomicCommit, type ParsedCommitArgs, parseCommitArgs } from "./commit.js";
@@ -870,7 +870,29 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+/**
+ * True only when this module is the process entrypoint.
+ *
+ * Importing `src/cli.ts` (from `src/index.ts`, Vitest or a third-party library) must
+ * not run `main()`: spawning the sync so pulls in npm, git and filesystem side effects.
+ */
+export function isDirectCliExecution(argv1: string | undefined = process.argv[1]): boolean {
+  if (!argv1) return false;
+
+  try {
+    if (realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(argv1))) {
+      return true;
+    }
+  } catch {
+    // Unresolvable path (virtual FS, deleted shim): fall through to the name heuristic.
+  }
+
+  return /(?:^|[\\/])(?:cli\.[cm]?[jt]s|lognexus(?:\.cmd|\.ps1|\.exe)?)$/i.test(argv1);
+}
+
+if (isDirectCliExecution()) {
+  main().catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  });
+}

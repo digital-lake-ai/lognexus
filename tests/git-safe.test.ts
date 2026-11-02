@@ -1,11 +1,13 @@
 import { execFileSync, execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   detectBaseBranch,
+  fetchNpmPackagePolicy,
   rejectNotesReference,
+  resolveNpmCliScript,
   validateGitReference,
   verifyCommitish,
 } from "../src/git/safe.js";
@@ -170,6 +172,77 @@ describe("Unified Git reference guard (src/git/safe.ts)", () => {
     it("defaults to main when neither candidate exists", () => {
       execSync("git branch -m trunk", { cwd: repoDir, stdio: "ignore" });
       expect(detectBaseBranch(repoDir)).toBe("main");
+    });
+  });
+
+  describe("resolveNpmCliScript", () => {
+    let root: string;
+
+    beforeEach(() => {
+      root = mkdtempSync(join(tmpdir(), "lognexus-npm-cli-"));
+    });
+
+    afterEach(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    function touch(filePath: string): string {
+      mkdirSync(dirname(filePath), { recursive: true });
+      writeFileSync(filePath, "", "utf8");
+      return filePath;
+    }
+
+    it("prefers npm_execpath when it points at a real JavaScript entrypoint", () => {
+      const script = touch(join(root, "custom", "npm-cli.js"));
+      expect(resolveNpmCliScript(join(root, "bin", "node"), { npm_execpath: script })).toBe(script);
+    });
+
+    it("ignores npm_execpath when it is not a JavaScript file", () => {
+      const shim = touch(join(root, "custom", "npm"));
+      expect(resolveNpmCliScript(join(root, "bin", "node"), { npm_execpath: shim })).toBeNull();
+    });
+
+    it("ignores npm_execpath when the file does not exist", () => {
+      const missing = join(root, "custom", "npm-cli.js");
+      expect(resolveNpmCliScript(join(root, "bin", "node"), { npm_execpath: missing })).toBeNull();
+    });
+
+    it("finds the Windows layout next to the node binary", () => {
+      const execPath = touch(join(root, "nodejs", "node.exe"));
+      const script = touch(join(root, "nodejs", "node_modules", "npm", "bin", "npm-cli.js"));
+      expect(resolveNpmCliScript(execPath, {})).toBe(script);
+    });
+
+    it("finds the Unix layout one level above the node binary", () => {
+      const execPath = touch(join(root, "usr", "bin", "node"));
+      const script = touch(
+        join(root, "usr", "bin", "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"),
+      );
+      expect(resolveNpmCliScript(execPath, {})).toBe(script);
+    });
+
+    it("returns null when no npm installation can be located", () => {
+      const execPath = touch(join(root, "bare", "bin", "node"));
+      expect(resolveNpmCliScript(execPath, {})).toBeNull();
+    });
+  });
+
+  describe("fetchNpmPackagePolicy", () => {
+    it("rejects malformed package names before spawning npm", () => {
+      expect(fetchNpmPackagePolicy("")).toBeNull();
+      expect(fetchNpmPackagePolicy("-g evil")).toBeNull();
+      expect(fetchNpmPackagePolicy("@scope/../..")).toBeNull();
+      expect(fetchNpmPackagePolicy("pkg; rm -rf /")).toBeNull();
+    });
+
+    it("accepts the legacy cwd argument without failing", () => {
+      const dir = mkdtempSync(join(tmpdir(), "lognexus-npm-policy-"));
+      try {
+        const result = fetchNpmPackagePolicy("lognexus-nonexistent-fixture-package-xyz", dir);
+        expect(result).toBeNull();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
   });
 });

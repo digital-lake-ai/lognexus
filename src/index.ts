@@ -10,13 +10,25 @@ export {
   parseIdentity,
   SUBJECT_TASK_PATTERN,
 } from "./audit/audit.js";
-export { getCliVersion, type ParsedCommitArgs, parseCommitArgs } from "./cli.js";
+export {
+  getCliVersion,
+  isDirectCliExecution,
+  type ParsedCommitArgs,
+  parseCommitArgs,
+} from "./cli.js";
 export {
   type CommitOptions,
   type CommitResult,
   executeAtomicCommit,
 } from "./commit.js";
-export { checkGit, checkGitHubCli, checkRulesConfig, runDiagnostics } from "./doctor.js";
+export {
+  checkGit,
+  checkGitHubCli,
+  checkRulesConfig,
+  checkScopeDrift,
+  runDiagnostics,
+} from "./doctor.js";
+export { fetchNpmPackagePolicy, type NpmPackagePolicy, resolveNpmCliScript } from "./git/safe.js";
 export {
   getMcpPrompt,
   listMcpPrompts,
@@ -51,13 +63,30 @@ export {
 export {
   attachNote,
   DEFAULT_NOTES_REF,
+  DEFAULT_SEARCH_LIMIT,
   fetchNotes,
   getNote,
   listNotes,
   type NoteOptions,
+  type NoteSearchFilter,
+  type NoteSearchResult,
   pushNotes,
+  searchNotesMemory,
 } from "./notes/notes.js";
 export { DEFAULT_ROUTING_TEMPLATE, initProject } from "./scaffold.js";
+export {
+  ARCHITECT_IDENTITY,
+  AUDITOR_IDENTITY,
+  type ContextHandoff,
+  generateContextHandoff,
+  getHandoffPath,
+  type HandoffScopeDrift,
+  type HandoffSubtaskEntry,
+  IMPLEMENTER_IDENTITY,
+  refreshContextHandoff,
+  renderContextHandoff,
+  writeContextHandoffFile,
+} from "./state/handoff.js";
 export {
   clearState,
   createEmptyState,
@@ -69,7 +98,7 @@ export {
 } from "./state/manager.js";
 export * from "./state/schema.js";
 export { fetchIssueMeta, getBranchName, syncStateFromGit } from "./state/sync.js";
-export { getProjectStatus } from "./status.js";
+export { getProjectStatus, getScopeDrift, type ScopeDrift } from "./status.js";
 export * from "./telemetry/index.js";
 export {
   buildTimelineTable,
@@ -77,3 +106,19 @@ export {
   type JourneyTimelineResult,
   type TimelineItem,
 } from "./timeline/timeline.js";
+export {
+  acceptTerms,
+  checkUpdateGate,
+  compareVersions,
+  formatUpdateGateResult,
+  getTermsConsentPath,
+  getUpdateCachePath,
+  isUpdateCheckDisabled,
+  readLocalPolicy,
+  readTermsConsent,
+  type TermsConsent,
+  UPDATE_CHECK_DISABLED_ENV,
+  UPGRADE_COMMAND,
+  type UpdateGateResult,
+  type UpdatePolicy,
+} from "./update/gate.js";
