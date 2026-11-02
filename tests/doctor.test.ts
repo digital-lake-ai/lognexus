@@ -71,4 +71,26 @@ describe("doctor diagnostics", () => {
     const results = runDiagnostics(process.cwd());
     expect(results.some((check) => check.name === "Scope Drift Guard")).toBe(true);
   });
+
+  it("reports pass when the contracted subtask is already completed", () => {
+    const logDir = join(tempDir, ".lognexus");
+    mkdirSync(logDir);
+    writeFileSync(
+      join(logDir, "state.json"),
+      JSON.stringify({
+        currentSubtask: {
+          id: "T1",
+          status: "completed",
+          contract: { allowedFiles: ["src/ok.ts"] },
+        },
+      }),
+      "utf8",
+    );
+    writeFileSync(join(tempDir, "rogue.ts"), "content\n", "utf8");
+    execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore", shell: false });
+
+    const check = checkScopeDrift(tempDir);
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("nothing to compare against");
+  });
 });

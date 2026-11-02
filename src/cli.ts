@@ -263,7 +263,17 @@ async function handleStatus() {
   console.log(`Current Branch:     ${st.branch}`);
   console.log(`Active Issue:       ${st.activeIssue ?? "(none — on base branch)"}`);
   console.log(`Rules Routing Mode: ${st.routingMode}`);
-  console.log(`Recommended Tier:   ${st.recommendedTier}\n`);
+  console.log(`Recommended Tier:   ${st.recommendedTier}`);
+  if (st.scopeDrift.detected) {
+    console.log(
+      `Scope Drift:        [SCOPE DRIFT DETECTED] ${st.scopeDrift.unauthorizedFiles.join(", ")}`,
+    );
+  } else if (st.scopeDrift.allowedFiles.length > 0) {
+    console.log(
+      `Scope Drift:        [PASS] (${st.scopeDrift.allowedFiles.length} allowed file(s))`,
+    );
+  }
+  console.log("");
 }
 
 async function handleState(args: string[]) {
