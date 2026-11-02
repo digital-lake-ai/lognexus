@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { extractTrailers } from "../audit/audit.js";
 import { getNote } from "../notes/notes.js";
 import { loadState } from "./manager.js";
 
@@ -91,10 +92,14 @@ function firstLine(noteBlob: string | null): string | null {
  * Walks the commits reachable from HEAD (newest first) and resolves the commit that
  * belongs to each completed subtask, together with its Git Note provenance.
  */
-function collectCompletedSubtasks(subtaskIds: string[], targetDir: string): HandoffSubtaskEntry[] {
+function collectCompletedSubtasks(
+  subtaskIds: string[],
+  targetDir: string,
+  activeIssueId: number | null = null,
+): HandoffSubtaskEntry[] {
   if (subtaskIds.length === 0) return [];
 
-  const log = runGit(["log", "--format=%H%x00%an%x00%s", "-n", "200"], targetDir);
+  const log = runGit(["log", "--format=%H%x1f%h%x1f%an%x1f%s%x1f%B%x1e", "-n", "200"], targetDir);
   if (!log) {
     return subtaskIds.map((id) => ({
       id,
@@ -106,14 +111,30 @@ function collectCompletedSubtasks(subtaskIds: string[], targetDir: string): Hand
     }));
   }
 
-  const commits = log.split("\n").map((line) => {
-    const [sha = "", author = "", subject = ""] = line.split("\u0000");
-    return { sha, author, subject };
-  });
+  const commits = log
+    .split("\u001e")
+    .map((record) => record.trim())
+    .filter((record) => record !== "")
+    .map((record) => {
+      const [sha = "", shortSha = "", gitAuthor = "", subject = "", body = ""] =
+        record.split("\u001f");
+      const trailerAuthor = extractTrailers(body).author;
+      return {
+        sha: sha.trim(),
+        shortSha: shortSha.trim(),
+        author: trailerAuthor ?? gitAuthor.trim(),
+        subject,
+      };
+    });
 
   return subtaskIds.map((id) => {
-    const pattern = new RegExp(`\\(#\\d+/${id}\\)`);
-    const match = commits.find((commit) => pattern.test(commit.subject));
+    // Prefer the commit nested under the active issue, then fall back to any scoped form.
+    const scopedPattern =
+      activeIssueId !== null ? new RegExp(`\\(#${activeIssueId}/${id}\\)`, "i") : null;
+    const fallbackPattern = new RegExp(`\\((?:#\\d+|[A-Z][A-Z0-9]*-\\d+)/${id}\\)`, "i");
+    const match =
+      (scopedPattern ? commits.find((commit) => scopedPattern.test(commit.subject)) : undefined) ??
+      commits.find((commit) => fallbackPattern.test(commit.subject));
     if (!match) {
       return { id, title: "", sha: null, shortSha: null, author: null, summary: null };
     }
@@ -121,7 +142,7 @@ function collectCompletedSubtasks(subtaskIds: string[], targetDir: string): Hand
       id,
       title: "",
       sha: match.sha,
-      shortSha: match.sha.slice(0, 7),
+      shortSha: match.shortSha || match.sha.slice(0, 7),
       author: match.author === "" ? null : match.author,
       summary: match.subject,
     };
@@ -163,15 +184,22 @@ function resolveNextAction(state: ReturnType<typeof loadState>): string {
 
 export function generateContextHandoff(targetDir: string = process.cwd()): ContextHandoff {
   const state = loadState(targetDir);
-  const contract = state.currentSubtask?.contract;
+  // A completed subtask releases its contract: nothing is pending, so nothing can drift.
+  const activeSubtask =
+    state.currentSubtask !== null && state.currentSubtask.status !== "completed"
+      ? state.currentSubtask
+      : null;
+  const contract = activeSubtask?.contract;
 
-  const completedSubtasks = collectCompletedSubtasks(state.completedSubtasks, targetDir).map(
-    (entry) => {
-      const note = entry.sha ? getNote(entry.sha, { cwd: targetDir }) : null;
-      const summary = firstLine(note);
-      return summary === null ? entry : { ...entry, title: summary };
-    },
-  );
+  const completedSubtasks = collectCompletedSubtasks(
+    state.completedSubtasks,
+    targetDir,
+    state.activeIssue?.id ?? null,
+  ).map((entry) => {
+    const note = entry.sha ? getNote(entry.sha, { cwd: targetDir }) : null;
+    const summary = firstLine(note);
+    return summary === null ? entry : { ...entry, title: summary };
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -184,10 +212,10 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
         }
       : null,
     version: readVersion(targetDir),
-    contract: state.currentSubtask
+    contract: activeSubtask
       ? {
-          id: state.currentSubtask.id,
-          title: state.currentSubtask.title,
+          id: activeSubtask.id,
+          title: activeSubtask.title,
           tier: state.activeIssue?.tier ?? "tier-3",
           decisionBudget: contract?.decisionBudget ?? "none",
           allowedFiles: contract?.allowedFiles ?? [],

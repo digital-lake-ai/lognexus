@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +16,10 @@ import { saveState, setSubtask } from "../src/state/manager.js";
 
 function git(args: string, cwd: string): string {
   return execSync(`git ${args}`, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
+}
+
+function gitArgs(args: string[], cwd: string): void {
+  execFileSync("git", args, { cwd, stdio: "ignore", shell: false });
 }
 
 describe("Context Handoff Generator", () => {
@@ -183,6 +187,68 @@ describe("Context Handoff Generator", () => {
     expect(entry.author).toBe("deepseek/VS Code");
     expect(entry.summary).toContain("standardize VS Code identity");
     expect(entry.title).toBe("Standardized identity trailers");
+  });
+
+  it("releases the contract and drift tracking once the subtask is completed", () => {
+    seedState();
+    setSubtask(
+      "T4",
+      "Bump atomic version contract",
+      { allowedFiles: ["package.json"], decisionBudget: "narrow" },
+      tempDir,
+    );
+
+    const current = JSON.parse(readFileSync(join(tempDir, ".lognexus", "state.json"), "utf8"));
+    current.currentSubtask.status = "completed";
+    writeFileSync(
+      join(tempDir, ".lognexus", "state.json"),
+      JSON.stringify(current, null, 2),
+      "utf8",
+    );
+
+    const handoff = generateContextHandoff(tempDir);
+    // A completed subtask holds no scope: neither the contract nor an allowed-file list.
+    expect(handoff.contract).toBeNull();
+    expect(handoff.scopeDrift).toEqual({ detected: false, unauthorizedFiles: [] });
+  });
+
+  it("prefers the Authored-by trailer and the active issue when resolving completed subtasks", () => {
+    seedState();
+
+    writeFileSync(join(tempDir, "t1.txt"), "t1\n", "utf8");
+    gitArgs(["add", "-A"], tempDir);
+    gitArgs(
+      ["commit", "-q", "-m", "feat(#26/T1): stale external subtask", "--author", "gemini <g@x.io>"],
+      tempDir,
+    );
+
+    writeFileSync(join(tempDir, "t1-scoped.txt"), "scoped\n", "utf8");
+    gitArgs(["add", "-A"], tempDir);
+    gitArgs(
+      [
+        "commit",
+        "-q",
+        "-m",
+        "feat(#30/T1): scoped subtask\n\nAuthored-by: deepseek/VS Code (kimi-code)",
+        "--author",
+        "Someone Else <someone@example.com>",
+      ],
+      tempDir,
+    );
+    const scopedSha = git("rev-parse HEAD", tempDir);
+
+    const current = JSON.parse(readFileSync(join(tempDir, ".lognexus", "state.json"), "utf8"));
+    current.completedSubtasks = ["T1"];
+    writeFileSync(
+      join(tempDir, ".lognexus", "state.json"),
+      JSON.stringify(current, null, 2),
+      "utf8",
+    );
+
+    const [entry] = generateContextHandoff(tempDir).completedSubtasks;
+    expect(entry.sha).toBe(scopedSha);
+    expect(entry.author).toBe("deepseek/VS Code (kimi-code)");
+    expect(entry.summary).toContain("#30/T1");
   });
 
   it("renders a markdown report with every required section", () => {

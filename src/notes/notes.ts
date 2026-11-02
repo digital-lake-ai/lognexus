@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { extractTrailers } from "../audit/audit.js";
 import { validateGitReference } from "../git/safe.js";
 
 export const DEFAULT_NOTES_REF = "refs/notes/lognexus";
@@ -171,34 +172,27 @@ export function searchNotesMemory(
   const shas = notes.map((entry) => entry.commitSha);
   const subjects = new Map<string, string>();
   const authors = new Map<string, string>();
-  const bodies = new Map<string, string>();
+  const commitBodies = new Map<string, string>();
   const timestamps = new Map<string, number>();
 
   if (shas.length > 0) {
+    // The commit body carries the provenance trailers, so a single log pass resolves
+    // subject, author and Authored-by attribution without a second git invocation.
     const meta = runGitLines(
-      ["log", "--no-walk", "--format=%H%x00%at%x00%an%x00%s", ...shas],
+      ["log", "--no-walk", "--format=%H%x00%at%x00%an%x00%s%x00%B%x1e", ...shas],
       targetDir,
     );
-    for (const line of meta) {
-      const [sha = "", at = "", commitAuthor = "", subject = ""] = line.split("\u0000");
-      if (sha === "") continue;
-      subjects.set(sha, subject);
-      authors.set(sha, commitAuthor);
-      const seconds = Number.parseInt(at, 10);
-      timestamps.set(sha, Number.isNaN(seconds) ? 0 : seconds);
-    }
-
-    const bodiesRaw = runGitLines(
-      ["log", "--no-walk", "--format=%H%x00%B%x1e", ...shas],
-      targetDir,
-    );
-    const joined = bodiesRaw.join("\n");
-    for (const record of joined.split("\u001e")) {
+    for (const record of meta.join("\n").split("\u001e")) {
       const trimmed = record.trim();
       if (trimmed === "") continue;
-      const sep = trimmed.indexOf("\u0000");
-      if (sep === -1) continue;
-      bodies.set(trimmed.slice(0, sep), trimmed.slice(sep + 1).trim());
+      const [sha = "", at = "", gitAuthor = "", subject = "", body = ""] = trimmed.split("\u0000");
+      if (sha === "") continue;
+      subjects.set(sha, subject);
+      const trailerAuthor = extractTrailers(body).author;
+      authors.set(sha, trailerAuthor ?? gitAuthor.trim());
+      commitBodies.set(sha, body);
+      const seconds = Number.parseInt(at, 10);
+      timestamps.set(sha, Number.isNaN(seconds) ? 0 : seconds);
     }
   }
 
@@ -223,7 +217,7 @@ export function searchNotesMemory(
     const payload = parseNotePayload(note);
     const subject = subjects.get(entry.commitSha) ?? "";
     const commitAuthor = authors.get(entry.commitSha) ?? "";
-    const body = bodies.get(entry.commitSha) ?? "";
+    const body = commitBodies.get(entry.commitSha) ?? "";
 
     if (filter.issue !== undefined && payload.issueId !== filter.issue) continue;
 
@@ -239,7 +233,23 @@ export function searchNotesMemory(
     }
 
     if (query !== "") {
-      const haystack = [subject, note, body, payload.subtaskTitle ?? ""].join("\n").toLowerCase();
+      // Search only commit- and subtask-scoped fields: the note payload's issue block is
+      // shared by every commit of a cycle, so including it would match all of them.
+      // Free-form notes keep their full text searchable.
+      const subtaskBlock =
+        payload.subtaskId !== null
+          ? [payload.subtaskId, payload.subtaskTitle ?? ""].join(" ").trim()
+          : note;
+      const haystack = [
+        subject,
+        subtaskBlock,
+        payload.tier ?? "",
+        commitAuthor,
+        (files.length > 0 ? files : filesOf(entry.commitSha)).join(" "),
+        body,
+      ]
+        .join("\n")
+        .toLowerCase();
       if (!haystack.includes(query)) continue;
     }
 
