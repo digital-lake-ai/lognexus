@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +13,7 @@ import {
   setSubtask,
 } from "../src/state/manager.js";
 import { LognexusStateSchema } from "../src/state/schema.js";
-import { inferActiveIssueFromBranch } from "../src/state/sync.js";
+import { inferActiveIssueFromBranch, syncStateFromGit } from "../src/state/sync.js";
 
 describe("State Manager & Schema", () => {
   let tempDir: string;
@@ -346,5 +346,96 @@ describe("parseSetTaskArgs", () => {
     expect(() => parseSetTaskArgs(["T1", "--budget", "unbounded"])).toThrow(
       /Invalid decision budget/,
     );
+  });
+});
+
+describe("syncStateFromGit — cross-issue reset", () => {
+  let tempDir: string;
+
+  function git(args: string[]): void {
+    execFileSync("git", args, { cwd: tempDir, stdio: "ignore", shell: false });
+  }
+
+  function seedState(issueId: number, branch: string): void {
+    const state = createEmptyState();
+    state.activeIssue = {
+      id: issueId,
+      title: `Issue #${issueId}`,
+      branch,
+      phase: "commit",
+      tier: "tier-3",
+      readiness: "ready",
+    };
+    state.currentSubtask = {
+      id: "T1",
+      title: "Old subtask",
+      tier: "tier-3",
+      status: "in-progress",
+      contract: {
+        allowedFiles: ["src/old.ts"],
+        forbiddenFiles: [],
+        decisionBudget: "narrow",
+      },
+    };
+    state.completedSubtasks = ["T0"];
+    saveState(state, tempDir);
+  }
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "lognexus-sync-reset-"));
+    git(["init", "-q", "-b", "main"]);
+    git(["config", "user.name", "Test Runner"]);
+    git(["config", "user.email", "test@example.com"]);
+    git(["config", "commit.gpgsign", "false"]);
+    writeFileSync(join(tempDir, "README.md"), "# fixture\n", "utf8");
+    git(["add", "README.md"]);
+    git(["commit", "-qm", "docs: init"]);
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("clears the subtask cursor and history when switching to another issue", () => {
+    seedState(28, "issue/28-frontier-models-badges-and-governance");
+    git(["checkout", "-q", "-b", "issue/30-v1-3-0-handoff-drift-recall-and-update-gate"]);
+
+    const state = syncStateFromGit(tempDir);
+
+    expect(state.activeIssue?.id).toBe(30);
+    expect(state.currentSubtask).toBeNull();
+    expect(state.completedSubtasks).toEqual([]);
+  });
+
+  it("keeps the cursor when the branch still belongs to the same issue", () => {
+    seedState(30, "issue/30-v1-3-0-handoff-drift-recall-and-update-gate");
+    git(["checkout", "-q", "-b", "issue/30-follow-up-branch"]);
+
+    const state = syncStateFromGit(tempDir);
+
+    expect(state.activeIssue?.id).toBe(30);
+    expect(state.currentSubtask?.id).toBe("T1");
+    expect(state.completedSubtasks).toHaveLength(1);
+  });
+
+  it("clears everything on a protected base branch", () => {
+    seedState(28, "issue/28-frontier-models-badges-and-governance");
+
+    const state = syncStateFromGit(tempDir);
+
+    expect(state.activeIssue).toBeNull();
+    expect(state.currentSubtask).toBeNull();
+    expect(state.completedSubtasks).toEqual([]);
+  });
+
+  it("clears everything on an unrecognised branch", () => {
+    seedState(28, "issue/28-frontier-models-badges-and-governance");
+    git(["checkout", "-q", "-b", "experiment/scratch"]);
+
+    const state = syncStateFromGit(tempDir);
+
+    expect(state.activeIssue).toBeNull();
+    expect(state.currentSubtask).toBeNull();
+    expect(state.completedSubtasks).toEqual([]);
   });
 });

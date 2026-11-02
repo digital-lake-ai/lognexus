@@ -34,10 +34,16 @@ function readAllowedFiles(targetDir: string): string[] | null {
     const statePath = join(targetDir, ".lognexus", "state.json");
     if (!existsSync(statePath)) return null;
     const state = JSON.parse(readFileSync(statePath, "utf8")) as {
-      currentSubtask?: { status?: string; contract?: { allowedFiles?: unknown } } | null;
+      currentSubtask?: {
+        status?: string;
+        contract?: { allowedFiles?: unknown } | null;
+      } | null;
     };
     const subtask = state.currentSubtask;
     if (subtask === null || subtask === undefined) return null;
+    // A completed subtask has no contract in force: its commits are already written,
+    // so pending edits cannot be judged against a scope that no longer applies.
+    if (subtask.status === "completed") return null;
     const allowed = subtask.contract?.allowedFiles;
     if (!Array.isArray(allowed)) return null;
     return allowed.filter((entry): entry is string => typeof entry === "string").map(normalizePath);
@@ -55,11 +61,21 @@ function readTouchedFiles(targetDir: string): string[] {
       shell: false,
     });
 
-    return output
-      .split("\n")
-      .filter((line) => line.trim() !== "")
-      .map((line) => normalizePath(line.slice(3)))
-      .filter((file) => file !== "");
+    // Never `.trim()` the whole output: the first line of an unstaged modification
+    // starts with a space (" M src/file.ts"), and trimming would shift `slice(3)`
+    // by one character and corrupt the first path.
+    const files: string[] = [];
+    for (const rawLine of output.replace(/\r\n/g, "\n").split("\n")) {
+      if (rawLine.length < 4) continue;
+      const rawPath = rawLine.slice(3).trim();
+      if (rawPath === "") continue;
+      const renamed = rawPath.indexOf(" -> ");
+      const filePath = renamed >= 0 ? rawPath.slice(renamed + 4) : rawPath;
+      const normalized = normalizePath(filePath);
+      if (normalized !== "") files.push(normalized);
+    }
+
+    return files;
   } catch {
     return [];
   }

@@ -84,10 +84,12 @@ export function fetchIssueMeta(
 export function syncStateFromGit(targetDir: string = process.cwd()): LognexusState {
   const state = loadState(targetDir);
   const branch = getBranchName(targetDir);
+  const previousIssueId = state.activeIssue?.id ?? null;
 
   if (!branch || branch === "main" || branch === "master") {
     state.activeIssue = null;
     state.currentSubtask = null;
+    state.completedSubtasks = [];
     saveState(state, targetDir);
     return state;
   }
@@ -106,6 +108,13 @@ export function syncStateFromGit(targetDir: string = process.cwd()): LognexusSta
       readiness = remoteMeta.readiness;
     }
 
+    if (previousIssueId !== null && previousIssueId !== issueId) {
+      // Switching issues retires the previous cycle entirely: its contract, its
+      // subtask cursor and its completed history must not leak into the new issue.
+      state.currentSubtask = null;
+      state.completedSubtasks = [];
+    }
+
     state.activeIssue = {
       id: issueId,
       title,
@@ -116,6 +125,8 @@ export function syncStateFromGit(targetDir: string = process.cwd()): LognexusSta
     };
   } else {
     state.activeIssue = null;
+    state.currentSubtask = null;
+    state.completedSubtasks = [];
   }
 
   saveState(state, targetDir);

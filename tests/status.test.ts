@@ -37,11 +37,13 @@ describe("live scope-drift guard", () => {
     execFileSync("git", args, { cwd: tempDir, stdio: "ignore", shell: false });
   }
 
-  function writeState(allowedFiles: string[]): void {
+  function writeState(allowedFiles: string[], status?: string): void {
     mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
     writeFileSync(
       join(tempDir, ".lognexus", "state.json"),
-      JSON.stringify({ currentSubtask: { id: "T1", contract: { allowedFiles } } }),
+      JSON.stringify({
+        currentSubtask: { id: "T1", ...(status ? { status } : {}), contract: { allowedFiles } },
+      }),
       "utf8",
     );
   }
@@ -98,6 +100,50 @@ describe("live scope-drift guard", () => {
     touch("docs/contexto/issue-30-plan.md");
 
     const drift = getScopeDrift(tempDir);
+    expect(drift.detected).toBe(false);
+  });
+
+  it("exempts a completed subtask from drift tracking entirely", () => {
+    writeState(["src/allowed.ts"], "completed");
+    touch("src/rogue.ts");
+
+    const drift = getScopeDrift(tempDir);
+    expect(drift.detected).toBe(false);
+    expect(drift.allowedFiles).toEqual([]);
+    expect(drift.unauthorizedFiles).toEqual([]);
+  });
+
+  it("keeps the full path of an unstaged modification on the first status line", () => {
+    writeState(["src/allowed.ts"]);
+    touch("src/allowed.ts");
+    git(["add", "src/allowed.ts"]);
+    // Rewrite without staging: git now reports " M src/allowed.ts", whose leading
+    // space used to be trimmed away and shift every path by one character.
+    writeFileSync(join(tempDir, "src/allowed.ts"), "changed\n", "utf8");
+    touch("src/rogue.ts");
+
+    const drift = getScopeDrift(tempDir);
+    expect(drift.allowedFiles).toEqual(["src/allowed.ts"]);
+    expect(drift.unauthorizedFiles).toEqual(["src/rogue.ts"]);
+  });
+
+  it("reads the destination path of a renamed file", () => {
+    writeState(["src/renamed.ts"]);
+    touch("src/original.ts");
+    git(["add", "src/original.ts"]);
+    git([
+      "-c",
+      "user.name=Test Runner",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-m",
+      "chore: seed",
+    ]);
+    git(["mv", "src/original.ts", "src/renamed.ts"]);
+
+    const drift = getScopeDrift(tempDir);
+    expect(drift.unauthorizedFiles).toEqual([]);
     expect(drift.detected).toBe(false);
   });
 });

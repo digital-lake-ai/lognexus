@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -304,5 +304,41 @@ describe("Memory Recall (Git Notes search)", () => {
     expect(results[0].subtaskId).toBeNull();
     expect(results[0].issueId).toBeNull();
     expect(results[0].note).toContain("Reviewed-by");
+  });
+
+  it("scopes the query to subtask fields instead of the shared issue payload", () => {
+    // Every commit in a cycle shares issue.title, so a title word must not match them all.
+    const results = searchNotesMemory(tempDir, { issue: 30, query: "scope-drift" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].subtaskId).toBe("T2");
+    expect(results.some((entry) => entry.subtaskId === "T3")).toBe(false);
+  });
+
+  it("resolves the Authored-by trailer as the commit author", () => {
+    const target = join(tempDir, "src/trailer.ts");
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, "export const trailer = true;\n", "utf8");
+    git("add -A");
+    execFileSync(
+      "git",
+      [
+        "commit",
+        "-m",
+        "feat(#30/T1): standardize identity trailers\n\nAuthored-by: deepseek/VS Code (kimi-code)",
+        "--author",
+        "Someone Else <someone@example.com>",
+      ],
+      { cwd: tempDir, stdio: "pipe", shell: false },
+    );
+    const sha = git("rev-parse HEAD");
+    attachNote(notePayload(30, "T1", "Standardize identity trailers"), sha, { cwd: tempDir });
+
+    const byTrailer = searchNotesMemory(tempDir, { author: "kimi-code" });
+    expect(byTrailer).toHaveLength(1);
+    expect(byTrailer[0].author).toBe("deepseek/VS Code (kimi-code)");
+
+    const [entry] = searchNotesMemory(tempDir, { issue: 30, query: "identity trailers" });
+    expect(entry.author).toBe("deepseek/VS Code (kimi-code)");
   });
 });

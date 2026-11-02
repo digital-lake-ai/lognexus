@@ -1,7 +1,10 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { isDirectCliExecution } from "../src/cli.js";
+import * as barrel from "../src/index.js";
 import {
   acceptTerms,
   checkUpdateGate,
@@ -138,6 +141,13 @@ describe("Startup update & terms gate", () => {
 
   it("never hard-blocks on the local manifest alone", () => {
     writePackage(tempDir, { minCriticalVersion: "1.3.0", requiresTermsAcceptance: true });
+    // Pin a fresh, policy-free cache entry: the point of this test is that the *local*
+    // manifest never blocks, so the published registry policy must not leak in.
+    writeUpdateCache(tempDir, {
+      checkedAt: new Date().toISOString(),
+      remoteVersion: null,
+      policy: null,
+    });
 
     const result = checkUpdateGate({ targetDir: tempDir, currentVersion: "1.2.7", env: TEST_ENV });
 
@@ -195,5 +205,79 @@ describe("Startup update & terms gate", () => {
   it("returns empty consent and null policy for missing files", () => {
     expect(readTermsConsent(tempDir)).toEqual({ acceptedVersion: null, acceptedAt: null });
     expect(readLocalPolicy(tempDir)).toBeNull();
+  });
+});
+
+describe("CLI entrypoint guard", () => {
+  it("does not run main() when the module is imported", () => {
+    expect(isDirectCliExecution(undefined)).toBe(false);
+    expect(isDirectCliExecution("")).toBe(false);
+  });
+
+  it("recognises the resolved CLI module path as the entrypoint", () => {
+    const cliPath = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
+    expect(isDirectCliExecution(cliPath)).toBe(true);
+  });
+
+  it("recognises the compiled CLI and its launcher shims by name", () => {
+    expect(isDirectCliExecution("/repo/dist/cli.js")).toBe(true);
+    expect(isDirectCliExecution("C:\\repo\\dist\\cli.js")).toBe(true);
+    expect(isDirectCliExecution("/usr/local/bin/lognexus")).toBe(true);
+    expect(isDirectCliExecution("C:\\repo\\node_modules\\.bin\\lognexus.cmd")).toBe(true);
+    expect(isDirectCliExecution("/usr/local/bin/lognexus.ps1")).toBe(true);
+  });
+
+  it("ignores unrelated scripts and libraries", () => {
+    expect(isDirectCliExecution("/repo/dist/index.js")).toBe(false);
+    expect(isDirectCliExecution("/repo/tests/mcp.test.ts")).toBe(false);
+    expect(isDirectCliExecution("/repo/dist/mcp/server.js")).toBe(false);
+  });
+});
+
+describe("Public barrel (src/index.ts)", () => {
+  const expected = [
+    "isDirectCliExecution",
+    "checkScopeDrift",
+    "fetchNpmPackagePolicy",
+    "resolveNpmCliScript",
+    "searchNotesMemory",
+    "getScopeDrift",
+    "generateContextHandoff",
+    "getHandoffPath",
+    "refreshContextHandoff",
+    "renderContextHandoff",
+    "writeContextHandoffFile",
+    "IMPLEMENTER_IDENTITY",
+    "AUDITOR_IDENTITY",
+    "ARCHITECT_IDENTITY",
+    "acceptTerms",
+    "checkUpdateGate",
+    "compareVersions",
+    "formatUpdateGateResult",
+    "getTermsConsentPath",
+    "getUpdateCachePath",
+    "isUpdateCheckDisabled",
+    "readLocalPolicy",
+    "readTermsConsent",
+    "UPDATE_CHECK_DISABLED_ENV",
+    "UPGRADE_COMMAND",
+  ] as const;
+
+  it("re-exports every public API introduced in v1.3.0", () => {
+    for (const symbol of expected) {
+      expect(barrel, `missing export: ${symbol}`).toHaveProperty(symbol);
+    }
+  });
+
+  it("exposes the update gate and handoff identities with real values", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lognexus-barrel-"));
+    try {
+      expect(barrel.UPDATE_CHECK_DISABLED_ENV).toBe(UPDATE_CHECK_DISABLED_ENV);
+      expect(barrel.UPGRADE_COMMAND).toBe(UPGRADE_COMMAND);
+      expect(typeof barrel.IMPLEMENTER_IDENTITY).toBe("string");
+      expect(barrel.getUpdateCachePath(dir)).toBe(getUpdateCachePath(dir));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
