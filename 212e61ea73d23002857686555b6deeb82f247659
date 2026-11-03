@@ -1,0 +1,36 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.2",
+  "timestamp": "2026-11-03T20:53:06.305Z",
+  "issue": {
+    "id": 34,
+    "title": "feat(v1.3.2): telemetry Git-notes backfill, context-window budget guard, handoff --prompt, --stage-allowed & GitHub Packages"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Add GitHub Packages publish, context-window governance and bump to 1.3.2",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        ".github/workflows/release.yml",
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "src/cli.ts",
+        "CHANGELOG.md",
+        "docs/TELEMETRY_PRIVACY.md",
+        "tests/mcp.test.ts",
+        "tests/e2e.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "narrow"
+    }
+  },
+  "tier": "tier-3"
+}
