@@ -73,17 +73,23 @@ export {
   pushNotes,
   searchNotesMemory,
 } from "./notes/notes.js";
-export { DEFAULT_ROUTING_TEMPLATE, initProject } from "./scaffold.js";
+export { DEFAULT_ROUTING_TEMPLATE, initProject, LOGNEXUS_GITIGNORE_ENTRIES } from "./scaffold.js";
 export {
   ARCHITECT_IDENTITY,
   AUDITOR_IDENTITY,
+  CONTEXT_MAX_FILES,
+  CONTEXT_MAX_LOC,
+  type ContextBudgetStatus,
   type ContextHandoff,
+  discoverPlanFile,
+  evaluateContextBudget,
   generateContextHandoff,
   getHandoffPath,
   type HandoffScopeDrift,
   type HandoffSubtaskEntry,
   IMPLEMENTER_IDENTITY,
   refreshContextHandoff,
+  renderCompactDispatchPrompt,
   renderContextHandoff,
   writeContextHandoffFile,
 } from "./state/handoff.js";
@@ -110,6 +116,8 @@ export {
   acceptTerms,
   checkUpdateGate,
   compareVersions,
+  EPHEMERAL_LOGNEXUS_FILES,
+  ensureLocalGitExclude,
   formatUpdateGateResult,
   getTermsConsentPath,
   getUpdateCachePath,

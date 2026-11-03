@@ -13,6 +13,7 @@ export {
   recordTaskFinish,
   recordTaskStart,
   saveTelemetry,
+  syncTelemetryFromGitNotes,
   updateCostSavingsEstimate,
 } from "./collector.js";
 export {

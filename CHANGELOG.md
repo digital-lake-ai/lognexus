@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.2] - 2026-11-03
+
+### Summary
+A continuity release. Telemetry can now rebuild itself from the Git Notes history when the local store is lost or was never populated, so a cloned repository reports real numbers instead of zeros. The handoff generator gained a compact dispatch prompt, a context-window budget guard and two Git-derived fallbacks, and the commit engine can stage exactly the files its contract allows. Ephemeral CLI bookkeeping files stop polluting the working tree.
+
+### Added
+- **Telemetry backfill from Git Notes:** `syncTelemetryFromGitNotes()` in `src/telemetry/collector.ts` reconstructs the summary, stack extensions, model families, LOC and subtask counts from `refs/notes/lognexus` when the note history is longer than the local store. `generateTelemetryReportFile()` uses it, so `lognexus telemetry report` works on a fresh clone.
+- **`lognexus handoff --prompt` / `--compact-prompt`:** renders a compact dispatch prompt (six lines, no inlined specs) that points the next agent at the plan file, the handoff document and the state store.
+- **Context-window budget guard:** `evaluateContextBudget()` measures the active contract against `CONTEXT_MAX_FILES` (6) and `CONTEXT_MAX_LOC` (1200). Oversized contracts are flagged in the handoff with a delegation recommendation instead of failing governance.
+- **`lognexus commit --stage-allowed`:** stages only the working-tree files that fall inside the subtask contract, never the forbidden set.
+- **Plan-file discovery:** `discoverPlanFile()` resolves `docs/contexto/issue-<id>-plan.md`, falling back to `PLAN-ISSUE-<id>`-style names.
+- **Git-derived handoff fallbacks:** when `completedSubtasks` is empty, the handoff rebuilds the completed list from commit subjects; the reported version falls back to the CLI version when `package.json` is absent.
+- **`lua` and `spherescript` stacks:** `.lua`/`.toc` and `.scp` are now recognised by the stack detector.
+- **Subtask inference on note attach:** attaching state to a commit now infers issue and subtask from the commit subject when the state store is empty.
+- **GitHub Packages mirror:** the release workflow publishes `@digital-lake-ai/lognexus` to `npm.pkg.github.com` next to the npm release, as a non-blocking step.
+
+### Fixed
+- **Ephemeral bookkeeping files:** `.lognexus/update-check.json`, the terms consent, the handoff document and the state store are auto-excluded through `.git/info/exclude`, so they no longer show up as scope drift. `lognexus init` scaffolds the same entries into a project `.gitignore`, and `lognexus audit` exempts `.lognexus/` bookkeeping.
+
+### Changed
+- **Version contract:** the atomic version contract moves to `1.3.2` across `package.json` (including `lognexusPolicy.minCriticalVersion`), `package-lock.json`, `.claude-plugin/plugin.json`, the CLI fallback and the privacy policy.
+
 ## [1.3.1] - 2026-11-02
 
 ### Summary

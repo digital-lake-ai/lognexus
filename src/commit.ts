@@ -28,6 +28,8 @@ export interface CommitOptions {
   tier?: AuthorTier;
   /** Acknowledges a tier-1 author working on a tier-3 subtask. */
   escalated?: boolean;
+  /** Stages every modified file that matches the active contract before committing. */
+  stageAllowed?: boolean;
   /** Internal test-only escape hatch for isolated unit tests. Never exposed via CLI or MCP. */
   _internalTestAllowMain?: boolean;
 }
@@ -40,6 +42,7 @@ export interface ParsedCommitArgs {
   allowEmpty: boolean;
   tier?: AuthorTier;
   escalated: boolean;
+  stageAllowed: boolean;
 }
 
 export function parseCommitArgs(args: string[]): ParsedCommitArgs {
@@ -50,6 +53,7 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
   let allowEmpty = false;
   let tier: AuthorTier | undefined;
   let escalated = false;
+  let stageAllowed = false;
 
   const isFlag = (token: string | undefined): boolean => {
     if (!token) return false;
@@ -104,6 +108,8 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
       tier = value;
     } else if (arg === "--escalated") {
       escalated = true;
+    } else if (arg === "--stage-allowed") {
+      stageAllowed = true;
     }
   }
 
@@ -115,6 +121,7 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
     allowEmpty,
     tier,
     escalated,
+    stageAllowed,
   };
 }
 
@@ -154,6 +161,49 @@ function matchesPath(file: string, rule: string): boolean {
     return pattern.test(file);
   }
   return file === rule;
+}
+
+/**
+ * Lists the working-tree files that belong to the active contract, so `--stage-allowed`
+ * can stage exactly the sanctioned edits and never sweep unrelated changes into a commit.
+ */
+export function listModifiedAllowedFiles(
+  cwd: string,
+  allowedRules: string[],
+  forbiddenRules: string[],
+): string[] {
+  const allowed = allowedRules.map(normalizePath).filter((rule) => rule !== "");
+  if (allowed.length === 0) return [];
+  const forbidden = forbiddenRules.map(normalizePath);
+
+  let raw: string;
+  try {
+    raw = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    });
+  } catch {
+    return [];
+  }
+
+  const files: string[] = [];
+  for (const line of raw.replace(/\r\n/g, "\n").split("\n")) {
+    if (line.length < 4) continue;
+    const status = line.slice(0, 2);
+    if (status === "!!" || status === "DD") continue;
+    const path = line.slice(3).trim();
+    if (path === "") continue;
+    const arrow = path.indexOf(" -> ");
+    const file = normalizePath(arrow === -1 ? path : path.slice(arrow + 4).trim());
+    if (file === "") continue;
+    if (!allowed.some((rule) => matchesPath(file, rule))) continue;
+    if (forbidden.some((rule) => matchesPath(file, rule))) continue;
+    files.push(file);
+  }
+
+  return files;
 }
 
 function listStagedFiles(cwd: string): string[] {
@@ -235,8 +285,18 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     state.activeIssue = inferActiveIssueFromBranch(cwd);
   }
 
-  const stagedFiles = listStagedFiles(cwd);
+  if (options.stageAllowed && state.currentSubtask?.contract) {
+    const toStage = listModifiedAllowedFiles(
+      cwd,
+      state.currentSubtask.contract.allowedFiles ?? [],
+      state.currentSubtask.contract.forbiddenFiles ?? [],
+    );
+    if (toStage.length > 0) {
+      runGit(["add", "--", ...toStage], cwd);
+    }
+  }
 
+  const stagedFiles = listStagedFiles(cwd);
   // 3.1 Tier routing guard: tier-1 authors must acknowledge working outside their scope
   const effectiveTier: AuthorTier =
     options.tier ?? inferTierFromAuthor(author) ?? state.activeIssue?.tier ?? "tier-3";

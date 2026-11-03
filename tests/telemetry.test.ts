@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { attachCurrentStateToCommit } from "../src/index.js";
 import { inferTierFromAuthor } from "../src/telemetry/detector.js";
 import {
   AnonymousCommunityPayloadSchema,
@@ -172,6 +173,17 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor(null)).toBeNull();
     });
 
+    it("detects Lua and SphereScript stacks from extensions", () => {
+      mkdirSync(join(tempDir, "scripts"), { recursive: true });
+      writeFileSync(join(tempDir, "scripts", "macro.lua"), "print('macro')\n", "utf8");
+      writeFileSync(join(tempDir, "scripts", "ui.toc"), "## Interface: 100002\n", "utf8");
+      writeFileSync(join(tempDir, "scripts", "undead.scp"), "[EOF]\n", "utf8");
+
+      const stacks = detectProjectStacks(tempDir);
+      expect(stacks).toContain("lua");
+      expect(stacks).toContain("spherescript");
+    });
+
     it("detects PowerShell and Batch stacks from scripts in nested folders", () => {
       mkdirSync(join(tempDir, "scripts"), { recursive: true });
       mkdirSync(join(tempDir, "tools", "win"), { recursive: true });
@@ -273,6 +285,28 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
   });
 
   describe("Report Generation & Community Payload", () => {
+    it("backfills telemetry from Git notes written by the attach engine", () => {
+      writeFileSync(join(tempDir, "worker.ts"), "export const run = () => {};\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -m "feat: add worker"', { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      attachCurrentStateToCommit(sha, { cwd: tempDir });
+
+      expect(loadTelemetry(tempDir).summary.totalCommits).toBe(0);
+      enableTelemetry({ cwd: tempDir });
+
+      const { content } = generateTelemetryReportFile(tempDir);
+      expect(content).toContain("`.ts`");
+
+      const store = loadTelemetry(tempDir);
+      expect(store.summary.totalCommits).toBe(1);
+      expect(store.summary.totalLinesAdded).toBe(1);
+      expect(store.extensions[".ts"]?.commits).toBe(1);
+      expect(Object.values(store.models)[0]?.commits).toBe(1);
+      expect(store.summary.estimatedCostSavingsPct).toBe(96);
+    });
+
     it("generates markdown report with HUD tables and frontmatter", () => {
       enableTelemetry({ cwd: tempDir });
 

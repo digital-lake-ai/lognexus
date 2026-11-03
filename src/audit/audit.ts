@@ -195,6 +195,15 @@ function isImplementationFile(file: string): boolean {
   return !file.endsWith(".md") && !file.startsWith(".lognexus/");
 }
 
+/**
+ * Framework bookkeeping (`state.json`, plan files) is rewritten by the CLI on the
+ * agent's behalf and never describes the delivered change, so it must not count
+ * as scope drift against a subtask contract.
+ */
+function isBookkeepingFile(file: string): boolean {
+  return file.startsWith(".lognexus/") || file.startsWith("docs/contexto/");
+}
+
 function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
   const violations: AuditViolation[] = [];
   const base = { commitSha: item.sha, shortSha: item.shortSha };
@@ -266,7 +275,7 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
 
     if (allowedFiles.length > 0) {
       const outside = changedFiles.filter(
-        (file) => !allowedFiles.some((rule) => matchesPath(file, rule)),
+        (file) => !isBookkeepingFile(file) && !allowedFiles.some((rule) => matchesPath(file, rule)),
       );
       if (outside.length > 0) {
         violations.push({

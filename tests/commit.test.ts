@@ -133,6 +133,33 @@ describe("Atomic Commit Engine (lognexus commit)", () => {
     expect(result.noteAttached).toBe(true);
   });
 
+  it("stages only the allowed files when stageAllowed is enabled", () => {
+    setSubtask(
+      "T3",
+      "Stage allowed task",
+      { allowedFiles: ["src/allowed.ts"], decisionBudget: "narrow" },
+      tempDir,
+    );
+    mkdirSync(join(tempDir, "src"), { recursive: true });
+    writeFileSync(join(tempDir, "src/allowed.ts"), "export const ok = 1;", "utf8");
+    writeFileSync(join(tempDir, "scratch.ts"), "export const scratch = 1;", "utf8");
+
+    const result = executeAtomicCommit({
+      message: "feat(#34/T3): stage only contract files",
+      author: "deepseek/VS Code (kimi-code)",
+      targetDir: tempDir,
+      stageAllowed: true,
+    });
+
+    const committed = execSync("git show --name-only --format= HEAD", {
+      cwd: tempDir,
+      encoding: "utf8",
+    }).trim();
+
+    expect(committed).toBe("src/allowed.ts");
+    expect(result.noteAttached).toBe(true);
+  });
+
   it("executes atomic commit using -F / --file message file", () => {
     writeFileSync(join(tempDir, "file_input.txt"), "hello world", "utf8");
     execSync("git add file_input.txt", { cwd: tempDir, stdio: "ignore" });
@@ -332,6 +359,14 @@ describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
     expect(() => {
       parseCommitArgs(["-m", "feat(#15/T1): routing flags", "--tier", "tier-9"]);
     }).toThrow(/Invalid --tier value 'tier-9'/);
+  });
+
+  it("parses the --stage-allowed flag and defaults it to false", () => {
+    const withFlag = parseCommitArgs(["-m", "feat(#34/T3): stage allowed", "--stage-allowed"]);
+    const withoutFlag = parseCommitArgs(["-m", "feat(#34/T3): stage allowed"]);
+
+    expect(withFlag.stageAllowed).toBe(true);
+    expect(withoutFlag.stageAllowed).toBe(false);
   });
 });
 

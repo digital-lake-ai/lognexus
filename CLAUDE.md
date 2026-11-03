@@ -7,7 +7,8 @@ Refer to [AGENTS.md](./AGENTS.md) for full governance and execution rules.
 2. **Merge with `--no-ff`:** When merging via `gh`, always run `gh pr merge <num> --merge --delete-branch`. Never use `--squash` or `--rebase`.
 3. **Cross-Model Review:** You cannot approve your own PR. A different model family (e.g. Gemini, DeepSeek, OpenAI) must perform the review.
 4. **Anti-Spoofing:** As the author you must never write a `Reviewed-by:` trailer and never run `gh pr merge`. Writing your own review sign-off — even under another model's name — forges the gate and is prohibited.
-5. **Use LogNexus Engine:** Stage specific files, execute atomic commits via `lognexus commit` with `-m` or `-F`, and ensure Git Notes are preserved.
+5. **Use LogNexus Engine:** Stage specific files (or use `--stage-allowed`), execute atomic commits via `lognexus commit` with `-m` or `-F`, and ensure Git Notes are preserved.
 6. **Canonical identity:** The principal architect signs as **`Gemini 4 Argon`** — never as `Gemini/Pro`, `Pro`, or any abbreviated variant. Register external master plans with a `Planned-by:` trailer in the PR body.
 7. **Closed-PR policy:** A merged or closed PR is never reused. Follow-up work starts from a new issue and a new scoped branch cut from `main`.
 8. **Implementer identity:** The DeepSeek implementer signs as **`deepseek/VS Code (kimi-code)`** in `Authored-by:` trailers — never as `deepseek/chat`, `deepseek/r1` or any other variant.
+9. **Context-window topology (AGENTS.md §5):** Claude Code runs a shared orchestration/execution window unless you delegate through the Task tool. Delegate reads larger than four files to a subagent and require a compact, technically complete summary back; keep the active contract under `CONTEXT_MAX_FILES` (6 files) and `CONTEXT_MAX_LOC` (1200 lines); hand context to the next agent through `lognexus handoff --prompt` instead of pasting specifications into chat.

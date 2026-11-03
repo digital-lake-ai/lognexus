@@ -90,6 +90,21 @@ describe("Git Notes (Quiet Mode)", () => {
     expect(parsed.subtask.id).toBe("T1");
   });
 
+  it("infers issue and subtask from the commit subject when state is empty", () => {
+    writeFileSync(join(tempDir, "undead.scp"), "[EOF]\n", "utf8");
+    execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+    execSync('git commit -m "fix(#8/T4): add MT_RUN to undead"', {
+      cwd: tempDir,
+      stdio: "ignore",
+    });
+
+    const payload = attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    expect(payload.issue?.id).toBe(8);
+    expect(payload.subtask?.id).toBe("T4");
+    expect(payload.subtask?.status).toBe("completed");
+    expect(payload.subtask?.title).toBe("add MT_RUN to undead");
+  });
+
   it("throws error on attachCurrentStateToCommit when self-approval is detected", () => {
     writeFileSync(join(tempDir, "file2.txt"), "more content", "utf8");
     execSync("git add file2.txt", { cwd: tempDir, stdio: "ignore" });

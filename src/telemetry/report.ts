@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { loadTelemetry } from "./collector.js";
+import { syncTelemetryFromGitNotes } from "./collector.js";
 import type { TelemetryStore } from "./schema.js";
 
 export const CUSTOM_NOTES_MARKER = "<!-- lognexus:custom-notes -->";
@@ -171,7 +171,7 @@ export function generateTelemetryReportFile(
   targetDir: string = process.cwd(),
   outputPath?: string,
 ): { filePath: string; content: string } {
-  const store = loadTelemetry(targetDir);
+  const store = syncTelemetryFromGitNotes(targetDir);
   const content = formatTelemetryMarkdownReport(store);
   const defaultPath = join(targetDir, ".lognexus", "telemetry.md");
   const filePath = resolveConfinedOutputPath(targetDir, outputPath ?? defaultPath);

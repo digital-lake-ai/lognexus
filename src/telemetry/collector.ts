@@ -1,11 +1,16 @@
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { extractTrailers, SUBJECT_TASK_PATTERN } from "../audit/audit.js";
 import { getCliVersion } from "../cli.js";
+import { validateGitReference } from "../git/safe.js";
+import { getNote, listNotes } from "../notes/notes.js";
 import {
   detectProjectStacks,
   extractCommitDiffStats,
   extractModelFamilyCategory,
+  inferTierFromAuthor,
 } from "./detector.js";
 import {
   type AnonymousCommunityPayload,
@@ -261,6 +266,132 @@ export function recordCommitTelemetry(options: {
 
   updateCostSavingsEstimate(store);
   saveTelemetry(store, cwd);
+}
+
+/**
+ * Rebuilds the commit aggregates from `refs/notes/lognexus`.
+ *
+ * Telemetry is opt-in, so every commit made before the user enabled it — or during a
+ * run where the store was rewritten — still leaves a Git note behind. The notes are the
+ * authoritative record: this reads them and recomputes the aggregates from scratch,
+ * which makes the reconciliation idempotent and keeps it entirely offline.
+ */
+export function syncTelemetryFromGitNotes(targetDir: string = process.cwd()): TelemetryStore {
+  const store = loadTelemetry(targetDir);
+  if (isTelemetryGloballyDisabled()) return store;
+
+  const notes = listNotes({ cwd: targetDir });
+  if (notes.length === 0 || notes.length <= store.summary.totalCommits) return store;
+
+  const extensions: Record<string, ExtensionStat> = {};
+  const models: Record<string, ModelStat> = {};
+  const notedSubtasks = new Set<string>();
+  let totalLinesAdded = 0;
+  let totalLinesDeleted = 0;
+
+  for (const { commitSha } of notes) {
+    let safeSha: string;
+    try {
+      safeSha = validateGitReference(commitSha);
+    } catch {
+      continue;
+    }
+
+    let subject = "";
+    let gitAuthor = "";
+    let body = "";
+    try {
+      const raw = execFileSync("git", ["log", "-1", "--format=%s%x1f%an%x1f%B", safeSha], {
+        cwd: targetDir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      });
+      const [rawSubject = "", rawAuthor = "", rawBody = ""] = raw.split("\u001f");
+      subject = rawSubject.trim();
+      gitAuthor = rawAuthor;
+      body = rawBody;
+    } catch {
+      continue;
+    }
+
+    let parsedNote: {
+      issue?: { id?: unknown } | null;
+      subtask?: { id?: unknown } | null;
+      tier?: unknown;
+    } | null = null;
+    const rawNote = getNote(safeSha, { cwd: targetDir });
+    if (rawNote !== null && rawNote !== "") {
+      try {
+        parsedNote = JSON.parse(rawNote);
+      } catch {
+        parsedNote = null;
+      }
+    }
+
+    const author = extractTrailers(body).author ?? gitAuthor.trim();
+    const noteTier = typeof parsedNote?.tier === "string" ? parsedNote.tier : null;
+    const tier = noteTier ?? inferTierFromAuthor(author) ?? "tier-3";
+
+    const noteSubtaskId =
+      typeof parsedNote?.subtask?.id === "string" ? parsedNote.subtask.id : null;
+    if (noteSubtaskId !== null) {
+      const issueId = typeof parsedNote?.issue?.id === "number" ? String(parsedNote.issue.id) : "0";
+      notedSubtasks.add(`${issueId}/${noteSubtaskId}`);
+    } else {
+      const subjectSubtasks = subject.match(new RegExp(SUBJECT_TASK_PATTERN, "gi"));
+      for (const match of subjectSubtasks ?? []) {
+        notedSubtasks.add(match);
+      }
+    }
+
+    const diffItems = extractCommitDiffStats(safeSha, targetDir);
+    for (const item of diffItems) {
+      totalLinesAdded += item.linesAdded;
+      totalLinesDeleted += item.linesDeleted;
+
+      const existing: ExtensionStat = extensions[item.ext] ?? {
+        ext: item.ext,
+        commits: 0,
+        linesAdded: 0,
+        linesDeleted: 0,
+      };
+      existing.commits += 1;
+      existing.linesAdded += item.linesAdded;
+      existing.linesDeleted += item.linesDeleted;
+      extensions[item.ext] = existing;
+    }
+
+    const modelKey = extractModelFamilyCategory(author);
+    const existingModel: ModelStat = models[modelKey] ?? {
+      family: modelKey,
+      tier,
+      commits: 0,
+      totalDurationSec: 0,
+      avgSubtaskDurationSec: 0,
+    };
+    existingModel.tier = tier;
+    existingModel.commits += 1;
+    models[modelKey] = existingModel;
+  }
+
+  store.extensions = extensions;
+  store.models = models;
+  store.summary.totalCommits = notes.length;
+  store.summary.totalLinesAdded = totalLinesAdded;
+  store.summary.totalLinesDeleted = totalLinesDeleted;
+  store.summary.totalSubtasksCompleted = Math.max(
+    store.summary.totalSubtasksCompleted,
+    notedSubtasks.size,
+  );
+
+  updateCostSavingsEstimate(store);
+
+  if (isTelemetryActive(targetDir)) {
+    saveTelemetry(store, targetDir);
+  }
+
+  return store;
 }
 
 export function buildAnonymousCommunityPayload(store: TelemetryStore): AnonymousCommunityPayload {
