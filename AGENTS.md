@@ -34,7 +34,7 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 - **PROHIBIDO AUTO-APROBAR:**
   - An agent or model cannot review or approve its own code.
   - The PR author and the reviewer MUST belong to different model families:
-    - Example: `Authored-by: gemini/flash (antigravity)` → Reviewed by: `deepseek/VS Code`, `claude/sonnet`, or `openai/gpt-4o`.
+    - Example: `Authored-by: gemini/flash (antigravity)` → Reviewed by: `deepseek/chat`, `claude/sonnet`, or `openai/gpt-4o`.
   - Every PR body must carry the review snapshot and signed provenance trailers:
     ```markdown
     Authored-by: <family>/<version> (<client>)
@@ -56,23 +56,6 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
     Reviewed-by: <family>/<version> (<client>)
     ```
   - `Planned-by` documents where the plan came from; it does **not** grant review authority, merge rights, or any exception from the rules above.
-  - The trailer is **mandatory** whenever an external plan drove the work: an untrailered PR that implements an out-of-repo master plan fails the governance audit.
-
-- **Canonical architect identity:**
-  - The principal architect is always declared with its canonical full name **`Gemini 4 Argon`**. Abbreviated, ambiguous forms such as `Gemini/Pro`, `gemini-pro (lead)`, or `Pro` are **not** valid signatures and are rejected at review time.
-  - Canonical signing examples:
-    | Model | Tier | Canonical signature |
-    |---|---|---|
-    | Google Gemini 4 Argon | `tier-1` | `gemini/argon (antigravity)` |
-    | Google Gemini 4 Carbon | `tier-1` | `gemini/carbon (antigravity)` |
-    | Google Gemini 3.8 Flash High | `tier-2` | `gemini/flash-high (antigravity)` |
-    | Moonshot Kimi K3 | `tier-3` | `moonshot/kimi-k3 (kimi-code)` |
-    | DeepSeek Chat | `tier-3` | `deepseek/VS Code (kimi-code)` |
-  - `src/telemetry/detector.ts` maps these identities onto their routing tiers, so a signature outside this vocabulary degrades tier attribution in the ROI report.
-
-- **Closed-PR policy (branch hygiene):**
-  - A Pull Request that has been **merged or closed is never reused**. Follow-up work requires a new issue and a new `issue/<id>-<slug>` or `security/<id>-<slug>` branch cut from `main`.
-  - Reopening a closed PR, force-pushing onto its branch, or re-targeting it to a different issue is prohibited: it breaks the subtask timeline and detaches LogNexus Git Notes (`refs/notes/lognexus`) from the audited commit graph.
 
 ---
 
@@ -85,3 +68,21 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
   ```
 - Use `-F / --file <filePath>` for multiline messages or when running in Windows shells to prevent quote-stripping issues.
 - `lognexus commit` will automatically abort with a governance error if run directly on `main` or `master`.
+- **Contract-scoped staging:** `--stage-allowed` stages only the working-tree files that fall inside the active subtask contract, which removes the "forgot to `git add`" failure mode without widening the contract.
+
+---
+
+## 5. Context-Window Topology & Delegation Budget
+- **Declare the topology before reading files.** Every client either shares one context window between orchestration and execution, or isolates each delegated agent in its own window:
+  - **Shared-window clients (VS Code / Kimi Code):** orchestration and implementation consume the same window. Keep each turn inside the active contract, never inline a full specification into chat, and read `docs/contexto/issue-<id>-plan.md`, `.lognexus/handoff.md` and `.lognexus/state.json` instead of restating them.
+  - **Isolated-subagent clients (Antigravity, Claude Code Task subagents, Gemini CLI delegation):** each delegated agent starts cold, so anything it must know has to be written into its prompt. Delegate reads larger than four files to a subagent and ask for a compact, technically complete summary back.
+- **Model parity:** an orchestrator must not delegate to a model whose context window is smaller than the one it uses to plan, and a delegated agent must never assume it inherited the parent's context.
+- **Hard budget:** `CONTEXT_MAX_FILES` (6 implementation files) and `CONTEXT_MAX_LOC` (1200 lines) per subtask. `evaluateContextBudget()` reports the active contract against that ceiling and the handoff embeds a delegation recommendation when it is exceeded. An oversized contract is legal but must be split, or explicitly delegated, before the next subtask starts.
+- **Handoff as the context transfer:** `lognexus handoff --prompt` renders the compact dispatch prompt for the next agent. Prefer it over pasting instructions between sessions.
+
+---
+
+## 6. Canonical Identities & Closed-PR Policy
+- The principal architect declares itself with the canonical name **`Gemini 4 Argon`** — never abbreviated as `Gemini/Pro`, `Pro` or any other variant. External master plans are recorded with the `Planned-by:` trailer defined in §3.
+- The canonical DeepSeek implementer identity is **`deepseek/VS Code (kimi-code)`** in `Authored-by:` trailers — never `deepseek/chat`, `deepseek/r1` or any other variant.
+- **Closed-PR policy:** a merged or closed PR is never reopened or reused. Follow-up work starts from a new issue and a new scoped branch cut from `main`.
