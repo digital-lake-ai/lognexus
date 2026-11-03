@@ -1,9 +1,22 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fetchNpmPackagePolicy, type NpmPackagePolicy } from "../git/safe.js";
 
 /** Environment switch that silences the startup update check entirely. */
 export const UPDATE_CHECK_DISABLED_ENV = "LOGNEXUS_NO_UPDATE_CHECK";
+
+/**
+ * Files the framework rewrites on its own. They are mirror bookkeeping, never
+ * user content, so every repository must keep them out of `git status`.
+ */
+export const EPHEMERAL_LOGNEXUS_FILES = [
+  ".lognexus/state.json",
+  ".lognexus/state.json.bak",
+  ".lognexus/handoff.md",
+  ".lognexus/telemetry.json",
+  ".lognexus/update-check.json",
+  ".lognexus/terms-consent.json",
+] as const;
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_PACKAGE_NAME = "@digital-lake/lognexus";
@@ -48,6 +61,34 @@ export function getUpdateCachePath(targetDir: string = process.cwd()): string {
 
 export function getTermsConsentPath(targetDir: string = process.cwd()): string {
   return join(lognexusDir(targetDir), "terms-consent.json");
+}
+
+/**
+ * Registers the ephemeral runtime files in `.git/info/exclude`.
+ *
+ * The local exclude file is used instead of `.gitignore` so a checkout is never
+ * dirtied by the first command that writes a cache. A non-repository directory,
+ * or a `.git` file (worktree/submodule), is silently ignored.
+ */
+export function ensureLocalGitExclude(targetDir: string = process.cwd()): void {
+  const gitDir = join(targetDir, ".git");
+  try {
+    if (!existsSync(gitDir) || !statSync(gitDir).isDirectory()) return;
+
+    const infoDir = join(gitDir, "info");
+    mkdirSync(infoDir, { recursive: true });
+
+    const excludePath = join(infoDir, "exclude");
+    const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf8") : "";
+    const present = new Set(existing.split(/\r?\n/).map((line) => line.trim()));
+    const missing = EPHEMERAL_LOGNEXUS_FILES.filter((entry) => !present.has(entry));
+    if (missing.length === 0) return;
+
+    const prefix = existing === "" || existing.endsWith("\n") ? "" : "\n";
+    writeFileSync(excludePath, `${existing}${prefix}${missing.join("\n")}\n`, "utf8");
+  } catch {
+    // Read-only checkouts and exotic VCS layouts must not break the CLI.
+  }
 }
 
 /**
@@ -137,6 +178,7 @@ function isCacheFresh(entry: UpdateCacheEntry, now: number): boolean {
 
 function writeCache(targetDir: string, entry: UpdateCacheEntry): void {
   try {
+    ensureLocalGitExclude(targetDir);
     mkdirSync(lognexusDir(targetDir), { recursive: true });
     writeFileSync(getUpdateCachePath(targetDir), JSON.stringify(entry, null, 2), "utf8");
   } catch {
@@ -163,6 +205,7 @@ export function acceptTerms(termsVersion: string, targetDir: string = process.cw
     acceptedVersion: termsVersion,
     acceptedAt: new Date().toISOString(),
   };
+  ensureLocalGitExclude(targetDir);
   mkdirSync(lognexusDir(targetDir), { recursive: true });
   writeFileSync(getTermsConsentPath(targetDir), JSON.stringify(consent, null, 2), "utf8");
   return consent;

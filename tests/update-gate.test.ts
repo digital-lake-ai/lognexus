@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,8 @@ import {
   acceptTerms,
   checkUpdateGate,
   compareVersions,
+  EPHEMERAL_LOGNEXUS_FILES,
+  ensureLocalGitExclude,
   formatUpdateGateResult,
   getTermsConsentPath,
   getUpdateCachePath,
@@ -234,6 +236,63 @@ describe("CLI entrypoint guard", () => {
   });
 });
 
+describe("Ephemeral .lognexus exclusion", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "lognexus-ephemeral-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function readExclude(dir: string): string {
+    return readFileSync(join(dir, ".git", "info", "exclude"), "utf8");
+  }
+
+  it("registers every ephemeral path in .git/info/exclude and is idempotent", () => {
+    mkdirSync(join(tempDir, ".git"), { recursive: true });
+
+    ensureLocalGitExclude(tempDir);
+    const first = readExclude(tempDir);
+    for (const entry of EPHEMERAL_LOGNEXUS_FILES) {
+      expect(first).toContain(entry);
+    }
+
+    ensureLocalGitExclude(tempDir);
+    const second = readExclude(tempDir);
+    expect(second).toBe(first);
+    expect(second.match(/\.lognexus\/state\.json\n/g)).toHaveLength(1);
+  });
+
+  it("preserves pre-existing exclude entries", () => {
+    mkdirSync(join(tempDir, ".git", "info"), { recursive: true });
+    writeFileSync(join(tempDir, ".git", "info", "exclude"), "custom-ignore/\n", "utf8");
+
+    ensureLocalGitExclude(tempDir);
+    const content = readExclude(tempDir);
+    expect(content.startsWith("custom-ignore/\n")).toBe(true);
+    expect(content).toContain(".lognexus/telemetry.json");
+  });
+
+  it("acceptTerms excludes the consent file so it never shows as untracked", () => {
+    mkdirSync(join(tempDir, ".git"), { recursive: true });
+
+    acceptTerms("2026-11", tempDir);
+    expect(readExclude(tempDir)).toContain(".lognexus/terms-consent.json");
+  });
+
+  it("is a silent no-op outside a git repository or for a .git file", () => {
+    expect(() => ensureLocalGitExclude(tempDir)).not.toThrow();
+    expect(existsSync(join(tempDir, ".git", "info", "exclude"))).toBe(false);
+
+    writeFileSync(join(tempDir, ".git"), "gitdir: ../elsewhere\n", "utf8");
+    expect(() => ensureLocalGitExclude(tempDir)).not.toThrow();
+    expect(existsSync(join(tempDir, ".git", "info"))).toBe(false);
+  });
+});
+
 describe("Public barrel (src/index.ts)", () => {
   const expected = [
     "isDirectCliExecution",
@@ -261,6 +320,8 @@ describe("Public barrel (src/index.ts)", () => {
     "readTermsConsent",
     "UPDATE_CHECK_DISABLED_ENV",
     "UPGRADE_COMMAND",
+    "EPHEMERAL_LOGNEXUS_FILES",
+    "ensureLocalGitExclude",
   ] as const;
 
   it("re-exports every public API introduced in v1.3.0", () => {

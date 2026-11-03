@@ -280,6 +280,62 @@ describe("Traceability audit", () => {
     expect(result.violations.some((v) => v.rule === "tier-routing-violation")).toBe(false);
   });
 
+  it("does not flag .lognexus bookkeeping files as outside the allowed set", () => {
+    mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+    commitFile(
+      tempDir,
+      ".lognexus/telemetry.md",
+      "# local telemetry",
+      "feat(#9/T1): implement journey timeline\n\nAuthored-by: deepseek/V3 (kimi-code)\n",
+    );
+    commitFile(
+      tempDir,
+      "feature.ts",
+      "export const ok = true;",
+      "feat(#9/T1): implement journey timeline\n\nAuthored-by: deepseek/V3 (kimi-code)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        subtask: { id: "T1", contract: { allowedFiles: ["feature.ts"] } },
+        tier: "tier-3",
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "contract-files")).toBe(false);
+    expect(result.passed).toBe(true);
+  });
+
+  it("still rejects real implementation files outside the allowed set", () => {
+    commitFile(
+      tempDir,
+      "feature.ts",
+      "export const ok = true;",
+      "feat(#9/T1): implement journey timeline\n\nAuthored-by: deepseek/V3 (kimi-code)\n",
+    );
+    commitFile(
+      tempDir,
+      "leak.ts",
+      "export const nope = true;",
+      "feat(#9/T1): implement journey timeline\n\nAuthored-by: deepseek/V3 (kimi-code)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        subtask: { id: "T1", contract: { allowedFiles: ["feature.ts"] } },
+        tier: "tier-3",
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    const violation = result.violations.find((v) => v.rule === "contract-files");
+    expect(violation).toBeDefined();
+    expect(violation?.message).toContain("leak.ts");
+  });
+
   it("fails audit when run directly on base branch with 0 commit range (base-branch-range error)", () => {
     execSync(`git checkout ${baseBranch}`, { cwd: tempDir, stdio: "ignore" });
 

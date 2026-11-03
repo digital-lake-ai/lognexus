@@ -73,7 +73,7 @@ export {
   pushNotes,
   searchNotesMemory,
 } from "./notes/notes.js";
-export { DEFAULT_ROUTING_TEMPLATE, initProject } from "./scaffold.js";
+export { DEFAULT_ROUTING_TEMPLATE, initProject, LOGNEXUS_GITIGNORE_ENTRIES } from "./scaffold.js";
 export {
   ARCHITECT_IDENTITY,
   AUDITOR_IDENTITY,
@@ -110,6 +110,8 @@ export {
   acceptTerms,
   checkUpdateGate,
   compareVersions,
+  EPHEMERAL_LOGNEXUS_FILES,
+  ensureLocalGitExclude,
   formatUpdateGateResult,
   getTermsConsentPath,
   getUpdateCachePath,
