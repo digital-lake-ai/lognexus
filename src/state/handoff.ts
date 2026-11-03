@@ -1,13 +1,32 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { extractTrailers } from "../audit/audit.js";
+import { getCliVersion } from "../cli.js";
 import { getNote } from "../notes/notes.js";
+import { ensureLocalGitExclude } from "../update/gate.js";
 import { loadState } from "./manager.js";
 
 export const IMPLEMENTER_IDENTITY = "deepseek/VS Code (kimi-code)";
 export const AUDITOR_IDENTITY = "google/gemini-3.8-flash-high (antigravity)";
 export const ARCHITECT_IDENTITY = "Gemini 4 Argon";
+
+/** Hard ceiling on implementation files a single subtask may touch in one turn. */
+export const CONTEXT_MAX_FILES = 6;
+/** Hard ceiling on total lines of implementation code a single subtask may touch. */
+export const CONTEXT_MAX_LOC = 1200;
+
+export interface ContextBudgetStatus {
+  exceeded: boolean;
+  fileCount: number;
+  totalLines: number;
+  maxFiles: number;
+  maxLines: number;
+  recommendation: string | null;
+}
+
+const CONTEXT_BUDGET_RECOMMENDATION =
+  "Subtask exceeds single-turn context budget (>6 files or >1200 LOC). In isolated-subagent clients (Antigravity), delegate file reads to a research/flash subagent to preserve orchestrator context. In shared-window clients (VS Code / Kimi Code), split the subtask or ensure target model contextWindow >= active model contextWindow.";
 
 export interface HandoffSubtaskEntry {
   id: string;
@@ -27,6 +46,7 @@ export interface ContextHandoff {
   generatedAt: string;
   issue: { id: number; title: string; branch: string; tier: string } | null;
   version: string | null;
+  planFile?: string | null;
   contract: {
     id: string;
     title: string;
@@ -34,6 +54,7 @@ export interface ContextHandoff {
     decisionBudget: string;
     allowedFiles: string[];
   } | null;
+  contextBudget?: ContextBudgetStatus;
   scopeDrift: HandoffScopeDrift;
   completedSubtasks: HandoffSubtaskEntry[];
   nextAction: string;
@@ -56,18 +77,63 @@ function runGit(args: string[], cwd: string): string | null {
   }
 }
 
-function readVersion(targetDir: string): string | null {
+function readPackageVersion(targetDir: string): string | null {
   const raw = runGit(["show", "HEAD:package.json"], targetDir);
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
     if (parsed !== null && typeof parsed === "object" && "version" in parsed) {
       const version = (parsed as { version?: unknown }).version;
-      return typeof version === "string" ? version : null;
+      return typeof version === "string" && version.trim() !== "" ? version : null;
     }
   } catch {
     return null;
   }
+  return null;
+}
+
+/**
+ * Resolves the version of the cycle. A repository checkout without a readable
+ * `package.json` (installed CLI, fresh scaffold) still reports the running CLI version
+ * instead of the opaque "unknown" placeholder.
+ */
+function readVersion(targetDir: string): string | null {
+  return readPackageVersion(targetDir) ?? getCliVersion();
+}
+
+function toPosix(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+/**
+ * Locates the technical specification of the given issue: the canonical
+ * `docs/contexto/issue-<id>-plan.md` first, then any scoped plan filename.
+ */
+export function discoverPlanFile(
+  issueId: number | null,
+  targetDir: string = process.cwd(),
+): string | null {
+  if (issueId === null) return null;
+
+  const canonical = `docs/contexto/issue-${issueId}-plan.md`;
+  if (existsSync(join(targetDir, canonical))) {
+    return canonical;
+  }
+
+  const pattern = new RegExp(`^(?:PLAN-ISSUE-|issue-)${issueId}(?:[-_.]|$).*\\.md$`, "i");
+  for (const dir of [".lognexus", "docs/contexto"]) {
+    const absoluteDir = join(targetDir, dir);
+    if (!existsSync(absoluteDir)) continue;
+    try {
+      const match = readdirSync(absoluteDir)
+        .filter((entry) => pattern.test(entry))
+        .sort()[0];
+      if (match !== undefined) {
+        return toPosix(relative(resolve(targetDir), join(absoluteDir, match)));
+      }
+    } catch {}
+  }
+
   return null;
 }
 
@@ -149,6 +215,31 @@ function collectCompletedSubtasks(
   });
 }
 
+/**
+ * Rebuilds the completed-subtask list from the commit history when the state file lost
+ * it (fresh clone, restored index, crash before write). Chronological order is restored
+ * by inverting `git log`, which yields newest first.
+ */
+function collectCompletedSubtasksFromGit(
+  activeIssueId: number,
+  targetDir: string,
+): HandoffSubtaskEntry[] {
+  const log = runGit(["log", "--format=%s", "-n", "200"], targetDir);
+  if (!log) return [];
+
+  const pattern = new RegExp(`\\(#${activeIssueId}/(T\\d+(?:-[a-zA-Z0-9]+)?)\\)`, "i");
+  const subjects = log.split("\n").reverse();
+  const ids: string[] = [];
+  for (const subject of subjects) {
+    const match = subject.match(pattern);
+    if (match === null) continue;
+    const id = match[1].toUpperCase();
+    if (!ids.includes(id)) ids.push(id);
+  }
+
+  return collectCompletedSubtasks(ids, targetDir, activeIssueId);
+}
+
 function resolveScopeDrift(targetDir: string, allowedFiles: string[]): HandoffScopeDrift {
   const raw = runGit(["status", "--porcelain", "--untracked-files=all"], targetDir);
   if (!raw) return { detected: false, unauthorizedFiles: [] };
@@ -172,6 +263,43 @@ function resolveScopeDrift(targetDir: string, allowedFiles: string[]): HandoffSc
   return { detected: unauthorized.length > 0, unauthorizedFiles: unauthorized };
 }
 
+/**
+ * Reviews the active contract against the single-turn context ceiling. Large contracts
+ * do not fail governance; they carry the delegation recommendation in the handoff.
+ */
+export function evaluateContextBudget(targetDir: string = process.cwd()): ContextBudgetStatus {
+  const state = loadState(targetDir);
+  const allowedFiles =
+    state.currentSubtask !== null && state.currentSubtask.status !== "completed"
+      ? (state.currentSubtask.contract?.allowedFiles ?? [])
+      : [];
+
+  const implFiles = allowedFiles.filter(
+    (file) => !file.endsWith(".md") && !file.startsWith(".lognexus/"),
+  );
+
+  let totalLines = 0;
+  for (const file of implFiles) {
+    const absolutePath = join(targetDir, file);
+    if (!existsSync(absolutePath)) continue;
+    try {
+      const content = readFileSync(absolutePath, "utf8");
+      totalLines += content === "" ? 0 : content.split(/\r?\n/).length;
+    } catch {}
+  }
+
+  const exceeded = implFiles.length > CONTEXT_MAX_FILES || totalLines > CONTEXT_MAX_LOC;
+
+  return {
+    exceeded,
+    fileCount: implFiles.length,
+    totalLines,
+    maxFiles: CONTEXT_MAX_FILES,
+    maxLines: CONTEXT_MAX_LOC,
+    recommendation: exceeded ? CONTEXT_BUDGET_RECOMMENDATION : null,
+  };
+}
+
 function resolveNextAction(state: ReturnType<typeof loadState>): string {
   if (state.currentSubtask === null) {
     return `Cross-Model Auditor: ${AUDITOR_IDENTITY} under supervision of ${ARCHITECT_IDENTITY}`;
@@ -191,10 +319,10 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
       : null;
   const contract = activeSubtask?.contract;
 
-  const completedSubtasks = collectCompletedSubtasks(
-    state.completedSubtasks,
-    targetDir,
-    state.activeIssue?.id ?? null,
+  const completedSubtasks = (
+    state.completedSubtasks.length > 0 || state.activeIssue === null
+      ? collectCompletedSubtasks(state.completedSubtasks, targetDir, state.activeIssue?.id ?? null)
+      : collectCompletedSubtasksFromGit(state.activeIssue.id, targetDir)
   ).map((entry) => {
     const note = entry.sha ? getNote(entry.sha, { cwd: targetDir }) : null;
     const summary = firstLine(note);
@@ -212,6 +340,7 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
         }
       : null,
     version: readVersion(targetDir),
+    planFile: discoverPlanFile(state.activeIssue?.id ?? null, targetDir),
     contract: activeSubtask
       ? {
           id: activeSubtask.id,
@@ -221,6 +350,7 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
           allowedFiles: contract?.allowedFiles ?? [],
         }
       : null,
+    contextBudget: evaluateContextBudget(targetDir),
     scopeDrift: resolveScopeDrift(targetDir, contract?.allowedFiles ?? []),
     completedSubtasks,
     nextAction: resolveNextAction(state),
@@ -244,6 +374,9 @@ export function renderContextHandoff(handoff: ContextHandoff): string {
     lines.push("- **Issue:** none active");
   }
   lines.push(`- **Version:** ${handoff.version ?? "unknown"}`);
+  if (handoff.planFile) {
+    lines.push(`- **Plan file:** \`${handoff.planFile}\``);
+  }
   lines.push("");
   lines.push("## Active Subtask Contract");
   lines.push("");
@@ -275,6 +408,12 @@ export function renderContextHandoff(handoff: ContextHandoff): string {
   } else {
     lines.push("[PASS] Working tree matches the active contract.");
   }
+  if (handoff.contextBudget?.exceeded) {
+    lines.push("");
+    lines.push(
+      `[WARN] ${handoff.contextBudget.recommendation} (${handoff.contextBudget.fileCount} files, ${handoff.contextBudget.totalLines} LOC)`,
+    );
+  }
   lines.push("");
   lines.push("## Completed Subtasks");
   lines.push("");
@@ -299,6 +438,25 @@ export function renderContextHandoff(handoff: ContextHandoff): string {
   return lines.join("\n");
 }
 
+/**
+ * Renders the short dispatch block an orchestrator pastes to the implementer, so the
+ * full specification stays in the plan file instead of being inlined into the chat.
+ */
+export function renderCompactDispatchPrompt(handoff: ContextHandoff): string {
+  const issueTag = handoff.issue ? `Issue #${handoff.issue.id}` : "active issue";
+  const branch = handoff.issue?.branch ?? "current scoped branch";
+  const planRef = handoff.planFile ?? ".lognexus/handoff.md";
+  const taskRef = handoff.contract ? `subtask ${handoff.contract.id}` : "all planned subtasks";
+  return [
+    `Execute ${issueTag} (${taskRef}) on branch \`${branch}\`.`,
+    `1. Read \`${planRef}\`, \`.lognexus/handoff.md\`, and \`.lognexus/state.json\` first (do not inline specs in chat).`,
+    `2. Sign every commit with \`--author "${IMPLEMENTER_IDENTITY}"\` and \`--finish-task\`.`,
+    `3. Governance guards: 0 changes in \`src/mcp/tools.ts\`, 0 \`fetch()\` calls, and strict \`{ shell: false }\`.`,
+    `4. Context topology: in shared-window clients (VS Code / Kimi Code), keep each turn within contract scope and ensure model contextWindow parity; in isolated-subagent clients (Antigravity), delegate >4 file reads to subagents.`,
+    `5. Do NOT write \`Reviewed-by:\` trailers, do NOT run \`git push\`, and do NOT open a PR. Run \`npm test && npm run build && npx lognexus audit main\` when done.`,
+  ].join("\n");
+}
+
 export function writeContextHandoffFile(targetDir: string = process.cwd()): ContextHandoff {
   const handoff = generateContextHandoff(targetDir);
   const filePath = getHandoffPath(targetDir);
@@ -307,6 +465,7 @@ export function writeContextHandoffFile(targetDir: string = process.cwd()): Cont
     mkdirSync(dirPath, { recursive: true });
   }
   writeFileSync(filePath, renderContextHandoff(handoff), "utf8");
+  ensureLocalGitExclude(targetDir);
   return handoff;
 }
 

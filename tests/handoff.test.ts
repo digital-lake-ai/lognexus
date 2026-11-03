@@ -1,14 +1,19 @@
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachNote } from "../src/notes/notes.js";
 import {
   AUDITOR_IDENTITY,
+  CONTEXT_MAX_FILES,
+  CONTEXT_MAX_LOC,
+  discoverPlanFile,
+  evaluateContextBudget,
   generateContextHandoff,
   getHandoffPath,
   IMPLEMENTER_IDENTITY,
+  renderCompactDispatchPrompt,
   renderContextHandoff,
   writeContextHandoffFile,
 } from "../src/state/handoff.js";
@@ -283,5 +288,76 @@ describe("Context Handoff Generator", () => {
     const written = readFileSync(filePath, "utf8");
     expect(written).toBe(renderContextHandoff(handoff));
     expect(written).toContain("## Next Required Action");
+  });
+
+  it("renders a compact dispatch prompt referencing the handoff and the implementer identity", () => {
+    seedState();
+    setSubtask("T3", "Implement handoff", { allowedFiles: [], decisionBudget: "narrow" }, tempDir);
+
+    const prompt = renderCompactDispatchPrompt(generateContextHandoff(tempDir));
+    const lines = prompt.split("\n");
+
+    expect(lines.length).toBeLessThanOrEqual(12);
+    expect(prompt).toContain(IMPLEMENTER_IDENTITY);
+    expect(prompt).toContain(".lognexus/handoff.md");
+    expect(prompt).toContain("Issue #30");
+    expect(prompt).toContain("src/mcp/tools.ts");
+  });
+
+  it("reports the plan file next to the cycle state", () => {
+    seedState();
+    const planPath = join(tempDir, "docs", "contexto");
+    mkdirSync(planPath, { recursive: true });
+    writeFileSync(join(planPath, "issue-30-plan.md"), "# plan\n", "utf8");
+
+    const handoff = generateContextHandoff(tempDir);
+
+    expect(handoff.planFile).toBe("docs/contexto/issue-30-plan.md");
+    expect(discoverPlanFile(30, tempDir)).toBe("docs/contexto/issue-30-plan.md");
+    expect(renderContextHandoff(handoff)).toContain(
+      "- **Plan file:** `docs/contexto/issue-30-plan.md`",
+    );
+  });
+
+  it("falls back to git log when completedSubtasks is empty", () => {
+    seedState();
+    git('commit -q --allow-empty -m "feat(#30/T1): first slice"', tempDir);
+    git('commit -q --allow-empty -m "feat(#30/T2): second slice"', tempDir);
+
+    const handoff = generateContextHandoff(tempDir);
+
+    expect(handoff.completedSubtasks.map((entry) => entry.id)).toEqual(["T1", "T2"]);
+  });
+
+  it("keeps the context budget inside bounds for a small contract", () => {
+    seedState();
+    setSubtask(
+      "T3",
+      "Implement handoff",
+      { allowedFiles: ["src/state/handoff.ts", "docs/plan.md"], decisionBudget: "narrow" },
+      tempDir,
+    );
+    writeFileSync(join(tempDir, "src.ts"), "const a = 1;\n", "utf8");
+
+    const budget = evaluateContextBudget(tempDir);
+
+    expect(budget.fileCount).toBe(1);
+    expect(budget.exceeded).toBe(false);
+    expect(budget.recommendation).toBeNull();
+    expect(budget.maxFiles).toBe(CONTEXT_MAX_FILES);
+    expect(budget.maxLines).toBe(CONTEXT_MAX_LOC);
+  });
+
+  it("flags an oversized contract with a delegation recommendation", () => {
+    seedState();
+    const files = Array.from({ length: CONTEXT_MAX_FILES + 1 }, (_, i) => `src/mod-${i}.ts`);
+    setSubtask("T3", "Wide contract", { allowedFiles: files, decisionBudget: "full" }, tempDir);
+
+    const handoff = generateContextHandoff(tempDir);
+
+    expect(handoff.contextBudget?.exceeded).toBe(true);
+    expect(handoff.contextBudget?.fileCount).toBe(files.length);
+    expect(handoff.contextBudget?.recommendation).toContain("subagent");
+    expect(renderContextHandoff(handoff)).toContain("[WARN]");
   });
 });

@@ -12,6 +12,7 @@ import { fetchNotes, getNote, listNotes, pushNotes, searchNotesMemory } from "./
 import { initProject } from "./scaffold.js";
 import {
   generateContextHandoff,
+  renderCompactDispatchPrompt,
   renderContextHandoff,
   writeContextHandoffFile,
 } from "./state/handoff.js";
@@ -577,12 +578,18 @@ async function handleNote(args: string[]) {
 
 async function handleHandoff(args: string[]) {
   const flags = args.filter((arg) => arg.startsWith("-"));
-  const known = ["--json"];
+  const known = ["--json", "--prompt", "--compact-prompt"];
   const unknown = flags.filter((flag) => !known.includes(flag));
   if (unknown.length > 0) {
     console.error(`Unknown option(s) for handoff: ${unknown.join(", ")}\n`);
     printUsage();
     process.exit(1);
+  }
+
+  if (flags.includes("--prompt") || flags.includes("--compact-prompt")) {
+    const handoff = writeContextHandoffFile();
+    console.log(renderCompactDispatchPrompt(handoff));
+    return;
   }
 
   const asJson = flags.includes("--json");
@@ -694,6 +701,7 @@ async function handleCommit(args: string[]) {
       allowEmpty: parsed.allowEmpty,
       tier: parsed.tier,
       escalated: parsed.escalated,
+      stageAllowed: parsed.stageAllowed,
     });
 
     console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);
