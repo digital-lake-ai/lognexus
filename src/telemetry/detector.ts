@@ -15,6 +15,9 @@ const SHELL_STACK_EXTENSIONS: Record<string, string> = {
   ".psd1": "powershell",
   ".bat": "batch",
   ".cmd": "batch",
+  ".lua": "lua",
+  ".toc": "lua",
+  ".scp": "spherescript",
 };
 
 const SHELL_SCAN_MAX_DEPTH = 2;
@@ -172,6 +175,15 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
 
   const trimmed = identityStr.trim().toLowerCase();
 
+  // The Antigravity orchestrator drives the plan from an isolated window; classify it
+  // as the architecture family before the generic Gemini checks can claim it.
+  if (
+    trimmed.includes("antigravity") &&
+    (trimmed.includes("lead") || trimmed.includes("orchestrator") || trimmed.includes("architect"))
+  ) {
+    return "gemini/argon";
+  }
+
   // Well-known model family heuristics
   if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
   if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
@@ -228,6 +240,9 @@ const TIER_1_MARKERS = [
   "gemini/carbon",
   "argon",
   "carbon",
+  "lead/orchestrator",
+  "orchestrator",
+  "antigravity/lead",
   "claude/opus",
   "opus",
   "openai/o1",
