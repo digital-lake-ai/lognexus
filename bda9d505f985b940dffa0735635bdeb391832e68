@@ -1,0 +1,32 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.1",
+  "timestamp": "2026-11-03T20:44:28.097Z",
+  "issue": {
+    "id": 34,
+    "title": "feat(v1.3.2): telemetry Git-notes backfill, context-window budget guard, handoff --prompt, --stage-allowed & GitHub Packages"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Backfill telemetry from Git notes, infer subtask on note attach and detect lua/spherescript stacks",
+    "status": "in-progress",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/detector.ts",
+        "src/telemetry/collector.ts",
+        "src/telemetry/report.ts",
+        "src/telemetry/index.ts",
+        "src/notes/attach.ts",
+        "tests/telemetry.test.ts",
+        "tests/notes.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
