@@ -26,7 +26,7 @@ export interface ContextBudgetStatus {
 }
 
 const CONTEXT_BUDGET_RECOMMENDATION =
-  "Subtask exceeds single-turn context budget (>6 files or >1200 LOC). In isolated-subagent clients (Antigravity), delegate file reads to a research/flash subagent to preserve orchestrator context. In shared-window clients (VS Code / Kimi Code), split the subtask or ensure target model contextWindow >= active model contextWindow.";
+  "Subtask exceeds single-turn context budget (>6 files or >1200 LOC). Consider splitting the subtask or using your host assistant's native subagent/exploration capabilities while keeping contract execution strictly bounded.";
 
 export interface HandoffSubtaskEntry {
   id: string;
@@ -141,11 +141,14 @@ function firstLine(noteBlob: string | null): string | null {
   if (!noteBlob) return null;
   try {
     const parsed: unknown = JSON.parse(noteBlob);
-    if (parsed !== null && typeof parsed === "object" && "subtask" in parsed) {
-      const subtask = (parsed as { subtask?: { title?: unknown } | null }).subtask;
-      if (subtask && typeof subtask.title === "string" && subtask.title.trim() !== "") {
-        return subtask.title.trim();
+    if (parsed !== null && typeof parsed === "object") {
+      if ("subtask" in parsed) {
+        const subtask = (parsed as { subtask?: { title?: unknown } | null }).subtask;
+        if (subtask && typeof subtask.title === "string" && subtask.title.trim() !== "") {
+          return subtask.title.trim();
+        }
       }
+      return null;
     }
   } catch {
     // notes written outside LogNexus carry free-form text
@@ -275,7 +278,7 @@ export function evaluateContextBudget(targetDir: string = process.cwd()): Contex
       : [];
 
   const implFiles = allowedFiles.filter(
-    (file) => !file.endsWith(".md") && !file.startsWith(".lognexus/"),
+    (file) => !file.endsWith(".md") && !file.startsWith(".lognexus/") && !file.startsWith("tests/"),
   );
 
   let totalLines = 0;
@@ -452,7 +455,7 @@ export function renderCompactDispatchPrompt(handoff: ContextHandoff): string {
     `1. Read \`${planRef}\`, \`.lognexus/handoff.md\`, and \`.lognexus/state.json\` first (do not inline specs in chat).`,
     `2. Sign every commit with \`--author "${IMPLEMENTER_IDENTITY}"\` and \`--finish-task\`.`,
     `3. Governance guards: 0 changes in \`src/mcp/tools.ts\`, 0 \`fetch()\` calls, and strict \`{ shell: false }\`.`,
-    `4. Context topology: in shared-window clients (VS Code / Kimi Code), keep each turn within contract scope and ensure model contextWindow parity; in isolated-subagent clients (Antigravity), delegate >4 file reads to subagents.`,
+    `4. Assistant vs. Contract boundary: operate freely with your native IDE/assistant capabilities during conversation and exploration, but once executing the active subtask contract, strictly obey LogNexus contract governance (\`allowedFiles\`, \`forbiddenFiles\`, \`decisionBudget\`, and verification).`,
     `5. Do NOT write \`Reviewed-by:\` trailers, do NOT run \`git push\`, and do NOT open a PR. Run \`npm test && npm run build && npx lognexus audit main\` when done.`,
   ].join("\n");
 }

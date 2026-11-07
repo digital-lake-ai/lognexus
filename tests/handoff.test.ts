@@ -302,6 +302,26 @@ describe("Context Handoff Generator", () => {
     expect(prompt).toContain(".lognexus/handoff.md");
     expect(prompt).toContain("Issue #30");
     expect(prompt).toContain("src/mcp/tools.ts");
+    expect(prompt).toContain("Assistant vs. Contract boundary");
+  });
+
+  it("summarizes a note without a subtask title from its commit subject", () => {
+    seedState();
+    writeFileSync(join(tempDir, "pending.txt"), "pending\n", "utf8");
+    git("add -A", tempDir);
+    git('commit -q -m "feat(#30/T1): implement core"', tempDir);
+
+    const sha = git("rev-parse HEAD", tempDir);
+    attachNote(JSON.stringify({ generator: "LogNexus", subtask: null }), sha, { cwd: tempDir });
+
+    const handoff = generateContextHandoff(tempDir);
+    const rendered = renderContextHandoff(handoff);
+
+    expect(handoff.completedSubtasks.map((entry) => entry.id)).toEqual(["T1"]);
+    expect(handoff.completedSubtasks[0]?.summary).toBe("feat(#30/T1): implement core");
+    expect(handoff.completedSubtasks[0]?.title).toBe("");
+    expect(rendered).toContain("implement core");
+    expect(rendered).not.toContain("{");
   });
 
   it("reports the plan file next to the cycle state", () => {

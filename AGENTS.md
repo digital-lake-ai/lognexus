@@ -72,13 +72,10 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 
 ---
 
-## 5. Context-Window Topology & Delegation Budget
-- **Declare the topology before reading files.** Every client either shares one context window between orchestration and execution, or isolates each delegated agent in its own window:
-  - **Shared-window clients (VS Code / Kimi Code):** orchestration and implementation consume the same window. Keep each turn inside the active contract, never inline a full specification into chat, and read `docs/contexto/issue-<id>-plan.md`, `.lognexus/handoff.md` and `.lognexus/state.json` instead of restating them.
-  - **Isolated-subagent clients (Antigravity, Claude Code Task subagents, Gemini CLI delegation):** each delegated agent starts cold, so anything it must know has to be written into its prompt. Delegate reads larger than four files to a subagent and ask for a compact, technically complete summary back.
-- **Model parity:** an orchestrator must not delegate to a model whose context window is smaller than the one it uses to plan, and a delegated agent must never assume it inherited the parent's context.
-- **Hard budget:** `CONTEXT_MAX_FILES` (6 implementation files) and `CONTEXT_MAX_LOC` (1200 lines) per subtask. `evaluateContextBudget()` reports the active contract against that ceiling and the handoff embeds a delegation recommendation when it is exceeded. An oversized contract is legal but must be split, or explicitly delegated, before the next subtask starts.
-- **Handoff as the context transfer:** `lognexus handoff --prompt` renders the compact dispatch prompt for the next agent. Prefer it over pasting instructions between sessions.
+## 5. Native Assistant Autonomy & Contract Execution Governance
+- **Native Assistant Autonomy:** during conversation, exploration and diagnosis, use every native capability of your host assistant (subagents, parallel tool calls, long-context reads, web search, IDE indexing) without artificial per-turn limits. Investigating a problem deeply is part of the job, not a contract violation.
+- **Strict Contract Execution Governance:** the moment a subtask contract becomes active, execution is bound by it. Modify only `allowedFiles`, never touch `forbiddenFiles`, stay inside the declared `decisionBudget`, and treat `verificationCmd` as the gate. Exploration freedom does not extend to unapproved writes.
+- **Subtask Context Budget & Handoff:** keep the contract itself scoped — `CONTEXT_MAX_FILES` (6 implementation files) and `CONTEXT_MAX_LOC` (1200 lines), with test files exempt from the file count. `evaluateContextBudget()` reports the active contract against that ceiling and the handoff embeds a split recommendation when it is exceeded. An oversized contract is legal but must be split before the next subtask starts, and `lognexus handoff --prompt` renders the compact dispatch prompt for the next agent — prefer it over pasting instructions between sessions.
 
 ---
 
