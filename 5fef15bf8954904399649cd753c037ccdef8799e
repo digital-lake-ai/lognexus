@@ -1,0 +1,36 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.3",
+  "timestamp": "2026-11-07T02:03:31.074Z",
+  "issue": {
+    "id": 36,
+    "title": "feat(v1.3.3): telemetry author/tier fixes (ko8r4), assistant-vs-contract governance boundary & cross-platform metadata (Glama / awesome-mcp-servers)"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Declare darwin/linux/win32 OS support, document Glama and awesome-mcp-servers listings and bump atomic version to 1.3.3",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "src/cli.ts",
+        "README.md",
+        "CHANGELOG.md",
+        "docs/TELEMETRY_PRIVACY.md",
+        "docs/contexto/backlog-v1-3-3.md",
+        "docs/contexto/issue-36-plan.md",
+        "tests/mcp.test.ts",
+        "tests/e2e.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm test"
+    }
+  },
+  "tier": "tier-3"
+}
