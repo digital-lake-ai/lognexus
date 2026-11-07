@@ -22,6 +22,7 @@
 [![MCP TDQS](https://img.shields.io/badge/MCP_TDQS-Grade_A_(4.3%2F5.0)-0d9488)](https://glama.ai/mcp/servers/digital-lake-ai/lognexus)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6?logo=typescript&logoColor=white)](https://github.com/digital-lake-ai/lognexus)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20_LTS-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Platforms](https://img.shields.io/badge/Platforms-Linux_%7C_macOS_%7C_Windows-0284c7)](#installation--setup)
 [![Privacy](https://img.shields.io/badge/Privacy-100%25_Local--First-0284c7)](./docs/TELEMETRY_PRIVACY.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0284c7)](./LICENSE)
 
@@ -36,6 +37,7 @@ As AI coding agents take on complex engineering tasks across different IDEs, the
 **LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
 - **Clients:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code, VS Code, Zed.
 - **Models:** Google Gemini (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
+- **Supported Platforms:** **Linux**, **macOS**, and **Windows** (`linux`, `darwin`, `win32` — 100% cross-platform Node.js >= 20 & Git >= 2.28, zero native binary dependencies).
 
 ```
 Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context & Diffs) ──▶ PR (Timeline & Review)
@@ -170,7 +172,7 @@ npx @digital-lake/lognexus commit -m "feat(#42/T1): add user schema" \
   --reviewer "gemini/pro (lead-architect)" \
   --finish-task
 
-# Or read message from file (safe against Windows shell quote-stripping):
+# Or read message from file (cross-platform on Linux, macOS, and Windows shells):
 npx @digital-lake/lognexus commit -F commit-msg.txt --finish-task
 ```
 
@@ -329,6 +331,8 @@ Every published release is continuously measured against independent third-party
 | **Socket Security** | Maintenance health | **96 / 100** |
 | **SLSA Provenance** | Build supply chain | **Verified** (`SLSA Provenance`, OIDC-signed npm publish) |
 | **License & Contribution model** | Open governance | **MIT** — Open Source, Core-Maintained (**Closed to Unsolicited External PRs**) |
+| **Awesome MCP Servers** | Community MCP directory ([`punkpeye/awesome-mcp-servers`](https://github.com/punkpeye/awesome-mcp-servers) / [`HorchataHTML/awesome-mcp-servers`](https://github.com/HorchataHTML/awesome-mcp-servers)) | Listed under *Version Control* (`📇 🏠 🍎 🪟 🐧` — TypeScript, Local, **macOS**, **Windows**, **Linux**) |
+| **Smithery & Claude Plugin** | Native MCP & Plugin registries (`smithery.yaml`, `.claude-plugin/plugin.json`, `skills/lognexus/SKILL.md`) | Verified Cross-Platform (`Linux`, `macOS`, `Windows`) |
 
 > **Local-first by construction:** LogNexus ships `0` runtime network calls, `0` PII, and `0` telemetry endpoints. See [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md) and [`SECURITY.md`](SECURITY.md).
 
