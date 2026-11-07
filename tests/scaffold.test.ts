@@ -62,12 +62,13 @@ describe("initProject", () => {
     expect(content).toContain(".lognexus/handoff.md");
   });
 
-  it("documents the context-window topology and delegation thresholds in routing.md", () => {
+  it("documents native assistant autonomy and contract governance in routing.md", () => {
     initProject(tempDir);
     const content = readFileSync(join(tempDir, ".lognexus", "routing.md"), "utf8");
 
-    expect(content).toContain("Context-Window Topology & Multi-File Delegation Thresholds");
-    expect(content).toContain("max_direct_inspect_files: 4");
+    expect(content).toContain("Native Assistant Autonomy & Contract Execution Governance");
+    expect(content).toContain("assistant_autonomy:");
+    expect(content).toContain("contract_governance:");
     expect(content).toContain("max_subtask_files: 6");
     expect(content).toContain("max_subtask_loc: 1200");
   });

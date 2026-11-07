@@ -331,7 +331,11 @@ export function syncTelemetryFromGitNotes(targetDir: string = process.cwd()): Te
 
     const author = extractTrailers(body).author ?? gitAuthor.trim();
     const noteTier = typeof parsedNote?.tier === "string" ? parsedNote.tier : null;
-    const tier = noteTier ?? inferTierFromAuthor(author) ?? "tier-3";
+    const inferredTier = inferTierFromAuthor(author);
+    const tier =
+      noteTier !== null && noteTier !== "tier-3"
+        ? noteTier
+        : (inferredTier ?? noteTier ?? "tier-3");
 
     const noteSubtaskId =
       typeof parsedNote?.subtask?.id === "string" ? parsedNote.subtask.id : null;

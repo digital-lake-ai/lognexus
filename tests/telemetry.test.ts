@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -139,6 +139,9 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("deepseek/deepseek-coder")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code)")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory("deepseek/vs-code")).toBe("deepseek/v3");
+      expect(extractModelFamilyCategory("ko8r4")).toBe("deepseek/v3");
+      expect(extractModelFamilyCategory("ko8r4 <ko8r4@example.com>")).toBe("deepseek/v3");
+      expect(extractModelFamilyCategory("Lead (ko8r4)")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
     });
 
@@ -169,6 +172,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor("moonshot/kimi-k3")).toBe("tier-3");
       expect(inferTierFromAuthor("Kimi K3 (Moonshot AI)")).toBe("tier-3");
       expect(inferTierFromAuthor("gemini/flash-lite (antigravity)")).toBe("tier-3");
+      expect(inferTierFromAuthor("ko8r4")).toBe("tier-3");
       expect(inferTierFromAuthor("")).toBeNull();
       expect(inferTierFromAuthor(null)).toBeNull();
     });
@@ -305,6 +309,74 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(store.extensions[".ts"]?.commits).toBe(1);
       expect(Object.values(store.models)[0]?.commits).toBe(1);
       expect(store.summary.estimatedCostSavingsPct).toBe(96);
+    });
+
+    it("prefers the inferred tier over the legacy tier-3 default on historical notes", () => {
+      writeFileSync(join(tempDir, "plan.md"), "# plan\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "docs: orchestrator plan" --author "antigravity/lead-orchestrator (google-antigravity) <lead@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      execFileSync(
+        "git",
+        [
+          "notes",
+          "--ref=lognexus",
+          "add",
+          "-f",
+          "-m",
+          JSON.stringify({
+            schema: "lognexus/note/v1",
+            commit: sha,
+            issue: { id: 36, title: "v1.3.3" },
+            subtask: { id: "T1", title: "orchestrate", status: "completed" },
+            tier: "tier-3",
+          }),
+          sha,
+        ],
+        { cwd: tempDir, stdio: "ignore", shell: false },
+      );
+
+      enableTelemetry({ cwd: tempDir });
+      generateTelemetryReportFile(tempDir);
+
+      const store = loadTelemetry(tempDir);
+      const model = store.models["gemini/argon"];
+      expect(model).toBeDefined();
+      expect(model?.tier).toBe("tier-1");
+      expect(model?.commits).toBe(1);
+    });
+
+    it("honours an explicit non-default tier stored in the note", () => {
+      writeFileSync(join(tempDir, "plan.md"), "# plan\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "docs: plan" --author "someone/random <random@example.com>"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      execFileSync(
+        "git",
+        [
+          "notes",
+          "--ref=lognexus",
+          "add",
+          "-f",
+          "-m",
+          JSON.stringify({ commit: sha, tier: "tier-2" }),
+          sha,
+        ],
+        { cwd: tempDir, stdio: "ignore", shell: false },
+      );
+
+      enableTelemetry({ cwd: tempDir });
+      generateTelemetryReportFile(tempDir);
+
+      expect(Object.values(loadTelemetry(tempDir).models)[0]?.tier).toBe("tier-2");
     });
 
     it("generates markdown report with HUD tables and frontmatter", () => {

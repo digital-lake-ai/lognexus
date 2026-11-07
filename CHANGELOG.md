@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.3] - 2026-11-07
+
+### Summary
+A correctness and platform-release patch. Telemetry backfill now respects the real model tier recorded in the author trailer instead of the legacy `tier-3` default, so historical notes stop under-reporting frontier models, and the DeepSeek `ko8r4` identity is mapped to its family. The handoff document no longer renders `{` for retro-attached notes without a subtask title. The agent governance model is restated as native assistant autonomy during exploration plus strict contract execution, and the package now declares its cross-platform OS support explicitly.
+
+### Added
+- **Cross-platform OS metadata:** `package.json` declares `"os": ["darwin", "linux", "win32"]` next to `"engines"`, so npm and MCP registry scanners (Glama, Smithery) report the supported platforms explicitly. Keywords gained `linux`, `macos`, `windows` and `cross-platform`.
+- **Ecosystem directory coverage:** the README audit table now lists the community directories and registries where LogNexus is published (`awesome-mcp-servers`, Smithery, Claude Plugin).
+- **`Platforms` badge:** the README header advertises Linux, macOS and Windows support next to the Node.js badge.
+- **`ko8r4` DeepSeek identity:** `extractModelFamilyCategory()` maps `ko8r4` to the DeepSeek family and `inferTierFromAuthor()` resolves it to `tier-3`.
+
+### Fixed
+- **Telemetry backfill tier resolution:** `syncTelemetryFromGitNotes()` in `src/telemetry/collector.ts` prefers `inferTierFromAuthor(author)` over the legacy `"tier-3"` default stored in historical notes, while still honouring any explicit non-default tier. Historical commits authored by `tier-1` or `tier-2` models are no longer counted as `tier-3`.
+- **Handoff summary on notes without a subtask title:** `firstLine()` in `src/state/handoff.ts` returns `null` for JSON notes whose `subtask` is absent or `null`, so the completed-subtask table falls back to the commit subject instead of rendering `{`.
+
+### Changed
+- **Native assistant autonomy vs. contract governance:** `AGENTS.md` §5, `GEMINI.md`, `CLAUDE.md` and `.agents/rules.md` now state that exploration happens with every native capability of the host assistant, while execution of an active subtask contract stays bound to `allowedFiles`, `forbiddenFiles`, `decisionBudget` and its `verificationCmd`. Test files are exempt from the `CONTEXT_MAX_FILES` count in `evaluateContextBudget()`.
+- **Compact dispatch prompt:** `renderCompactDispatchPrompt()` states the assistant-versus-contract boundary explicitly, and the scaffolded `.lognexus/routing.md` documents the governance instead of a static topology table.
+- **Version contract:** the atomic version contract moves to `1.3.3` across `package.json` (including `lognexusPolicy.minCriticalVersion`), `package-lock.json`, `.claude-plugin/plugin.json`, the CLI fallback, the privacy policy and the test fixtures.
+
 ## [1.3.2] - 2026-11-03
 
 ### Summary

@@ -16,12 +16,11 @@ routing: confirm
 # tier-2 (Orchestration / Large Context >500 lines): Gemini 1.5 Pro (2M), Claude Sonnet, Kimi K2.7 Code
 # tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini 2.0/1.5 Flash, DeepSeek V3, Kimi K2.7 Code, Claude Haiku, GPT-4o-mini
 
-# Context-Window Topology & Multi-File Delegation Thresholds
-# max_direct_inspect_files: 4
+# Native Assistant Autonomy & Contract Execution Governance
 # max_subtask_files: 6
 # max_subtask_loc: 1200
-# topology_isolated_subagent (Antigravity): Delegate >4 file reads to research/flash subagents (zero orchestrator token cost)
-# topology_shared_window (VS Code / Kimi Code): Use file-pointer handoff (.lognexus/handoff.md) and ensure target model contextWindow >= active model contextWindow
+# assistant_autonomy: Operate freely with native IDE/assistant capabilities during conversation, analysis, and exploration
+# contract_governance: When executing an active subtask contract (.lognexus/state.json), strictly obey allowedFiles, forbiddenFiles, decisionBudget, and verificationCmd
 `;
 
 /** Ephemeral runtime state written by the framework itself. */
