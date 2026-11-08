@@ -1,0 +1,31 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.4",
+  "timestamp": "2026-11-08T02:09:56.924Z",
+  "issue": {
+    "id": 52,
+    "title": "security(codeql): remediate 9 CodeQL alerts (js/incomplete-sanitization and js/polynomial-redos)"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Remediate 9 CodeQL incomplete-sanitization and polynomial-redos alerts",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/timeline/timeline.ts",
+        "src/state/handoff.ts",
+        "src/audit/audit.ts",
+        "tests/audit.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/git/safe.ts",
+        "src/commit.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
