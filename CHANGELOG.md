@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.4] - 2026-11-08
+
+### Summary
+A distribution and maintenance release. LogNexus is now reachable from three package ecosystems at once: the npm package keeps working as before, a first-party Python launcher (`lognexus-mcp`) exposes the same MCP server through `uvx` and `pip`, and a `server.json` manifest publishes it to the official MCP Registry. The repository also gains automated supply-chain telemetry with Dependabot and CodeQL, and the README documents the exact MCP client configuration path for Linux, macOS and Windows.
+
+### Added
+- **MCP Registry manifest:** `server.json` declares `io.github.digital-lake-ai/lognexus` with the npm package (`npx`) and the PyPI package (`uvx`) as distribution channels. `package.json` exposes the same identifier through `"mcpName"` and ships `server.json` in the published tarball.
+- **PyPI package `lognexus-mcp`:** `pyproject.toml` and `python/lognexus_mcp/` provide `lognexus` and `lognexus-mcp` console scripts that resolve `npx` through `shutil.which` and delegate to the TypeScript CLI. Every subprocess call uses `subprocess.run(..., shell=False)`.
+- **OIDC release pipeline:** `.github/workflows/release.yml` validates `server.json` and `pyproject.toml` against the detected version and publishes the sdist and wheel through `pypa/gh-action-pypi-publish` as a non-blocking step.
+- **Dependabot:** `.github/dependabot.yml` keeps `npm` and `github-actions` dependencies updated weekly, with a limit of five open pull requests per ecosystem.
+- **CodeQL analysis:** `.github/workflows/codeql.yml` runs the `javascript-typescript` query suite on every push and pull request to `main`, plus a weekly schedule.
+- **Multi-OS MCP configuration:** the README documents the exact MCP client configuration path for macOS, Linux and Windows, alongside the Cursor and VS Code workspace files.
+- **MCP Registry & PyPI audit row:** the verified-quality table now reports the registry identifier and the `npx` / `uvx` distribution channels.
+
+### Changed
+- **Version contract:** the atomic version contract moves to `1.3.4` across `package.json`, `package-lock.json`, `.claude-plugin/plugin.json`, `src/cli.ts`, the privacy policy and the test fixtures. `lognexusPolicy.minCriticalVersion` stays at `1.3.3` so older installs receive an advisory update notice instead of a blocking error.
+- **CI safety net:** the workflow now runs `node dist/cli.js --version` after the build, so a broken binary fails the pipeline instead of shipping.
+- **Generated artifacts:** `.gitignore` excludes Python build output (`__pycache__/`, `*.py[cod]`, `build/`, `dist-pypi/`, `*.egg-info/`).
+
 ## [1.3.3] - 2026-11-07
 
 ### Summary

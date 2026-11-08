@@ -232,7 +232,12 @@ Telemetry is **strictly local-only**: no endpoint, no dispatch, no upload. The r
 
 LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp`) with zero external SDK dependencies. Connect it to Claude Desktop, Cursor, Google Antigravity, or any MCP-compliant client:
 
-**`claude_desktop_config.json` or Cursor MCP settings:**
+**`claude_desktop_config.json` or Cursor MCP settings** — config file locations per operating system:
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **Cursor / VS Code:** `.cursor/mcp.json` or `.vscode/mcp.json`
+
 ```json
 {
   "mcpServers": {
@@ -247,6 +252,15 @@ LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp
 **Or install automatically via Smithery:**
 ```bash
 npx -y @smithery/cli install @digital-lake/lognexus --client claude
+```
+
+**Or run via Python (`uvx` / `pip` from PyPI):**
+```bash
+# Zero-install MCP stdio launch via uvx:
+uvx lognexus-mcp
+
+# Or install globally via pip / pipx:
+pip install lognexus-mcp
 ```
 
 **Exposed Capabilities:**
@@ -333,6 +347,7 @@ Every published release is continuously measured against independent third-party
 | **License & Contribution model** | Open governance | **MIT** — Open Source, Core-Maintained (**Closed to Unsolicited External PRs**) |
 | **Awesome MCP Servers** | Community MCP directory ([`punkpeye/awesome-mcp-servers`](https://github.com/punkpeye/awesome-mcp-servers) / [`HorchataHTML/awesome-mcp-servers`](https://github.com/HorchataHTML/awesome-mcp-servers)) | Listed under *Version Control* (`📇 🏠 🍎 🪟 🐧` — TypeScript, Local, **macOS**, **Windows**, **Linux**) |
 | **Smithery & Claude Plugin** | Native MCP & Plugin registries (`smithery.yaml`, `.claude-plugin/plugin.json`, `skills/lognexus/SKILL.md`) | Verified Cross-Platform (`Linux`, `macOS`, `Windows`) |
+| **MCP Registry & PyPI** | Official `server.json` & Python launcher (`lognexus-mcp`) | Verified (`io.github.digital-lake-ai/lognexus` · `npx` & `uvx` across **Linux**, **macOS**, **Windows**) |
 
 > **Local-first by construction:** LogNexus ships `0` runtime network calls, `0` PII, and `0` telemetry endpoints. See [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md) and [`SECURITY.md`](SECURITY.md).
 
