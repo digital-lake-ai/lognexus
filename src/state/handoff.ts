@@ -428,7 +428,9 @@ export function renderContextHandoff(handoff: ContextHandoff): string {
     for (const entry of handoff.completedSubtasks) {
       const sha = entry.shortSha ? `\`${entry.shortSha}\`` : "—";
       const author = entry.author ?? "—";
-      const summary = (entry.title || entry.summary || "—").replace(/\|/g, "\\|");
+      const summary = (entry.title || entry.summary || "—")
+        .replace(/\\/g, "\\\\")
+        .replace(/\|/g, "\\|");
       lines.push(`| ${entry.id} | ${sha} | ${author} | ${summary} |`);
     }
   }
