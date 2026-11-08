@@ -29,19 +29,17 @@ export interface AuditResult {
   };
 }
 
-const VALID_TYPES = "feat, fix, docs, refactor, test, chore, style, perf";
+const VALID_TYPES = "feat, fix, docs, refactor, test, chore, style, perf, ci, build";
 export const TICKET_PATTERN_SOURCE = "(?:#\\d+|[A-Z][A-Z0-9]*-\\d+)";
 export const SUBTASK_PATTERN_SOURCE = "T\\d+(?:-[a-zA-Z0-9]+)?";
 export const COMMIT_FORMAT_PATTERN = new RegExp(
-  `^(feat|fix|docs|refactor|test|chore|style|perf)\\(${TICKET_PATTERN_SOURCE}(\\/${SUBTASK_PATTERN_SOURCE})?\\): \\S+`,
+  `^(feat|fix|docs|refactor|test|chore|style|perf|ci|build)\\(${TICKET_PATTERN_SOURCE}(\\/${SUBTASK_PATTERN_SOURCE})?\\): \\S+`,
 );
 export const SUBJECT_TASK_PATTERN = new RegExp(
   `\\(${TICKET_PATTERN_SOURCE}\\/(${SUBTASK_PATTERN_SOURCE})\\)`,
   "i",
 );
-const IDENTITY_PATTERN = /(\S+\/\S+)/;
-const FAMILY_PATTERN = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_. -]+?)\s*$/;
-const TRAILER_PATTERN = /^\s*(Authored-by|Reviewed-by|Last-code-by|Updated-by):\s*(.+)$/gim;
+const FAMILY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_. -]+$/;
 
 interface NoteContract {
   allowedFiles?: unknown;
@@ -65,9 +63,17 @@ export interface Identity {
  * to single dashes; `deepseek/chat` keeps resolving to `deepseek/chat`.
  */
 function extractFamily(value: string): string | null {
-  const match = value.split("(")[0].trim().match(FAMILY_PATTERN) ?? value.match(IDENTITY_PATTERN);
-  if (!match) return null;
-  return match[1].replace(/\s+/g, "-").toLowerCase();
+  const head = value.split("(")[0].trim();
+  if (FAMILY_PATTERN.test(head)) {
+    return head.replace(/\s+/g, "-").toLowerCase();
+  }
+  for (const token of value.trim().split(/\s+/)) {
+    const slashIdx = token.indexOf("/");
+    if (slashIdx > 0 && slashIdx < token.length - 1) {
+      return token.toLowerCase();
+    }
+  }
+  return null;
 }
 
 export function parseIdentity(value: string | null): Identity | null {
@@ -89,9 +95,13 @@ export function extractTrailers(commitBody: string): {
   let author: string | null = null;
   let reviewer: string | null = null;
 
-  for (const match of commitBody.matchAll(TRAILER_PATTERN)) {
-    const key = match[1].toLowerCase();
-    const value = match[2].trim();
+  for (const rawLine of commitBody.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const colonIdx = line.indexOf(":");
+    if (colonIdx <= 0) continue;
+
+    const key = line.slice(0, colonIdx).toLowerCase();
+    const value = line.slice(colonIdx + 1).trim();
     if (value === "") continue;
 
     if (key === "authored-by") {

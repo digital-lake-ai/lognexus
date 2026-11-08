@@ -8,6 +8,7 @@ export { validateGitReference };
 export function sanitizeMarkdown(value: string | null): string {
   if (value === null || value === "") return NO_VALUE;
   return value
+    .replace(/\\/g, "\\\\")
     .replace(/\|/g, "\\|")
     .replace(/`/g, "'")
     .replace(/\[/g, "\\[")
@@ -214,7 +215,7 @@ function buildItem(commit: RawCommit, targetDir: string): TimelineItem {
 
 function cell(value: string | null): string {
   if (value === null || value === "") return NO_VALUE;
-  return `\`${value.replace(/\|/g, "\\|")}\``;
+  return `\`${value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|")}\``;
 }
 
 export function buildTimelineTable(items: TimelineItem[]): string {

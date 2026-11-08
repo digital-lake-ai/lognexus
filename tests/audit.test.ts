@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { auditBranch } from "../src/audit/audit.js";
+import { auditBranch, extractTrailers, parseIdentity } from "../src/audit/audit.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
 import { attachNote } from "../src/notes/notes.js";
 
@@ -190,6 +190,28 @@ describe("Traceability audit", () => {
     expect(result.passed).toBe(true);
   });
 
+  it("accepts ci and build commit types without a commit-format warning", () => {
+    commitFile(
+      tempDir,
+      "workflow.txt",
+      "workflow",
+      "ci(#52/T1): add codeql workflow\n\nAuthored-by: deepseek/VS Code (kimi-code)\n",
+    );
+    const buildSha = commitFile(
+      tempDir,
+      "build.txt",
+      "build",
+      "build(#52/T1): emit release artifacts\n\nAuthored-by: deepseek/VS Code (kimi-code)\n",
+    );
+    attachCurrentStateToCommit(buildSha, { cwd: tempDir });
+
+    const result = auditBranch(baseBranch, tempDir);
+    const formatWarnings = result.violations.filter((v) => v.rule === "commit-format");
+    expect(formatWarnings).toEqual([]);
+    expect(result.commitCount).toBe(2);
+    expect(result.passed).toBe(true);
+  });
+
   it("warns when a tier-1 author changes implementation files on a contracted subtask", () => {
     commitFile(
       tempDir,
@@ -356,5 +378,66 @@ describe("Traceability audit", () => {
     expect(result.commitCount).toBe(0);
     expect(result.violations).toEqual([]);
     expect(result.passed).toBe(true);
+  });
+});
+
+describe("Identity and trailer parsing under adversarial input", () => {
+  it("resolves the model family from a qualifier that contains spaces", () => {
+    expect(parseIdentity("deepseek/VS Code (kimi-code)")).toEqual({
+      full: "deepseek/vs code (kimi-code)",
+      family: "deepseek/vs-code",
+    });
+  });
+
+  it("falls back to the first slash-bearing token when the head is not a family", () => {
+    expect(parseIdentity("  (orchestrator) gemini/flash (antigravity)")?.family).toBe(
+      "gemini/flash",
+    );
+  });
+
+  it("returns null for empty identities instead of inventing a family", () => {
+    expect(parseIdentity(null)).toBeNull();
+    expect(parseIdentity("   ")).toBeNull();
+    expect(parseIdentity("gemini")?.family).toBe("gemini");
+  });
+
+  it("extracts only the governance trailers from a commit body", () => {
+    const body = [
+      "Plan provenance: keep this line",
+      "",
+      "Authored-by: gemini/4-argon (antigravity)",
+      "Reviewed-by: deepseek/VS Code (kimi-code)",
+      "Co-authored-by: someone/else",
+    ].join("\n");
+
+    expect(extractTrailers(body)).toEqual({
+      author: "gemini/4-argon (antigravity)",
+      reviewer: "deepseek/VS Code (kimi-code)",
+    });
+  });
+
+  it("ignores trailer-like lines without a value or with a leading colon", () => {
+    const body = [
+      "Authored-by:",
+      "Authored-by:   ",
+      ": no key here",
+      "Reviewed-by: claude/sonnet",
+    ].join("\n");
+
+    expect(extractTrailers(body)).toEqual({ author: null, reviewer: "claude/sonnet" });
+  });
+
+  it("parses long adversarial trailer and identity strings without super-linear backtracking", () => {
+    const payload = `${"a".repeat(20000)}/${"b ".repeat(5000)}`;
+    const trailers = [`Authored-by: ${payload}`, "Reviewed-by: ".repeat(5000)].join("\n");
+
+    const start = performance.now();
+    parseIdentity(payload);
+    parseIdentity(`(qualifier) ${payload}`);
+    extractTrailers(trailers);
+    extractTrailers(`${"x".repeat(50000)}:${" ".repeat(5000)}`);
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(1000);
   });
 });
