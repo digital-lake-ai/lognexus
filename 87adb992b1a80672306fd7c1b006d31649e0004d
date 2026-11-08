@@ -1,0 +1,34 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.3",
+  "timestamp": "2026-11-08T01:30:14.340Z",
+  "issue": {
+    "id": 43,
+    "title": "feat(v1.3.4): Glama Maintenance Grade A hardening, MCP Registry server.json & PyPI package (lognexus-mcp)"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Add MCP Registry server.json, PyPI lognexus-mcp package, OIDC release step and packaging tests",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "server.json",
+        "pyproject.toml",
+        "python/lognexus_mcp/__init__.py",
+        "python/lognexus_mcp/__main__.py",
+        ".github/workflows/release.yml",
+        "tests/packaging.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/git/safe.ts",
+        "src/audit.ts",
+        "src/commit.ts"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
