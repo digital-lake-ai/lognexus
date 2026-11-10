@@ -237,10 +237,12 @@ function resolveRemote(
 }
 
 /**
- * Startup update & critical/legal-terms gate.
+ * Startup update & legal-terms gate.
  *
- * Three outcomes are possible: nothing to do, a non-blocking upgrade notice, or a
- * hard block that must be resolved before the CLI runs again. The gate fails open —
+ * Version updates are strictly advisory: a newer remote release only produces an
+ * `[UPDATE]` notice and never interrupts execution, so a published
+ * `minCriticalVersion` cannot lock a developer out. Only unaccepted legal terms
+ * (`requiresTermsAcceptance: true`) can hard-block the CLI. The gate fails open —
  * an unreachable registry never blocks a developer.
  */
 export function checkUpdateGate(
@@ -281,17 +283,6 @@ export function checkUpdateGate(
 
   if (remoteVersion !== null && compareVersions(remoteVersion, options.currentVersion) > 0) {
     result.updateNotice = `LogNexus ${remoteVersion} is available (current ${options.currentVersion}). Upgrade with: ${UPGRADE_COMMAND}`;
-  }
-
-  const minCritical = effectivePolicy?.minCriticalVersion;
-  if (
-    minCritical !== undefined &&
-    minCritical !== "" &&
-    compareVersions(minCritical, options.currentVersion) > 0
-  ) {
-    result.blocked = true;
-    result.blockReason = `LogNexus ${options.currentVersion} is below the minimum critical version ${minCritical}. Run: ${UPGRADE_COMMAND}`;
-    return result;
   }
 
   if (effectivePolicy?.requiresTermsAcceptance === true) {

@@ -26,6 +26,7 @@ export {
   checkGitHubCli,
   checkRulesConfig,
   checkScopeDrift,
+  checkVersionMaturity,
   runDiagnostics,
 } from "./doctor.js";
 export { fetchNpmPackagePolicy, type NpmPackagePolicy, resolveNpmCliScript } from "./git/safe.js";
@@ -104,7 +105,14 @@ export {
 } from "./state/manager.js";
 export * from "./state/schema.js";
 export { fetchIssueMeta, getBranchName, syncStateFromGit } from "./state/sync.js";
-export { getProjectStatus, getScopeDrift, type ScopeDrift } from "./status.js";
+export {
+  countPublishedReleases,
+  detectHostProjectVersion,
+  getProjectStatus,
+  getScopeDrift,
+  type ProjectStatus,
+  type ScopeDrift,
+} from "./status.js";
 export * from "./telemetry/index.js";
 export {
   buildTimelineTable,

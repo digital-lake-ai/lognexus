@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.5] - 2026-11-10
+
+### Summary
+A privacy and release-hygiene release. The startup update gate becomes strictly advisory, telemetry reports identify the host project by an anonymous ID instead of its local folder name, `lognexus status` surfaces the host project's own SemVer, and `lognexus doctor` flags projects that never left the `npm init -y` placeholder version. GitHub Actions are upgraded to supersede the pending Dependabot PRs, and the case-study documentation is sanitized.
+
+### Changed
+- **Advisory-only startup update gate:** `checkUpdateGate()` no longer blocks on `minCriticalVersion`; `lognexusPolicy.minCriticalVersion` is set to `"0.0.0"` and `requiresTermsAcceptance` remains the sole blocking condition. The gate now only advises the operator to update.
+- **Telemetry project anonymity & redaction:** `formatTelemetryMarkdownReport()` displays an `Anonymous Project ID` (`anonymousProjectId`) instead of the local repository folder, and `redactLocalProjectMetadata()` strips local folder names and paths from custom notes before they are written. `diagnostic-report.yml` was updated accordingly and the case-study documentation was sanitized.
+- **Host project SemVer visibility & maturity diagnostics:** `lognexus status` displays `Project Version` and the published release count (`detectHostProjectVersion()`, `countPublishedReleases()`). `lognexus doctor` adds a `Version Maturity` check (`checkVersionMaturity()`) that flags `npm init -y` `"1.0.0"` on greenfield repositories, and the skill/command docs now codify the SemVer Milestone Policy.
+
+### Security
+- **Security & CI supply-chain upgrades:** remediated CodeQL alerts (`#52`/`#53`), upgraded GitHub Actions to `actions/checkout@v7`, `actions/setup-node@v7`, `actions/setup-python@v7` and `github/codeql-action@v4` (`#45`–`#48`), and bumped `@biomejs/biome` (`^2.6.5`), `vitest` (`^5.1.0`) and `@types/node` (`^26.6.6`) (`#49`–`#51`).
+
+---
+
 ## [1.3.4] - 2026-11-08
 
 ### Summary
@@ -29,13 +44,13 @@ A distribution and maintenance release. LogNexus is now reachable from three pac
 ## [1.3.3] - 2026-11-07
 
 ### Summary
-A correctness and platform-release patch. Telemetry backfill now respects the real model tier recorded in the author trailer instead of the legacy `tier-3` default, so historical notes stop under-reporting frontier models, and the DeepSeek `ko8r4` identity is mapped to its family. The handoff document no longer renders `{` for retro-attached notes without a subtask title. The agent governance model is restated as native assistant autonomy during exploration plus strict contract execution, and the package now declares its cross-platform OS support explicitly.
+A correctness and platform-release patch. Telemetry backfill now respects the real model tier recorded in the author trailer instead of the legacy `tier-3` default, so historical notes stop under-reporting frontier models, and the canonical DeepSeek implementer identity is mapped to its family. The handoff document no longer renders `{` for retro-attached notes without a subtask title. The agent governance model is restated as native assistant autonomy during exploration plus strict contract execution, and the package now declares its cross-platform OS support explicitly.
 
 ### Added
 - **Cross-platform OS metadata:** `package.json` declares `"os": ["darwin", "linux", "win32"]` next to `"engines"`, so npm and MCP registry scanners (Glama, Smithery) report the supported platforms explicitly. Keywords gained `linux`, `macos`, `windows` and `cross-platform`.
 - **Ecosystem directory coverage:** the README audit table now lists the community directories and registries where LogNexus is published (`awesome-mcp-servers`, Smithery, Claude Plugin).
 - **`Platforms` badge:** the README header advertises Linux, macOS and Windows support next to the Node.js badge.
-- **`ko8r4` DeepSeek identity:** `extractModelFamilyCategory()` maps `ko8r4` to the DeepSeek family and `inferTierFromAuthor()` resolves it to `tier-3`.
+- **DeepSeek implementer identity normalization:** `extractModelFamilyCategory()` and `inferTierFromAuthor()` resolve canonical DeepSeek client identities to `tier-3`.
 
 ### Fixed
 - **Telemetry backfill tier resolution:** `syncTelemetryFromGitNotes()` in `src/telemetry/collector.ts` prefers `inferTierFromAuthor(author)` over the legacy `"tier-3"` default stored in historical notes, while still honouring any explicit non-default tier. Historical commits authored by `tier-1` or `tier-2` models are no longer counted as `tier-3`.

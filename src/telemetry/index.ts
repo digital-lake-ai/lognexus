@@ -25,6 +25,7 @@ export {
   CUSTOM_NOTES_MARKER,
   formatTelemetryMarkdownReport,
   generateTelemetryReportFile,
+  redactLocalProjectMetadata,
 } from "./report.js";
 export {
   type AnonymousCommunityPayload,

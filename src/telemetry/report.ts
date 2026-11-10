@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { syncTelemetryFromGitNotes } from "./collector.js";
 import type { TelemetryStore } from "./schema.js";
 
@@ -48,6 +48,7 @@ export function formatTelemetryMarkdownReport(store: TelemetryStore): string {
   return `<!-- lognexus:
 kind: telemetry-report
 mode: ${store.mode}
+anonymous_project_id: ${store.anonymousProjectId}
 updated_at: ${store.lastUpdated}
 commits: ${sum.totalCommits}
 cost_savings_pct: ${sum.estimatedCostSavingsPct}%
@@ -55,6 +56,7 @@ cost_savings_pct: ${sum.estimatedCostSavingsPct}%
 
 # ⚡ LogNexus Telemetry & ROI Performance Report
 
+**Anonymous Project ID:** \`${store.anonymousProjectId}\` *(local repository name & paths are strictly private and omitted)*  
 **Project Scope:** Local Project  
 **Detected Stacks:** ${stacks}  
 **Telemetry Mode:** \`${store.mode}\`  
@@ -100,7 +102,7 @@ By delegating scoped subtasks to lightweight execution models (\`tier-3\`) while
 
 Sharing is **never automatic**. LogNexus makes no network calls, contains no endpoint, and uploads nothing. If — and only if — you decide that a maintainer should see this report, you can publish it yourself with the GitHub CLI after a manual review:
 
-1. Re-read this file and delete anything you consider private (paths, remotes, branch names, notes).
+1. Re-read this file and confirm that only your **Anonymous Project ID** (\`${store.anonymousProjectId}\`) appears — never add your repository name, project name, paths, remotes, or branch names.
 2. Confirm you are not pasting source code, commit messages, or credentials.
 3. Open the issue from the repository root you are already authenticated against:
 \`\`\`bash
@@ -117,6 +119,37 @@ gh issue create \\
 *Report generated automatically by **LogNexus** (\`@digital-lake/lognexus\`)*
 
 ${CUSTOM_NOTES_MARKER}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Redacts the local repository folder name and absolute filesystem paths from custom
+ * notes so regenerating `.lognexus/telemetry.md` never leaks private project names
+ * if the user later shares the report in a GitHub Issue.
+ */
+export function redactLocalProjectMetadata(
+  text: string,
+  targetDir: string = process.cwd(),
+  anonymousProjectId = "anonymous-project",
+): string {
+  if (text === "") return "";
+
+  const resolvedBase = resolve(targetDir);
+  const posixBase = resolvedBase.replace(/\\/g, "/");
+  const repoName = basename(resolvedBase);
+
+  let sanitized = text.split(resolvedBase).join("<redacted-path>");
+  sanitized = sanitized.split(posixBase).join("<redacted-path>");
+
+  if (repoName.length >= 3) {
+    const repoPattern = new RegExp(`\\b${escapeRegExp(repoName)}\\b`, "gi");
+    sanitized = sanitized.replace(repoPattern, anonymousProjectId);
+  }
+
+  return sanitized;
 }
 
 function extractCustomNotes(existingContent: string | null): string {
@@ -181,7 +214,12 @@ export function generateTelemetryReportFile(
     mkdirSync(parentDir, { recursive: true });
   }
 
-  const customNotes = extractCustomNotes(readPreviousReport(filePath));
+  const rawCustomNotes = extractCustomNotes(readPreviousReport(filePath));
+  const customNotes = redactLocalProjectMetadata(
+    rawCustomNotes,
+    targetDir,
+    store.anonymousProjectId,
+  );
   const rendered = `${content}${customNotes}`;
 
   writeFileSync(filePath, rendered, "utf8");

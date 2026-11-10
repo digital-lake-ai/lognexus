@@ -114,18 +114,21 @@ describe("Startup update & terms gate", () => {
     expect(formatUpdateGateResult(result)).toBe("");
   });
 
-  it("blocks when the published policy declares a newer critical version", () => {
+  it("keeps version updates strictly advisory even when minCriticalVersion is higher than currentVersion", () => {
     writeUpdateCache(tempDir, {
       checkedAt: new Date().toISOString(),
-      remoteVersion: "1.2.7",
-      policy: { minCriticalVersion: "1.3.0", termsVersion: "", requiresTermsAcceptance: false },
+      remoteVersion: "1.4.0",
+      policy: { minCriticalVersion: "1.4.0", termsVersion: "", requiresTermsAcceptance: false },
     });
 
     const result = checkUpdateGate({ targetDir: tempDir, currentVersion: "1.2.7", env: TEST_ENV });
 
-    expect(result.blocked).toBe(true);
-    expect(result.blockReason).toContain("minimum critical version");
-    expect(formatUpdateGateResult(result)).toContain("[BLOCKED]");
+    expect(result.blocked).toBe(false);
+    expect(result.blockReason).toBeNull();
+    expect(result.updateNotice).toContain("1.4.0");
+    const rendered = formatUpdateGateResult(result);
+    expect(rendered.startsWith("[UPDATE]")).toBe(true);
+    expect(rendered).not.toContain("[BLOCKED]");
   });
 
   it("passes the critical gate once the running version is high enough", () => {

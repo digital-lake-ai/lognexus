@@ -3,7 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { checkGit, checkRulesConfig, checkScopeDrift, runDiagnostics } from "../src/doctor.js";
+import {
+  checkGit,
+  checkRulesConfig,
+  checkScopeDrift,
+  checkVersionMaturity,
+  runDiagnostics,
+} from "../src/doctor.js";
 
 describe("doctor diagnostics", () => {
   let tempDir: string;
@@ -92,5 +98,79 @@ describe("doctor diagnostics", () => {
     const check = checkScopeDrift(tempDir);
     expect(check.status).toBe("pass");
     expect(check.message).toContain("nothing to compare against");
+  });
+
+  describe("Version Maturity", () => {
+    function initRepo(): void {
+      execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore", shell: false });
+      writeFileSync(join(tempDir, "README.md"), "# demo\n", "utf8");
+      execFileSync("git", ["add", "README.md"], { cwd: tempDir, stdio: "ignore", shell: false });
+      execFileSync(
+        "git",
+        ["-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-m", "chore: seed"],
+        { cwd: tempDir, stdio: "ignore", shell: false },
+      );
+    }
+
+    it("warns on the npm init -y default version with no published release", () => {
+      initRepo();
+      writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "1.0.0" }), "utf8");
+
+      const check = checkVersionMaturity(tempDir);
+      expect(check.name).toBe("Version Maturity");
+      expect(check.status).toBe("warn");
+      expect(check.message).toContain("npm init -y");
+      expect(check.message).toContain("0.1.0");
+    });
+
+    it("passes when the manifest starts at 0.1.0", () => {
+      initRepo();
+      writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "0.1.0" }), "utf8");
+
+      const check = checkVersionMaturity(tempDir);
+      expect(check.status).toBe("pass");
+      expect(check.message).toContain("Manifest version 0.1.0");
+    });
+
+    it("passes once a release tag exists", () => {
+      initRepo();
+      writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "1.0.0" }), "utf8");
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=T",
+          "-c",
+          "user.email=t@example.com",
+          "tag",
+          "-a",
+          "v1.0.0",
+          "-m",
+          "v1.0.0",
+        ],
+        {
+          cwd: tempDir,
+          stdio: "ignore",
+          shell: false,
+        },
+      );
+
+      const check = checkVersionMaturity(tempDir);
+      expect(check.status).toBe("pass");
+      expect(check.message).toContain("1 release(s) published");
+    });
+
+    it("skips the check when no manifest declares a version", () => {
+      initRepo();
+
+      const check = checkVersionMaturity(tempDir);
+      expect(check.status).toBe("pass");
+      expect(check.message).toContain("No package manifest detected");
+    });
+
+    it("is the fifth check in the diagnostics table", () => {
+      const results = runDiagnostics(process.cwd());
+      expect(results[4]?.name).toBe("Version Maturity");
+    });
   });
 });

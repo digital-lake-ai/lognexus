@@ -10,6 +10,8 @@ export interface ProjectStatus {
   routingMode: string;
   recommendedTier: string;
   scopeDrift: ScopeDrift;
+  projectVersion: string | null;
+  publishedReleases: number;
 }
 
 export interface ScopeDrift {
@@ -104,6 +106,59 @@ export function getScopeDrift(targetDir: string = process.cwd()): ScopeDrift {
   };
 }
 
+/**
+ * Reads the host project version from the first manifest that declares one, so
+ * `lognexus status` can show which release line the repository under governance is
+ * on. Returns `null` when no manifest is present or it cannot be parsed.
+ */
+export function detectHostProjectVersion(targetDir: string = process.cwd()): string | null {
+  const packageJsonPath = join(targetDir, "package.json");
+  if (existsSync(packageJsonPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
+      if (typeof pkg.version === "string" && pkg.version.trim() !== "") {
+        return pkg.version.trim();
+      }
+    } catch {
+      // A malformed manifest falls through to the other manifest formats.
+    }
+  }
+
+  const tomlManifests = ["pyproject.toml", "Cargo.toml"];
+  for (const manifest of tomlManifests) {
+    const manifestPath = join(targetDir, manifest);
+    if (!existsSync(manifestPath)) continue;
+    try {
+      const match = readFileSync(manifestPath, "utf8").match(/^version\s*=\s*"([^"]+)"/m);
+      if (match?.[1] && match[1].trim() !== "") {
+        return match[1].trim();
+      }
+    } catch {
+      // An unreadable manifest is treated as absent.
+    }
+  }
+
+  return null;
+}
+
+/** Counts the Git tags published in the repository; `0` outside Git or on error. */
+export function countPublishedReleases(targetDir: string = process.cwd()): number {
+  try {
+    const output = execFileSync("git", ["tag", "-l"], {
+      cwd: targetDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    });
+    return output
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "").length;
+  } catch {
+    return 0;
+  }
+}
+
 export function getProjectStatus(targetDir: string = process.cwd()): ProjectStatus {
   let isInsideGit = false;
   let branch = "detached";
@@ -160,5 +215,7 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     scopeDrift: isInsideGit
       ? getScopeDrift(targetDir)
       : { detected: false, unauthorizedFiles: [], allowedFiles: [] },
+    projectVersion: detectHostProjectVersion(targetDir),
+    publishedReleases: isInsideGit ? countPublishedReleases(targetDir) : 0,
   };
 }

@@ -26,6 +26,7 @@ npm-debug.log*
 # Internal context & planning
 docs/contexto/
 docs/historial_previo/
+.agents/skills/internal-release-guard/
 
 # OS artifacts
 .DS_Store
