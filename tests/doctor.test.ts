@@ -135,11 +135,25 @@ describe("doctor diagnostics", () => {
     it("passes once a release tag exists", () => {
       initRepo();
       writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "1.0.0" }), "utf8");
-      execFileSync("git", ["tag", "-a", "v1.0.0", "-m", "v1.0.0"], {
-        cwd: tempDir,
-        stdio: "ignore",
-        shell: false,
-      });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=T",
+          "-c",
+          "user.email=t@example.com",
+          "tag",
+          "-a",
+          "v1.0.0",
+          "-m",
+          "v1.0.0",
+        ],
+        {
+          cwd: tempDir,
+          stdio: "ignore",
+          shell: false,
+        },
+      );
 
       const check = checkVersionMaturity(tempDir);
       expect(check.status).toBe("pass");

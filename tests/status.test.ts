@@ -98,11 +98,25 @@ describe("host project SemVer visibility", () => {
         shell: false,
       },
     );
-    execFileSync("git", ["tag", "-a", "v0.1.0", "-m", "v0.1.0"], {
-      cwd: tempDir,
-      stdio: "ignore",
-      shell: false,
-    });
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=T",
+        "-c",
+        "user.email=t@example.com",
+        "tag",
+        "-a",
+        "v0.1.0",
+        "-m",
+        "v0.1.0",
+      ],
+      {
+        cwd: tempDir,
+        stdio: "ignore",
+        shell: false,
+      },
+    );
     expect(countPublishedReleases(tempDir)).toBe(1);
   });
 
