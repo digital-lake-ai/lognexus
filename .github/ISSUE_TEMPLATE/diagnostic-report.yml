@@ -12,6 +12,7 @@ body:
 
         Before submitting, please confirm:
         - You are pasting **only** LogNexus output (`lognexus telemetry report`, `lognexus doctor`, `lognexus status`).
+        - Identify your workspace exclusively by its **Anonymous Project ID** (`anonymousProjectId` UUIDv4). **Never** include your repository name, project codename, or organization name.
         - You are **not** pasting source code, commit messages, absolute or relative file paths, repository remotes, branch URLs, or credentials.
         - You may redact anything you are unsure about. A partial report is more useful than a leaked one.
 
@@ -21,7 +22,7 @@ body:
       label: Express confirmation (required)
       description: This report is published publicly on GitHub. Nothing is collected automatically.
       options:
-        - label: I confirm I am publishing this report voluntarily and have removed all source code, file paths and secrets.
+        - label: I confirm I am publishing this report voluntarily and have removed all repository/project names, source code, file paths and secrets.
           required: true
         - label: I confirm the Git username included below (if any) is public information I choose to disclose.
           required: false
@@ -31,9 +32,18 @@ body:
     attributes:
       label: LogNexus version
       description: Output of `npx @digital-lake/lognexus --version`.
-      placeholder: "1.2.7"
+      placeholder: "1.3.5"
     validations:
       required: true
+
+  - type: input
+    id: anonymous-project-id
+    attributes:
+      label: Anonymous Project ID (UUIDv4)
+      description: The `anonymousProjectId` generated locally in `.lognexus/telemetry.md` or `lognexus telemetry inspect`. Do NOT enter your repository or project name.
+      placeholder: "e4f8d2c1-4b3e-412a-9c0f-7e6d5b4a3c2d"
+    validations:
+      required: false
 
   - type: dropdown
     id: client

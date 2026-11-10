@@ -40,7 +40,7 @@ The 1.3.0 release adds session-continuity features that read more local state th
 | **Memory Recall Filter** (`lognexus note search`) | Git Notes under `refs/notes/lognexus`, commit subjects, `git show --name-only`. Filter inputs are echoed back in the result set only. | Nothing (read-only). | None. |
 | **Startup Update & Legal Terms Gate** (`src/update/gate.ts`) | The published registry policy, obtained via `execFileSync` (`shell: false`, `timeout: 2500`) — the only component in the package that contacts a remote service. The payload is the package name and version; no identifier, no project data, no telemetry store content is sent. | Nothing. | Registry read only, and only at CLI startup (the MCP transport is exempt). |
 
-> **Note:** the retired pre-2.0.0 hard-block behavior is gone. The gate enforces only the policy returned by the registry and can no longer block a running CLI based on the local `package.json`.
+> **Note:** the retired pre-2.0.0 hard-block behavior is gone. Version update checks are strictly **advisory** (`[UPDATE]` notice) and never hard-block execution: a published `minCriticalVersion` cannot lock a developer out. Only unaccepted legal terms (`requiresTermsAcceptance: true`) can block a running CLI, and it is never derived from the local `package.json`.
 
 ---
 
@@ -61,8 +61,8 @@ Under a kill switch, the store reports mode `off`, no metrics file is written, a
 
 | Category | ✅ What Is Stored Locally (`local` mode only) | ❌ What Is Never Stored (Forbidden) |
 | :--- | :--- | :--- |
-| **Identity** | An anonymous, randomly generated `UUIDv4` (`anonymousProjectId`) scoped to the project. | Usernames, real names, email addresses, GitHub handles, hostnames, IP addresses. |
-| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.3.4`). | Absolute file system paths, home directories, environment variable values. |
+| **Identity** | An anonymous, randomly generated `UUIDv4` (`anonymousProjectId`) scoped to the project. Diagnostic reports (`.lognexus/telemetry.md`) display **only** this `anonymousProjectId`, and `redactLocalProjectMetadata()` automatically strips the local repository folder name and absolute paths from custom notes when the report is regenerated. | Usernames, real names, email addresses, GitHub handles, hostnames, IP addresses, repository names, project codenames. |
+| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.3.5`). | Absolute file system paths, home directories, environment variable values. |
 | **Project Stack** | Detected stack categories (e.g. `["typescript", "nodejs"]`) and file-extension counters (`.ts`, `.py`, `.ps1`). | Source code, file names, directory names, package names, internal library names. |
 | **AI Models** | Model family (`gemini`, `claude`, `deepseek`, `openai`, `kimi`) and operational tier (`tier-1`, `tier-2`, `tier-3`), derived from commit trailers. | Prompts, completions, reasoning tokens, system instructions, API keys. |
 | **Metrics** | Numeric counters: lines added, lines deleted, subtask duration in seconds, blocked review gate count, estimated % cost saved. | Commit subjects, commit bodies, diff contents, git branches, PR descriptions, secrets. |
@@ -90,7 +90,7 @@ Example payload:
   "environment": {
     "os": "win32",
     "nodeVersion": "v22.11.0",
-    "lognexusVersion": "1.3.4",
+    "lognexusVersion": "1.3.5",
     "detectedStacks": ["typescript", "nodejs"]
   },
   "summary": {

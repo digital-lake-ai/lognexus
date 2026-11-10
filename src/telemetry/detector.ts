@@ -204,12 +204,7 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   ) {
     return "openai/gpt";
   }
-  if (
-    trimmed.includes("deepseek") ||
-    trimmed === "ko8r4" ||
-    trimmed.startsWith("ko8r4 ") ||
-    trimmed.includes("(ko8r4)")
-  ) {
+  if (trimmed.includes("deepseek")) {
     return "deepseek/v3";
   }
   if (trimmed.includes("kimi") || trimmed.includes("moonshot")) return "moonshot/kimi";
@@ -258,16 +253,7 @@ const TIER_1_MARKERS = [
   "/o3",
 ];
 
-const TIER_3_MARKERS = [
-  "deepseek",
-  "ko8r4",
-  "kor",
-  "kimi",
-  "moonshot",
-  "haiku",
-  "qwen",
-  "flash/lite",
-];
+const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash/lite"];
 
 const TIER_2_MARKERS = [
   "gemini/flash/high",

@@ -1,7 +1,7 @@
 import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/index.js";
@@ -16,6 +16,7 @@ import {
   enableTelemetry,
   extractCommitDiffStats,
   extractModelFamilyCategory,
+  formatTelemetryMarkdownReport,
   generateTelemetryReportFile,
   getTelemetryPath,
   isTelemetryActive,
@@ -25,6 +26,7 @@ import {
   recordReviewGateBlock,
   recordTaskFinish,
   recordTaskStart,
+  redactLocalProjectMetadata,
 } from "../src/telemetry/index.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -139,9 +141,6 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("deepseek/deepseek-coder")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code)")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory("deepseek/vs-code")).toBe("deepseek/v3");
-      expect(extractModelFamilyCategory("ko8r4")).toBe("deepseek/v3");
-      expect(extractModelFamilyCategory("ko8r4 <ko8r4@example.com>")).toBe("deepseek/v3");
-      expect(extractModelFamilyCategory("Lead (ko8r4)")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
     });
 
@@ -172,7 +171,6 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor("moonshot/kimi-k3")).toBe("tier-3");
       expect(inferTierFromAuthor("Kimi K3 (Moonshot AI)")).toBe("tier-3");
       expect(inferTierFromAuthor("gemini/flash-lite (antigravity)")).toBe("tier-3");
-      expect(inferTierFromAuthor("ko8r4")).toBe("tier-3");
       expect(inferTierFromAuthor("")).toBeNull();
       expect(inferTierFromAuthor(null)).toBeNull();
     });
@@ -402,6 +400,45 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content).toContain("Cost Efficiency & Model-Tier ROI Evaluation");
       expect(content).toContain("`gemini/flash`");
       expect(content).toContain("`.py`");
+    });
+
+    it("displays only the Anonymous Project ID and redacts local repository metadata", () => {
+      enableTelemetry({ cwd: tempDir });
+      const store = loadTelemetry(tempDir);
+
+      const markdown = formatTelemetryMarkdownReport(store);
+      expect(markdown).toContain("Anonymous Project ID");
+      expect(markdown).toContain(store.anonymousProjectId);
+      expect(markdown).toContain(`anonymous_project_id: ${store.anonymousProjectId}`);
+      expect(markdown).not.toContain(tempDir);
+
+      const repoName = basename(tempDir);
+      const notes = `\n## 6. Custom Notes\nRepository: ${repoName}\nPath: ${tempDir}\n`;
+      const redacted = redactLocalProjectMetadata(notes, tempDir, store.anonymousProjectId);
+      expect(redacted).toContain(store.anonymousProjectId);
+      expect(redacted).toContain("<redacted-path>");
+      expect(redacted).not.toContain(repoName);
+      expect(redacted).not.toContain(tempDir);
+      expect(redactLocalProjectMetadata("", tempDir, store.anonymousProjectId)).toBe("");
+    });
+
+    it("sanitizes preserved custom notes when regenerating the report file", () => {
+      enableTelemetry({ cwd: tempDir });
+      const store = loadTelemetry(tempDir);
+      const repoName = basename(tempDir);
+
+      const { filePath } = generateTelemetryReportFile(tempDir);
+      writeFileSync(
+        filePath,
+        `${readFileSync(filePath, "utf8")}\n## 6. Custom Notes\nWorkspace: ${repoName}\nRoot: ${tempDir}\n`,
+        "utf8",
+      );
+
+      const { content } = generateTelemetryReportFile(tempDir);
+      expect(content).toContain("## 6. Custom Notes");
+      expect(content).toContain(store.anonymousProjectId);
+      expect(content).not.toContain(repoName);
+      expect(content).not.toContain(tempDir);
     });
 
     it("confines outputPath to targetDir and rejects traversal escapes", () => {
