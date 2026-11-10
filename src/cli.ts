@@ -59,7 +59,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.3.4";
+  return "1.3.5";
 }
 
 function printHeader() {
