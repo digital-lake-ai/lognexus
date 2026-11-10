@@ -1,0 +1,35 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.4",
+  "timestamp": "2026-11-10T18:51:04.522Z",
+  "issue": {
+    "id": 54,
+    "title": "feat(v1.3.5): telemetry project anonymity, advisory-only update gate, host SemVer visibility & CI action upgrades"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Upgrade GitHub Actions (checkout@v7, setup-node@v7, setup-python@v7, codeql-action@v4) & sanitize case-study docs",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/cross-ref-check.yml",
+        ".github/workflows/release.yml",
+        ".github/workflows/version-bump-check.yml",
+        "README.md",
+        "CHANGELOG.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
