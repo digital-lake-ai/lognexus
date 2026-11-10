@@ -1,0 +1,37 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.5",
+  "timestamp": "2026-11-10T18:52:45.173Z",
+  "issue": {
+    "id": 54,
+    "title": "feat(v1.3.5): telemetry project anonymity, advisory-only update gate, host SemVer visibility & CI action upgrades"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Upgrade devDependencies (#49-#51) and synchronize the 7-point 1.3.5 version contract",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml",
+        "python/lognexus_mcp/__init__.py",
+        "src/cli.ts",
+        "tests/e2e.test.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build && node dist/cli.js audit main"
+    }
+  },
+  "tier": "tier-3"
+}
