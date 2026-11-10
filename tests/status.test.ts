@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { extractIssueNumber } from "../src/branch.js";
-import { getProjectStatus, getScopeDrift } from "../src/status.js";
+import {
+  countPublishedReleases,
+  detectHostProjectVersion,
+  getProjectStatus,
+  getScopeDrift,
+} from "../src/status.js";
 
 describe("getProjectStatus", () => {
   it("reports current repository status and branch", () => {
@@ -27,6 +32,88 @@ describe("getProjectStatus", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("host project SemVer visibility", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "lognexus-semver-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("reads the version from package.json", () => {
+    writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "2.4.1" }), "utf8");
+    expect(detectHostProjectVersion(tempDir)).toBe("2.4.1");
+  });
+
+  it("falls back to pyproject.toml and Cargo.toml", () => {
+    writeFileSync(
+      join(tempDir, "pyproject.toml"),
+      '[project]\nname = "demo"\nversion = "0.3.0"\n',
+      "utf8",
+    );
+    expect(detectHostProjectVersion(tempDir)).toBe("0.3.0");
+
+    rmSync(join(tempDir, "pyproject.toml"));
+    writeFileSync(
+      join(tempDir, "Cargo.toml"),
+      '[package]\nname = "demo"\nversion = "0.1.2"\n',
+      "utf8",
+    );
+    expect(detectHostProjectVersion(tempDir)).toBe("0.1.2");
+  });
+
+  it("returns null when no manifest declares a version", () => {
+    expect(detectHostProjectVersion(tempDir)).toBeNull();
+
+    writeFileSync(join(tempDir, "package.json"), JSON.stringify({ name: "demo" }), "utf8");
+    expect(detectHostProjectVersion(tempDir)).toBeNull();
+  });
+
+  it("counts published Git tags and reports zero without tags or outside Git", () => {
+    execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore", shell: false });
+    expect(countPublishedReleases(tempDir)).toBe(0);
+    expect(countPublishedReleases(join(tempDir, "not-a-repo"))).toBe(0);
+
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=T",
+        "-c",
+        "user.email=t@example.com",
+        "commit",
+        "-m",
+        "chore: seed",
+        "--allow-empty",
+      ],
+      {
+        cwd: tempDir,
+        stdio: "ignore",
+        shell: false,
+      },
+    );
+    execFileSync("git", ["tag", "-a", "v0.1.0", "-m", "v0.1.0"], {
+      cwd: tempDir,
+      stdio: "ignore",
+      shell: false,
+    });
+    expect(countPublishedReleases(tempDir)).toBe(1);
+  });
+
+  it("exposes version and release count through getProjectStatus", () => {
+    execFileSync("git", ["init"], { cwd: tempDir, stdio: "ignore", shell: false });
+    writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "0.1.0" }), "utf8");
+
+    const status = getProjectStatus(tempDir);
+    expect(status.isInsideGit).toBe(true);
+    expect(status.projectVersion).toBe("0.1.0");
+    expect(status.publishedReleases).toBe(0);
   });
 });
 

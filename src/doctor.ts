@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getScopeDrift } from "./status.js";
+import { countPublishedReleases, detectHostProjectVersion, getScopeDrift } from "./status.js";
 
 export interface DiagnosticCheck {
   name: string;
@@ -153,11 +153,65 @@ export function checkScopeDrift(targetDir: string = process.cwd()): DiagnosticCh
   };
 }
 
+/**
+ * Reads the number of commits reachable from HEAD; `0` before the first commit.
+ */
+function countCommits(targetDir: string): number {
+  try {
+    const output = execFileSync("git", ["rev-list", "--count", "HEAD"], {
+      cwd: targetDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    }).trim();
+    const count = Number.parseInt(output, 10);
+    return Number.isFinite(count) ? count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Flags the `npm init -y` bootstrap default: a manifest that already declares
+ * `1.0.0` while the repository has published no release and barely any history.
+ * Such a repository has claimed its first stable milestone before shipping anything.
+ */
+export function checkVersionMaturity(targetDir: string = process.cwd()): DiagnosticCheck {
+  const version = detectHostProjectVersion(targetDir);
+
+  if (version === null) {
+    return {
+      name: "Version Maturity",
+      status: "pass",
+      message: "No package manifest detected — version check skipped",
+    };
+  }
+
+  const releases = countPublishedReleases(targetDir);
+  const commitCount = countCommits(targetDir);
+
+  if (version === "1.0.0" && releases === 0 && commitCount <= 5) {
+    return {
+      name: "Version Maturity",
+      status: "warn",
+      message:
+        'package manifest declares "1.0.0" with 0 published releases (typical npm init -y default) — consider starting at "0.1.0" during initial bootstrap and bumping only on PR merge (--no-ff)',
+    };
+  }
+
+  return {
+    name: "Version Maturity",
+    status: "pass",
+    message: `Manifest version ${version} (${releases} release(s) published)`,
+  };
+}
+
 export function runDiagnostics(targetDir: string = process.cwd()): DiagnosticCheck[] {
   return [
     checkGit(targetDir),
     checkGitHubCli(),
     checkRulesConfig(targetDir),
     checkScopeDrift(targetDir),
+    checkVersionMaturity(targetDir),
   ];
 }

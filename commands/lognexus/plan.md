@@ -110,6 +110,13 @@ If the issue was created with `readiness: ready` and tasks are fully scoped, app
 gh issue edit <N> --add-label "lognexus/ready"
 ```
 
+## SemVer & Release Milestone Policy
+
+1. **Greenfield Bootstrap (`0.1.0`):** New repositories (`0` published releases) should start at `0.1.0` in `package.json` / `pyproject.toml` rather than the `npm init -y` default `1.0.0`.
+2. **Subtasks Never Bump Version (`T1..Tn`):** Subtasks (`T1`, `T2`, `T3`...) are atomic commits inside a single feature/fix branch (`issue/<id>-<slug>`). Do **not** increment the project version per subtask (`T1 != 0.1.0`, `T2 != 0.2.0`).
+3. **One Version Bump per Cycle at PR Closure (`--no-ff`):** Bump the project version at most once per Issue/PR cycle (typically in the final subtask before opening/merging the PR via `gh pr merge --merge --delete-branch`): `fix:` -> `PATCH` (`0.1.x`), `feat:` -> `MINOR` (`0.x.0`), and reserve `1.0.0` for the first production-validated milestone.
+4. **No `lognexus release` Command:** LogNexus does not have a `lognexus release` CLI command; releases are cut through standard manifest version bumps merged into `main` (`--no-ff`) and tagged via Git/CI.
+
 ## Acceptance Checklist
 
 - [ ] Issue envelope has all five triage fields (`kind`, `readiness`, `task_count`, `tasks_complete`, `max_tier`)

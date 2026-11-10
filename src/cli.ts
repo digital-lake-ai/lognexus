@@ -262,6 +262,9 @@ async function handleStatus() {
 
   console.log(`Git Repository:     ${st.isInsideGit ? "Yes" : "No"}`);
   console.log(`Current Branch:     ${st.branch}`);
+  console.log(
+    `Project Version:    ${st.projectVersion ? `${st.projectVersion} (${st.publishedReleases} release(s) published)` : "(no manifest detected)"}`,
+  );
   console.log(`Active Issue:       ${st.activeIssue ?? "(none — on base branch)"}`);
   console.log(`Rules Routing Mode: ${st.routingMode}`);
   console.log(`Recommended Tier:   ${st.recommendedTier}`);
