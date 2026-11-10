@@ -1,0 +1,30 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.5",
+  "timestamp": "2026-11-10T19:10:21.935Z",
+  "issue": {
+    "id": 54,
+    "title": "feat(v1.3.5): telemetry project anonymity, advisory-only update gate, host SemVer visibility & CI action upgrades"
+  },
+  "subtask": {
+    "id": "T2-fix",
+    "title": "Pass git user identity when creating annotated tags in CI test fixtures",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "tests/status.test.ts",
+        "tests/doctor.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npx vitest run tests/status.test.ts tests/doctor.test.ts"
+    }
+  },
+  "tier": "tier-3"
+}
