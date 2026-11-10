@@ -23,7 +23,7 @@ jobs:
     environment: Digital-Lake-LogNexus
     steps:
       - name: Checkout with previous commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Setup Node.js 22
         if: steps.detect.outputs.should_release == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: 'npm'
@@ -141,7 +141,7 @@ jobs:
 
       - name: Setup Python 3.12 for PyPI build
         if: steps.detect.outputs.should_release == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 

@@ -294,11 +294,11 @@ pip install lognexus-mcp
 
 </div>
 
-LogNexus was battle-tested in a high-intensity production deployment governing the end-to-end engineering of **Taranis**—a deterministic static analysis CLI and AI migration skill operating over **250,000+ lines of legacy code** with 22 AST/CFG rules (`SPH-001`..`SPH-022`).
+LogNexus was battle-tested in a high-intensity production deployment governing the end-to-end engineering of an enterprise static analysis CLI and AI migration skill (**Anonymous Project ID:** `prj-7a4e91c2`) operating over **250,000+ lines of legacy code** with 22 AST/CFG rules (`SPH-001`..`SPH-022`).
 
 ```
 ╔══════════════════════════════════════════════════════════════════════════════════════════════╗
-║  LOGNEXUS TELEMETRY HUD // PRODUCTION SWARM BENCHMARK (CASE STUDY: TARANIS)                  ║
+║  LOGNEXUS TELEMETRY HUD // PRODUCTION SWARM BENCHMARK (PROJECT ID: PRJ-7A4E91C2)             ║
 ╠═════════════════════════════════════════════╦════════════════════════════════════════════════╣
 ║  ▸ GOVERNED FEATURES     12 Issues (#1-#12) ║  ▸ ORPHAN / UNTRACKED COMMITS   0 (0.0%)       ║
 ║  ▸ VERIFIED COMMITS      38 / 38 Signed     ║  ▸ SELF-APPROVAL VIOLATIONS     0 Blocked      ║
