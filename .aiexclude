@@ -1,0 +1,20 @@
+# LogNexus Multi-Model Token Shield — prevent accidental token burn on lockfiles & build outputs
+node_modules/
+package-lock.json
+npm-shrinkwrap.json
+pnpm-lock.yaml
+yarn.lock
+bun.lockb
+Cargo.lock
+poetry.lock
+uv.lock
+.venv/
+venv/
+__pycache__/
+dist/
+dist-pypi/
+build/
+coverage/
+.next/
+target/
+.lognexus/*.json

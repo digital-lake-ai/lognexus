@@ -72,8 +72,8 @@ LogNexus is completely model-agnostic. Any model can be mapped to any tier depen
 
 | Tier | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Role |
 |------|------------------|--------|---------------|----------|--------------|
-| **tier-1** (Reasoning) | Claude Opus | o3, o1, GPT-4.5/5 | Gemini Pro / Flash (high) | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, cross-model review gates |
-| **tier-2** (Context / Triage) | Claude Sonnet | GPT-4.1, GPT-4o | Gemini Pro / Flash (1M) | DeepSeek V3 | Issue-to-branch context loading, discovery triage, knowledge retrieval |
+| **tier-1** (Reasoning) | Claude Opus | o3, o1, GPT-4.5/5 | Gemini 4 Carbon / Argon, Gemini 3.8 Pro | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, cross-model review gates |
+| **tier-2** (Context / Triage) | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Issue-to-branch context loading, discovery triage, knowledge retrieval |
 | **tier-3** (Execution) | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Scoped subtask execution, atomic commits (eat(#N/Tk)), timeline comments |
 
 ### Example Multi-Model Deployments

@@ -362,7 +362,7 @@ Every lognexus artifact (comments, PR bodies, review sign-offs) must carry a pro
 | Claude Code | System prompt model name | `claude/opus-4.6 (claude-code)` |
 | Codex | `~/.codex/config.toml` `model` + `model_reasoning_effort` | `openai/gpt-5.4 (codex, effort: high)` |
 | Cursor | System prompt model identifier | `claude/opus-4.6 (cursor)` |
-| Antigravity | Workspace agent configuration | google/gemini-3.8-flash (antigravity, role: orchestrator) |
+| Antigravity | Workspace agent configuration | `Gemini 4 Carbon (antigravity, role: orchestrator)` |
 | Kimi Code | Active model identifier in editor | deepseek/VS Code (kimi-code) |
 | Other | Best available model identifier | `<family>/<version> (<tool>)` |
 

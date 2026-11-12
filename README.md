@@ -66,6 +66,7 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 - **Journey Timeline & Review Gate Audit:** Reconstructs the complete branch journey into structured PR descriptions (`lognexus timeline --pr-body`) and programmatically audits review gate separation (`lognexus audit`).
 - **Hidden Metadata Envelopes:** HTML comments preserve machine-parseable state (`<!-- lognexus: kind: state ... -->`) without cluttering human-readable markdown.
 - **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Lightweight CLI for repository scaffolding (`init`), health diagnostics (`doctor`), and real-time status inspection (`status`).
+- **Optional Multi-Model Token Shield (`init --protect-tokens`):** Opt-in, zero-runtime-overhead workspace hygiene flag that scaffolds official context-exclusion and read-deny rules (`.geminiignore`, `.aiexclude`, `.cursorignore`, `.claude/settings.json`, `.rooignore`, `.codeiumignore`, `.aiderignore`) tailored to the agent ecosystems detected in your repository—preventing accidental token leakage on lockfiles and build artifacts, translating directly into lower context costs without touching the MCP server.
 
 ---
 
@@ -81,8 +82,8 @@ LogNexus organizes development phases into three cognitive tiers. You can assign
 
 | Tier | Cognitive Role | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Activities |
 |---|---|---|---|---|---|---|
-| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x | o3, o1, GPT-5 | Gemini 2.5 / 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model review sign-offs. |
-| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini Flash / Pro (1M context) | DeepSeek V3 | Large codebase exploration, discovery classification, knowledge retrieval. |
+| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x | o3, o1, GPT-5 | Gemini 4 Carbon / Argon, 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model review sign-offs. |
+| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, knowledge retrieval. |
 | **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
 
 ### Example Deployment Setups
@@ -145,6 +146,10 @@ An independent model inspects the PR diff, verifies task contracts, and signs of
 Initialize `.lognexus/` rules, templates, and routing configuration:
 ```bash
 npx @digital-lake/lognexus init
+
+# Optional: scaffold official multi-model context-exclusion rules (zero runtime overhead)
+# to prevent agents from burning tokens on lockfiles or build directories:
+npx @digital-lake/lognexus init --protect-tokens
 ```
 
 Verify your environment anytime:
@@ -357,9 +362,9 @@ Every commit carries signed provenance trailers (`Planned-by:` / `Authored-by:` 
 
 | Role | Canonical identity |
 |---|---|
-| Master Architecture & Security Orchestrator | `Gemini 4 Argon` |
+| Master Architecture & Security Orchestrators | `Gemini 4 Argon` · `Gemini 4 Carbon` |
 | Implementation (VS Code client) | `deepseek/VS Code (kimi-code)` |
-| Cross-model review (Antigravity) | `google/gemini-3.8-flash-high (antigravity)` |
+| Cross-model review (Antigravity) | `Gemini 4 Carbon` · `google/gemini-3.8-flash-high (antigravity)` |
 
 The `Planned-by:` trailer documents where an externally authored plan came from. It grants no review authority and no merge rights; an author model never writes its own `Reviewed-by:` trailer.
 
@@ -375,7 +380,7 @@ We extend our deep gratitude to **devallibus** for pioneering the concept of Git
 - Introducing the repository scaffolding CLI, Atomic Commit Engine, and native MCP server (`@digital-lake/lognexus`).
 - Providing seamless backwards-compatibility for existing `.shiplog` envelopes and workflows.
 
-The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Argon`** (*Master Architecture & Security Orchestrator*).
+The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Argon`** and **`Gemini 4 Carbon`** (*Master Architecture & Security Orchestrators*).
 
 Additional inspirations and patterns are derived from [OrchestKit](https://github.com/yonatangross/orchestkit) and [Superpowers](https://github.com/obra/superpowers). Detailed license texts are preserved in the [`LICENSES/`](LICENSES/) directory and in [`NOTICE.md`](NOTICE.md).
 
