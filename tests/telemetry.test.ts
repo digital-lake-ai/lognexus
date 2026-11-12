@@ -159,6 +159,21 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("Kimi K3 (Moonshot AI)")).toBe("moonshot/kimi");
     });
 
+    it("gives explicit Carbon identities precedence over the Antigravity orchestrator fallback", () => {
+      expect(extractModelFamilyCategory("Gemini 4 Carbon (antigravity, role: orchestrator)")).toBe(
+        "gemini/carbon",
+      );
+      expect(extractModelFamilyCategory("google/gemini-4-carbon (antigravity, orchestrator)")).toBe(
+        "gemini/carbon",
+      );
+      expect(inferTierFromAuthor("Gemini 4 Carbon (antigravity, role: orchestrator)")).toBe(
+        "tier-1",
+      );
+      expect(inferTierFromAuthor("google/gemini-4-carbon (antigravity, orchestrator)")).toBe(
+        "tier-1",
+      );
+    });
+
     it("infers the routing tier of frontier agent identities", () => {
       expect(
         inferTierFromAuthor("Gemini 4 Argon (Master Architecture & Security Orchestrator)"),

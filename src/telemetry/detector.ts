@@ -175,8 +175,14 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
 
   const trimmed = identityStr.trim().toLowerCase();
 
-  // The Antigravity orchestrator drives the plan from an isolated window; classify it
-  // as the architecture family before the generic Gemini checks can claim it.
+  // Explicit flagship Gemini 4 identities take precedence over generic client-role fallbacks.
+  if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
+  if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
+  if (trimmed.includes("antigravity") && trimmed.includes("carbon")) return "gemini/carbon";
+  if (trimmed.includes("antigravity") && trimmed.includes("argon")) return "gemini/argon";
+
+  // The Antigravity orchestrator drives the plan from an isolated window; classify unnamed
+  // Antigravity orchestrators as the architecture family before generic Gemini checks claim them.
   if (
     trimmed.includes("antigravity") &&
     (trimmed.includes("lead") || trimmed.includes("orchestrator") || trimmed.includes("architect"))
@@ -185,8 +191,6 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   }
 
   // Well-known model family heuristics
-  if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
-  if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
   if (trimmed.includes("gemini") && (trimmed.includes("flash-high") || trimmed.includes("high"))) {
     return "gemini/flash-high";
   }

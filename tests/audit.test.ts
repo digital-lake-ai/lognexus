@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { auditBranch, extractTrailers, parseIdentity } from "../src/audit/audit.js";
+import {
+  auditBranch,
+  checkSelfApproval,
+  extractTrailers,
+  parseIdentity,
+} from "../src/audit/audit.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
 import { attachNote } from "../src/notes/notes.js";
 
@@ -439,5 +444,46 @@ describe("Identity and trailer parsing under adversarial input", () => {
     const elapsed = performance.now() - start;
 
     expect(elapsed).toBeLessThan(1000);
+  });
+});
+
+describe("Canonical family normalization for the flagship Gemini 4 identities", () => {
+  it("collapses display names and provider slugs onto one canonical family", () => {
+    expect(parseIdentity("Gemini 4 Carbon")?.family).toBe("gemini/carbon");
+    expect(parseIdentity("Gemini 4 Carbon (antigravity, role: orchestrator)")?.family).toBe(
+      "gemini/carbon",
+    );
+    expect(parseIdentity("gemini/carbon (antigravity)")?.family).toBe("gemini/carbon");
+    expect(parseIdentity("google/gemini-4-carbon (antigravity)")?.family).toBe("gemini/carbon");
+    expect(parseIdentity("Gemini 4 Argon")?.family).toBe("gemini/argon");
+    expect(parseIdentity("gemini/argon (antigravity)")?.family).toBe("gemini/argon");
+  });
+
+  it("keeps unrelated families untouched", () => {
+    expect(parseIdentity("deepseek/VS Code (kimi-code)")?.family).toBe("deepseek/vs-code");
+    expect(parseIdentity("claude/sonnet (opus-harness)")?.family).toBe("claude/sonnet");
+  });
+
+  it("blocks self-approval between a Carbon display name and its slug aliases", () => {
+    for (const reviewer of [
+      "gemini/carbon (antigravity)",
+      "google/gemini-4-carbon (antigravity)",
+    ]) {
+      expect(checkSelfApproval("Gemini 4 Carbon", reviewer).isSelfApproval).toBe(true);
+    }
+    expect(checkSelfApproval("Gemini 4 Argon", "gemini/argon (antigravity)").isSelfApproval).toBe(
+      true,
+    );
+  });
+
+  it("still permits cross-model review between distinct families", () => {
+    expect(checkSelfApproval("Gemini 4 Carbon", "Gemini 4 Argon").isSelfApproval).toBe(false);
+    expect(
+      checkSelfApproval("deepseek/VS Code (kimi-code)", "Gemini 4 Carbon").isSelfApproval,
+    ).toBe(false);
+    expect(
+      checkSelfApproval("deepseek/VS Code (kimi-code)", "gemini/carbon (antigravity)")
+        .isSelfApproval,
+    ).toBe(false);
   });
 });
