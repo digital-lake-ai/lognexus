@@ -200,7 +200,7 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
   }
 
   let recommendedTier =
-    "tier-1 (Reasoning / Planning: Claude Opus, OpenAI o3, Gemini Pro, DeepSeek R1)";
+    "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon, Claude Opus, OpenAI o3, DeepSeek R1)";
   if (activeIssue) {
     recommendedTier =
       "tier-3 (Scoped Execution: Claude Haiku, GPT-4o-mini, DeepSeek Chat, Gemini Flash)";
