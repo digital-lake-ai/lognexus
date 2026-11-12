@@ -1,0 +1,35 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.5",
+  "timestamp": "2026-11-12T03:25:56.730Z",
+  "issue": {
+    "id": 56,
+    "title": "feat(v1.3.6): consolidate Gemini 4 Carbon support, multi-model token shield & CLI parity"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Implement opt-in Multi-Model Token Shield (init --protect-tokens), sync CLI --help, routing templates & Biome schema",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/scaffold.ts",
+        "src/status.ts",
+        "src/cli.ts",
+        "biome.json",
+        "tests/scaffold.test.ts",
+        "tests/status.test.ts",
+        "tests/packaging.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
