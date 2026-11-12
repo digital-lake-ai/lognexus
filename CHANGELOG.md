@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.6] - 2026-11-12
+
+### Summary
+A context-economy and identity-consolidation release. `lognexus init --protect-tokens` adds an opt-in Multi-Model Token Shield that teaches every supported AI client to skip lockfiles, vendor trees and build output, and this repository now runs the shield on itself. `Gemini 4 Carbon` is recognised as a co-flagship tier-1 identity across routing, provenance and the review gate, and the CLI help finally documents every MCP tool and flag it ships.
+
+### Added
+- **Optional Multi-Model Token Shield (`lognexus init --protect-tokens`):** opt-in, zero-runtime-overhead workspace hygiene that detects the agent ecosystems present in a repository and writes the matching context-exclusion files — Gemini/Antigravity (`.geminiignore`, `.aiexclude`), Claude Code (`.claude/settings.json` `permissions.deny`), Cursor (`.cursorignore`), Roo Code (`.rooignore`), Windsurf (`.codeiumignore`) and Aider (`.aiderignore`). A workspace with no detectable client receives the universal core instead. The default `init` output is unchanged.
+- **Repository token-shield activation:** `.geminiignore`, `.aiexclude`, `.cursorignore` and `.claude/settings.json` now guard this repository against accidental lockfile and build-artifact reads.
+- **Token Hygiene governance:** `AGENTS.md` §5, `GEMINI.md` and `CLAUDE.md` rule 10, and `.agents/rules.md` item 10 forbid reading `node_modules/`, lockfiles, `dist/` and `coverage/` into context.
+
+### Changed
+- **Co-flagship `Gemini 4 Carbon` consolidation:** tier routing, provenance docs, the `CO_ARCHITECT_IDENTITY` export and `lognexus status` all name `Gemini 4 Carbon` alongside `Gemini 4 Argon` as tier-1 principal architects. `CONTRIBUTING.md` documents the six synchronized version surfaces.
+- **Lockfile exemption in `evaluateContextBudget()`:** generated lockfiles no longer count toward `CONTEXT_MAX_FILES` or `CONTEXT_MAX_LOC`, so a contract is not penalised for a file the agent must never read.
+- **CLI `--help` synchronization:** `printUsage()` now lists all 12 MCP tools plus `--stage-allowed`, `--prompt` and `--protect-tokens`, and a packaging test keeps that parity enforced.
+- **Biome `2.6.6` schema alignment:** `biome.json` and `package.json` declare the same Biome version.
+
+### Fixed
+- **`extractModelFamilyCategory()` precedence:** the explicit `gemini/carbon` and `gemini/argon` checks now run before the Antigravity `orchestrator` fallback, so a `Gemini 4 Carbon` lane is no longer misclassified.
+- **`parseIdentity()` / `checkSelfApproval()` canonical family normalization:** display names and provider slugs resolve to the same canonical family, which fixes self-approval detection for `Gemini 4 Carbon` and rejects it across distinct flagship identities.
+
+---
+
 ## [1.3.5] - 2026-11-10
 
 ### Summary

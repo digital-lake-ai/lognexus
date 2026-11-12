@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachNote } from "../src/notes/notes.js";
 import {
   AUDITOR_IDENTITY,
+  CO_ARCHITECT_IDENTITY,
   CONTEXT_MAX_FILES,
   CONTEXT_MAX_LOC,
   discoverPlanFile,
@@ -379,5 +380,30 @@ describe("Context Handoff Generator", () => {
     expect(handoff.contextBudget?.fileCount).toBe(files.length);
     expect(handoff.contextBudget?.recommendation).toContain("subagent");
     expect(renderContextHandoff(handoff)).toContain("[WARN]");
+  });
+
+  it("exempts generated lockfiles from the implementation context budget", () => {
+    seedState();
+    setSubtask(
+      "T4",
+      "Version sync",
+      {
+        allowedFiles: ["package.json", "package-lock.json", "src/state/handoff.ts"],
+        decisionBudget: "none",
+      },
+      tempDir,
+    );
+    writeFileSync(join(tempDir, "package-lock.json"), '{\n  "v": 1\n}\n'.repeat(1000), "utf8");
+
+    const budget = evaluateContextBudget(tempDir);
+
+    // The 2,000-line lockfile must not count as an implementation file nor toward totalLines.
+    expect(budget.fileCount).toBe(2);
+    expect(budget.totalLines).toBeLessThan(100);
+    expect(budget.exceeded).toBe(false);
+  });
+
+  it("exposes the co-architect identity", () => {
+    expect(CO_ARCHITECT_IDENTITY).toBe("Gemini 4 Carbon");
   });
 });

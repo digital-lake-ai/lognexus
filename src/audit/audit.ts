@@ -76,16 +76,57 @@ function extractFamily(value: string): string | null {
   return null;
 }
 
+/**
+ * Normalizes flagship display names and provider-prefixed model slugs onto a single
+ * canonical family identifier so `Gemini 4 Carbon` and `gemini/carbon (antigravity)`
+ * (or `google/gemini-4-carbon`) cannot bypass the self-approval gate via formatting differences.
+ */
+function normalizeCanonicalFamily(raw: string): string {
+  const collapsed = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-");
+  if (
+    collapsed === "gemini-4-carbon" ||
+    collapsed === "gemini/carbon" ||
+    collapsed === "gemini/4-carbon" ||
+    collapsed === "google/gemini-4-carbon" ||
+    collapsed === "google/gemini-carbon"
+  ) {
+    return "gemini/carbon";
+  }
+  if (
+    collapsed === "gemini-4-argon" ||
+    collapsed === "gemini/argon" ||
+    collapsed === "gemini/4-argon" ||
+    collapsed === "google/gemini-4-argon" ||
+    collapsed === "google/gemini-argon"
+  ) {
+    return "gemini/argon";
+  }
+  return raw;
+}
+
 export function parseIdentity(value: string | null): Identity | null {
   if (value === null) return null;
 
+  const head = value.split("(")[0].trim();
   const family = extractFamily(value);
   if (family === null) {
-    const trimmed = value.trim().toLowerCase();
-    return trimmed === "" ? null : { full: trimmed, family: trimmed };
+    const trimmed = head.toLowerCase();
+    if (trimmed === "") {
+      const fullOnly = value.trim().toLowerCase();
+      return fullOnly === ""
+        ? null
+        : { full: fullOnly, family: normalizeCanonicalFamily(fullOnly) };
+    }
+    return {
+      full: value.trim().toLowerCase(),
+      family: normalizeCanonicalFamily(trimmed),
+    };
   }
 
-  return { full: value.trim().toLowerCase(), family };
+  return { full: value.trim().toLowerCase(), family: normalizeCanonicalFamily(family) };
 }
 
 export function extractTrailers(commitBody: string): {

@@ -59,7 +59,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.3.5";
+  return "1.3.6";
 }
 
 function printHeader() {
@@ -132,6 +132,7 @@ function printUsage() {
 
 Commands:
   init         Scaffold .lognexus/ configuration and rules in current repository
+               (--protect-tokens) also writes multi-model token-ignore files
   doctor       Check Git, GitHub CLI authentication, and repository rules health
   status       Inspect current branch, active issue, and recommended tier
   commit       Atomic commit with trailers, contract validation, and Git Note
@@ -162,6 +163,7 @@ Commit Command:
     --author "<identity>"           Author trailer (e.g. gemini/flash (antigravity))
     --reviewer "<identity>"         Optional reviewer trailer (e.g. gemini/pro)
     --finish-task                   Mark active subtask as completed in state
+    --stage-allowed                 Stage only working-tree files inside the active contract
     --allow-empty                   Allow creating empty commits
     --tier <tier-1|tier-2|tier-3>   Override the routing tier (defaults to the author tier)
     --escalated                     Acknowledge a tier-1 author working on a tier-3 subtask
@@ -194,13 +196,15 @@ Timeline & Audit:
 Context Handoff:
   lognexus handoff                  Write .lognexus/handoff.md and print the cycle handoff
     --json                          Emit the ContextHandoff JSON (no banner)
+    --prompt                        Render the compact dispatch prompt for the next agent
 
 MCP Server:
   lognexus mcp                      Start MCP server on stdio (JSON-RPC 2.0) for Claude Code,
                                     Cursor, VS Code, Antigravity or any MCP-compatible client
   Tools:     lognexus_status, lognexus_state_get, lognexus_state_sync, lognexus_state_set_task,
-             lognexus_state_finish_task, lognexus_state_clear, lognexus_note_show,
-             lognexus_note_attach, lognexus_timeline, lognexus_audit
+             lognexus_state_finish_task, lognexus_state_clear, lognexus_commit,
+             lognexus_note_show, lognexus_note_attach, lognexus_timeline, lognexus_audit,
+             lognexus_telemetry
   Resources: lognexus://state, lognexus://routing
   Prompts:   lognexus-plan, lognexus-review
 
@@ -215,10 +219,22 @@ Examples:
 `);
 }
 
-async function handleInit() {
+async function handleInit(args: string[] = []) {
   printHeader();
+
+  let protectTokens = false;
+  for (const arg of args) {
+    if (arg === "--protect-tokens") {
+      protectTokens = true;
+    } else if (arg.startsWith("-")) {
+      console.error(`[ERROR] Unknown init option: ${arg}\n`);
+      printUsage();
+      process.exit(1);
+    }
+  }
+
   console.log("Initializing LogNexus in current repository...\n");
-  const res = initProject();
+  const res = initProject(process.cwd(), { protectTokens });
 
   if (res.created.length > 0) {
     console.log("Created files:");
@@ -241,6 +257,11 @@ async function handleInit() {
     "  • Tip: install locally with 'npm i -D @digital-lake/lognexus' for instant execution (~0.15s)",
   );
   console.log("  • Verify environment anytime with: npx @digital-lake/lognexus doctor\n");
+  if (!protectTokens) {
+    console.log(
+      "  • Optional: re-run with --protect-tokens to ignore bulky lockfiles & vendor dirs in every AI client\n",
+    );
+  }
 }
 
 async function handleDoctor() {
@@ -843,7 +864,7 @@ async function main() {
       await handleTelemetry(args.slice(1));
       break;
     case "init":
-      await handleInit();
+      await handleInit(args.slice(1));
       break;
     case "doctor":
       await handleDoctor();

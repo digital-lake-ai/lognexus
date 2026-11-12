@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { listMcpTools } from "../src/mcp/tools.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -72,5 +73,31 @@ describe("Python launcher (python/lognexus_mcp/__init__.py)", () => {
     expect(launcher).toContain("subprocess.run(");
     expect(launcher).toContain("shell=False");
     expect(launcher).not.toContain("shell=True");
+  });
+});
+
+describe("CLI --help & Biome schema parity", () => {
+  it("documents every MCP tool and the current commit/handoff/init flags in printUsage()", () => {
+    const cli = readRepoFile("src/cli.ts");
+    const usage = cli.slice(
+      cli.indexOf("function printUsage()"),
+      cli.indexOf("async function handleInit"),
+    );
+
+    for (const tool of listMcpTools()) {
+      expect(usage).toContain(tool.name);
+    }
+    expect(usage).toContain("--stage-allowed");
+    expect(usage).toContain("--prompt");
+    expect(usage).toContain("--protect-tokens");
+  });
+
+  it("pins the Biome $schema to the installed @biomejs/biome version", () => {
+    const biome = JSON.parse(readRepoFile("biome.json")) as { $schema: string };
+    const pkg = JSON.parse(readRepoFile("node_modules/@biomejs/biome/package.json")) as {
+      version: string;
+    };
+
+    expect(biome.$schema).toContain(pkg.version);
   });
 });

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import { extractTrailers } from "../audit/audit.js";
 import { getCliVersion } from "../cli.js";
 import { getNote } from "../notes/notes.js";
@@ -10,6 +10,7 @@ import { loadState } from "./manager.js";
 export const IMPLEMENTER_IDENTITY = "deepseek/VS Code (kimi-code)";
 export const AUDITOR_IDENTITY = "google/gemini-3.8-flash-high (antigravity)";
 export const ARCHITECT_IDENTITY = "Gemini 4 Argon";
+export const CO_ARCHITECT_IDENTITY = "Gemini 4 Carbon";
 
 /** Hard ceiling on implementation files a single subtask may touch in one turn. */
 export const CONTEXT_MAX_FILES = 6;
@@ -270,6 +271,18 @@ function resolveScopeDrift(targetDir: string, allowedFiles: string[]): HandoffSc
  * Reviews the active contract against the single-turn context ceiling. Large contracts
  * do not fail governance; they carry the delegation recommendation in the handoff.
  */
+const GENERATED_LOCKFILES = new Set([
+  "package-lock.json",
+  "npm-shrinkwrap.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "Cargo.lock",
+  "poetry.lock",
+  "uv.lock",
+  "composer.lock",
+  "Gemfile.lock",
+]);
+
 export function evaluateContextBudget(targetDir: string = process.cwd()): ContextBudgetStatus {
   const state = loadState(targetDir);
   const allowedFiles =
@@ -278,7 +291,11 @@ export function evaluateContextBudget(targetDir: string = process.cwd()): Contex
       : [];
 
   const implFiles = allowedFiles.filter(
-    (file) => !file.endsWith(".md") && !file.startsWith(".lognexus/") && !file.startsWith("tests/"),
+    (file) =>
+      !file.endsWith(".md") &&
+      !file.startsWith(".lognexus/") &&
+      !file.startsWith("tests/") &&
+      !GENERATED_LOCKFILES.has(basename(file)),
   );
 
   let totalLines = 0;

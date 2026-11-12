@@ -33,6 +33,20 @@ describe("getProjectStatus", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("recommends tier-1 with the consolidated Gemini 4 Carbon / Argon identity on main", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lognexus-status-main-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: dir, stdio: "ignore", shell: false });
+      const status = getProjectStatus(dir);
+
+      expect(status.branch).toBe("main");
+      expect(status.recommendedTier).toContain("tier-1");
+      expect(status.recommendedTier).toContain("Gemini 4 Carbon / Argon");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("host project SemVer visibility", () => {
