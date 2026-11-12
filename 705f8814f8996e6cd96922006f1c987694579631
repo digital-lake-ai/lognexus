@@ -1,0 +1,40 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.6",
+  "timestamp": "2026-11-12T03:30:25.298Z",
+  "issue": {
+    "id": 56,
+    "title": "feat(v1.3.6): consolidate Gemini 4 Carbon support, multi-model token shield & CLI parity"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Synchronize the 1.3.6 atomic version contract and changelog",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml",
+        "python/lognexus_mcp/__init__.py",
+        "src/cli.ts",
+        ".github/ISSUE_TEMPLATE/diagnostic-report.yml",
+        "docs/TELEMETRY_PRIVACY.md",
+        "CHANGELOG.md",
+        "tests/e2e.test.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build && node dist/cli.js audit main"
+    }
+  },
+  "tier": "tier-3"
+}
