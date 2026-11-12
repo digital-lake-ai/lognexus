@@ -1,0 +1,34 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.5",
+  "timestamp": "2026-11-12T03:17:26.769Z",
+  "issue": {
+    "id": 56,
+    "title": "feat(v1.3.6): consolidate Gemini 4 Carbon support, multi-model token shield & CLI parity"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Consolidate Gemini 4 Carbon precedence, self-approval normalization & lockfile context-budget exemption",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/detector.ts",
+        "src/audit/audit.ts",
+        "src/state/handoff.ts",
+        "tests/telemetry.test.ts",
+        "tests/audit.test.ts",
+        "tests/handoff.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
