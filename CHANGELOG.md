@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.7] - 2026-11-15
+
+### Summary
+A package-metadata, provenance, and toolchain maintenance patch. Lead author and contributor attribution (`HorchataHTML` and `Digital Lake`, including cross-reference CI provenance `cd0582c1`) is standardized across npm, PyPI, Claude plugin manifests, `LICENSE`, `NOTICE.md`, and `README.md`. Rules diagnostics, PR cross-reference grep checks, and envelope documentation are streamlined around canonical `.lognexus/` conventions, `@biomejs/biome` moves to `2.6.7`, and the atomic version contract advances to `1.3.7`.
+
+### Changed
+- **Provenance & manifest attribution parity:** `package.json` (`contributors`), `pyproject.toml` (`authors`), `.claude-plugin/plugin.json` (`author`), `LICENSE`, `NOTICE.md`, and `README.md` (`Provenance & Acknowledgments`) align lead authorship and copyright hierarchy around `HorchataHTML` (`https://github.com/digital-lake-ai/lognexus`) and `Digital Lake`, recording explicit provenance for the TypeScript runtime/MCP architecture and cross-reference validation specification (`cd0582c1`).
+- **Canonical `.lognexus/` rules & envelope checks:** `checkRulesConfig()` in `src/doctor.ts`, `.github/workflows/cross-ref-check.yml`, `CONTRIBUTING.md`, and `skills/lognexus/references/artifact-envelopes.md` are streamlined around canonical `.lognexus/` directories and `<!-- lognexus:` envelopes.
+- **Biome `2.6.7` upgrade:** `@biomejs/biome` in `devDependencies` and `"$schema"` in `biome.json` advance in lockstep to `2.6.7`.
+- **Version contract:** the atomic version contract moves to `1.3.7` across `package.json`, `package-lock.json`, `.claude-plugin/plugin.json`, `server.json` (`root`, `npm`, `pypi`), `pyproject.toml`, `python/lognexus_mcp/__init__.py`, `src/cli.ts`, `.github/ISSUE_TEMPLATE/diagnostic-report.yml`, `docs/TELEMETRY_PRIVACY.md`, and the test suite, keeping `lognexusPolicy.minCriticalVersion` at `"0.0.0"`.
+
+---
+
 ## [1.3.6] - 2026-11-12
 
 ### Summary
@@ -239,7 +252,7 @@ Official General Availability (GA) release of **LogNexus** — the universal, Gi
   - Verifies Review Gate integrity preventing self-approval (`author !== reviewer`).
 - **CLI Commands:** `lognexus timeline [base] [--json|--pr-body]` and `lognexus audit [base]`.
 - **MCP Server Expansion:** Exposes `lognexus_timeline` and `lognexus_audit` tools in native JSON-RPC 2.0 stdio server.
-- **Removed Legacy Artifact:** Removed `docs/MIGRATING_FROM_SHIPLOG.md` and cleaned references in `src/doctor.ts`.
+- **Removed Legacy Artifact:** Removed legacy migration guide and cleaned fallback references in `src/doctor.ts`.
 
 ## [1.0.0-alpha.4] - 2026-10-21
 
@@ -299,13 +312,13 @@ Official General Availability (GA) release of **LogNexus** — the universal, Gi
 ## [1.0.0-alpha.0] - 2026-10-21
 
 ### Added
-- **Hard Fork Initialization:** Independent hard fork and architectural evolution of `devallibus/shiplog` under the MIT License by Digital Lake.
+- **Framework Initialization:** Open-source multi-model architecture initialization under the MIT License by HorchataHTML and Digital Lake.
 - **Native Context & Rules Framework (Skill Markdown):**
   - Drop-in support for Claude Code, Cursor, Codex, Google Antigravity, and Kimi Code.
   - Full issue-to-merge lifecycle governed by Git as a knowledge graph (`/lognexus plan`, `start`, `commit`, `pr`, `review`).
 - **Cross-Model Review Gate Enforcement:** Guaranteed verification separation (`Authored-by:` vs `Reviewed-by:`).
 - **Backward Compatibility:**
-  - Transparent fallback reading for `.shiplog/` directories and `<!-- shiplog: -->` metadata envelopes during transition.
+  - Canonical `.lognexus/` workspace directories and `<!-- lognexus: -->` HTML metadata envelopes.
 - **Quality & Standards:**
   - Fast, modular unit tests with Vitest.
   - Strict linting and formatting via Biome.
