@@ -3,7 +3,8 @@
   "description": "The Universal, Git-powered context & rules framework for native AI agents (Claude, OpenAI, Gemini, DeepSeek).",
   "version": "1.3.6",
   "author": {
-    "name": "Digital Lake"
+    "name": "HorchataHTML (Digital Lake)",
+    "url": "https://github.com/digital-lake-ai/lognexus"
   },
   "homepage": "https://github.com/digital-lake-ai/lognexus",
   "repository": "https://github.com/digital-lake-ai/lognexus",
