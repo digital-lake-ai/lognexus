@@ -90,7 +90,6 @@ export function checkGitHubCli(): DiagnosticCheck {
 
 export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticCheck {
   const lognexusDir = join(targetDir, ".lognexus");
-  const shiplogDir = join(targetDir, ".shiplog");
 
   if (existsSync(lognexusDir)) {
     const routingFile = join(lognexusDir, "routing.md");
@@ -108,14 +107,6 @@ export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticC
       name: "LogNexus Rules",
       status: "warn",
       message: "Found .lognexus/ directory, but routing.md is missing (run 'lognexus init')",
-    };
-  }
-
-  if (existsSync(shiplogDir)) {
-    return {
-      name: "LogNexus Rules",
-      status: "warn",
-      message: "Found legacy .shiplog/ directory — run 'lognexus init' to scaffold .lognexus/",
     };
   }
 

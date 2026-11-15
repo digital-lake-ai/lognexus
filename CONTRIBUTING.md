@@ -90,7 +90,7 @@ Every version bump merged to `main` automatically triggers a GitHub Release and 
 Before opening a PR:
 ```bash
 # Check cross-references and envelopes
-grep -rnE '(^|[^!:-])(lognexus|shiplog):[a-z]+' skills commands --include='*.md' | grep -vE '<!-- (lognexus|shiplog):'
+grep -rnE '(^|[^!:-])lognexus:[a-z]+' skills commands --include='*.md' | grep -vE '<!-- lognexus:'
 
 # Run lint and test suite (when working on runtime code)
 npm run lint

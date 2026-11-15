@@ -1,5 +1,5 @@
-# Rejects legacy cross-reference forms that the audit found drifting:
-# bare `lognexus:<skill>` or `shiplog:<skill>` references outside HTML envelopes.
+# Rejects bare internal cross-reference forms that drift outside HTML envelopes:
+# bare `lognexus:<skill>` references outside HTML envelopes.
 # LogNexus's own units are referenced by file path; the `plugin:skill` syntax is
 # reserved for external plugins (e.g. `ork:commit`, `superpowers:brainstorming`).
 #
@@ -22,9 +22,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Envelopes start with '<!-- lognexus:' or '<!-- shiplog:'
-          if grep -rnE '(^|[^!:-])(lognexus|shiplog):[a-z]+' skills commands --include='*.md' \
-             | grep -vE '<!-- (lognexus|shiplog):'; then
+          # Envelopes start with '<!-- lognexus:'
+          if grep -rnE '(^|[^!:-])lognexus:[a-z]+' skills commands --include='*.md' \
+             | grep -vE '<!-- lognexus:'; then
             echo "::error::Legacy '<plugin>:<skill>' reference found. Use a file path instead."
             exit 1
           fi
