@@ -32,9 +32,6 @@ updated_at: 2026-03-14T12:00:00Z
 
 Place the envelope at the **top** of the artifact body (issue body, PR body, or comment), before any visible content.
 
-> [!NOTE] Backwards Compatibility
-> Parsers and agents MUST accept both canonical <!-- lognexus: and legacy <!-- shiplog: openers when reading prior issues, branches, and PRs. Newly produced artifacts ALWAYS emit <!-- lognexus:. If a repository has .shiplog/ instead of .lognexus/, agents fall back to reading .shiplog/ transparently.
-
 ### Fields
 
 | Field | Required | Type | Description |

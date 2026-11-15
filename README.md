@@ -370,19 +370,18 @@ The `Planned-by:` trailer documents where an externally authored plan came from.
 
 ---
 
-## Based on & Acknowledgments
+## Provenance & Acknowledgments
 
-LogNexus is an independent hard fork and continuation of [`shiplog`](https://github.com/devallibus/shiplog), originally created by **devallibus** under the MIT License.
-
-We extend our deep gratitude to **devallibus** for pioneering the concept of Git-as-knowledge-graph for AI development. LogNexus builds upon that foundation by:
-- Expanding the model ecosystem to provide first-class native support for **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), and **DeepSeek** (`R1`, `V3`, `Chat`) alongside **Claude** and **OpenAI**.
-- Formalizing the multi-model tier routing taxonomy and closed delegation contracts.
-- Introducing the repository scaffolding CLI, Atomic Commit Engine, and native MCP server (`@digital-lake/lognexus`).
-- Providing seamless backwards-compatibility for existing `.shiplog` envelopes and workflows.
+**LogNexus** is engineered and maintained by **[HorchataHTML](https://github.com/digital-lake-ai/lognexus)** and **[Digital Lake](https://github.com/digital-lake-ai)**, encompassing:
+- The full TypeScript runtime, repository scaffolding & diagnostic CLI, Persistent Agent State Engine, Atomic Commit Engine, Git Notes memory layer (`refs/notes/lognexus`), local-first FinOps telemetry, Multi-Model Token Shield, and native JSON-RPC 2.0 stdio MCP server (`@digital-lake/lognexus` / `lognexus-mcp`).
+- First-class multi-model tier routing and closed delegation contracts across **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
+- The cross-reference CI validation workflow (`.github/workflows/cross-ref-check.yml`), single-source-of-truth review/signing block architecture, and sub-skill anchor normalization authored by **HorchataHTML** (`2026-08-04`, commit `cd0582c1`).
 
 The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Argon`** and **`Gemini 4 Carbon`** (*Master Architecture & Security Orchestrators*).
 
-Additional inspirations and patterns are derived from [OrchestKit](https://github.com/yonatangross/orchestkit) and [Superpowers](https://github.com/obra/superpowers). Detailed license texts are preserved in the [`LICENSES/`](LICENSES/) directory and in [`NOTICE.md`](NOTICE.md).
+Additional workflow inspirations and patterns are derived from [OrchestKit](https://github.com/yonatangross/orchestkit) and [Superpowers](https://github.com/obra/superpowers). Detailed license texts and notices are preserved in the [`LICENSES/`](LICENSES/) directory and in [`NOTICE.md`](NOTICE.md).
+
+LogNexus is an independent continuation and full-stack TypeScript, CLI, and native MCP evolution of shiplog.
 
 ---
 
@@ -405,5 +404,6 @@ If **LogNexus** saved you time, prevented context amnesia in your workflows, and
 ## License
 
 LogNexus is released under the [MIT License](LICENSE).  
-Copyright (c) 2026 devallibus  
-Copyright (c) 2026 Digital Lake and LogNexus contributors.
+Copyright (c) 2026 HorchataHTML (https://github.com/digital-lake-ai/lognexus)  
+Copyright (c) 2026 Digital Lake and LogNexus contributors.  
+Copyright (c) 2026 devallibus
