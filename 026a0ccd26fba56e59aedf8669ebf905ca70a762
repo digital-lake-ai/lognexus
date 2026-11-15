@@ -1,0 +1,31 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.6",
+  "timestamp": "2026-11-15T03:34:29.262Z",
+  "issue": {
+    "id": 58,
+    "title": "chore(v1.3.7): standardize package provenance metadata, rules diagnostics & Biome 2.6.7 sync"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Standardize provenance hierarchy, architecture notice and license headers",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "LICENSE",
+        "NOTICE.md",
+        "README.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "src/mcp/resources.ts",
+        "src/mcp/prompts.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
