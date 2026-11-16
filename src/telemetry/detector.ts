@@ -2,11 +2,84 @@ import { execFileSync } from "node:child_process";
 import { type Dirent, existsSync, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { validateGitReference } from "../git/safe.js";
+import type { DiffCategory } from "./schema.js";
 
 export interface DiffStatItem {
   ext: string;
+  category: DiffCategory;
   linesAdded: number;
   linesDeleted: number;
+}
+
+const TEST_PATH_PREFIXES = ["tests/", "test/", "__tests__/"];
+
+const DOC_EXTENSIONS = new Set([".md", ".mdx", ".txt", ".rst"]);
+
+const DOC_BASENAMES = new Set(["license", "notice", "changelog", "readme"]);
+
+const CONFIG_EXTENSIONS = new Set([
+  ".json",
+  ".yml",
+  ".yaml",
+  ".toml",
+  ".ini",
+  ".lock",
+  ".gitignore",
+  ".geminiignore",
+  ".aiexclude",
+  ".cursorignore",
+]);
+
+const CONFIG_PATH_PREFIXES = [
+  ".github/",
+  ".claude/",
+  ".claude-plugin/",
+  ".lognexus/",
+  ".agents/",
+  ".cursor/",
+];
+
+const GOVERNANCE_DOC_BASENAMES = new Set(["claude.md", "agents.md", "gemini.md"]);
+
+/**
+ * Buckets a changed file into a diff category without recording its path anywhere.
+ *
+ * Test lines are priced like source lines because they carry the same authoring effort,
+ * while docs and config lines are priced as cheap boilerplate by the ROI estimator.
+ */
+export function classifyFileCategory(filePath: string): DiffCategory {
+  const normalized = filePath.trim().replace(/\\/g, "/").toLowerCase();
+  if (normalized === "") return "source";
+
+  const segments = normalized.split("/");
+  const base = segments[segments.length - 1] ?? "";
+  const baseWithoutExt = base.includes(".") ? base.slice(0, base.lastIndexOf(".")) : base;
+  const ext = base.includes(".") ? base.slice(base.lastIndexOf(".")) : "";
+
+  if (TEST_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix))) return "test";
+  if (normalized.includes(".test.") || normalized.includes(".spec.")) return "test";
+
+  if (DOC_EXTENSIONS.has(ext)) return "docs";
+  if (normalized.startsWith("docs/")) return "docs";
+  if (DOC_BASENAMES.has(base) || DOC_BASENAMES.has(baseWithoutExt)) return "docs";
+
+  if (CONFIG_EXTENSIONS.has(ext)) return "config";
+  if (CONFIG_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix))) return "config";
+
+  return "source";
+}
+
+/**
+ * Identifies the surfaces a Tier-1 orchestrator legitimately edits without owning the
+ * issue's task tier: governance markdown, templates, CI workflows and configuration.
+ */
+export function isGovernanceOrConfigSurface(filePath: string): boolean {
+  const normalized = filePath.trim().replace(/\\/g, "/").toLowerCase();
+
+  const category = classifyFileCategory(normalized);
+  if (category === "docs" || category === "config") return true;
+
+  return GOVERNANCE_DOC_BASENAMES.has(normalized);
 }
 
 const SHELL_STACK_EXTENSIONS: Record<string, string> = {
@@ -106,13 +179,14 @@ export function detectProjectStacks(targetDir: string = process.cwd()): string[]
 }
 
 /**
- * Extracts line change metrics by extension from a Git commit SHA without storing any file names or paths.
+ * Extracts line change metrics by extension and diff category from a Git commit SHA
+ * without storing any file names or paths.
  */
 export function extractCommitDiffStats(
   sha: string,
   targetDir: string = process.cwd(),
 ): DiffStatItem[] {
-  const extensionMap = new Map<string, { linesAdded: number; linesDeleted: number }>();
+  const extensionMap = new Map<string, DiffStatItem>();
 
   try {
     const sanitizedSha = validateGitReference(sha);
@@ -143,24 +217,28 @@ export function extractCommitDiffStats(
       const linesAdded = Number.isNaN(added) ? 0 : added;
       const linesDeleted = Number.isNaN(deleted) ? 0 : deleted;
 
-      // Extract ONLY extension (e.g. '.ts', '.py', '.md'). Zero path or filename is recorded.
+      // Extract ONLY extension (e.g. '.ts', '.py', '.md') and category. Zero path or filename is recorded.
       const rawExt = extname(filePath).toLowerCase();
       const ext = rawExt === "" ? "(no-ext)" : rawExt;
+      const category = classifyFileCategory(filePath);
 
-      const existing = extensionMap.get(ext) ?? { linesAdded: 0, linesDeleted: 0 };
+      // Keyed by extension AND category so `.ts` in `src/` and `.ts` in `tests/` stay separate.
+      const key = `${ext}\u0000${category}`;
+      const existing: DiffStatItem = extensionMap.get(key) ?? {
+        ext,
+        category,
+        linesAdded: 0,
+        linesDeleted: 0,
+      };
       existing.linesAdded += linesAdded;
       existing.linesDeleted += linesDeleted;
-      extensionMap.set(ext, existing);
+      extensionMap.set(key, existing);
     }
   } catch {
     // Non-git or commit without parents
   }
 
-  return Array.from(extensionMap.entries()).map(([ext, stats]) => ({
-    ext,
-    linesAdded: stats.linesAdded,
-    linesDeleted: stats.linesDeleted,
-  }));
+  return Array.from(extensionMap.values());
 }
 
 /**
@@ -178,8 +256,10 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   // Explicit flagship Gemini 4 identities take precedence over generic client-role fallbacks.
   if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
   if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
+  if (trimmed.includes("gemini") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
   if (trimmed.includes("antigravity") && trimmed.includes("carbon")) return "gemini/carbon";
   if (trimmed.includes("antigravity") && trimmed.includes("argon")) return "gemini/argon";
+  if (trimmed.includes("antigravity") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
 
   // The Antigravity orchestrator drives the plan from an isolated window; classify unnamed
   // Antigravity orchestrators as the architecture family before generic Gemini checks claim them.
@@ -262,6 +342,8 @@ const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash/
 const TIER_2_MARKERS = [
   "gemini/flash/high",
   "gemini/flash",
+  "gemini/hydrogen",
+  "hydrogen",
   "claude/sonnet",
   "sonnet",
   "gpt-4o",

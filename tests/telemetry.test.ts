@@ -5,7 +5,11 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/index.js";
-import { inferTierFromAuthor } from "../src/telemetry/detector.js";
+import {
+  classifyFileCategory,
+  inferTierFromAuthor,
+  isGovernanceOrConfigSurface,
+} from "../src/telemetry/detector.js";
 import {
   AnonymousCommunityPayloadSchema,
   buildAnonymousCommunityPayload,
@@ -27,7 +31,9 @@ import {
   recordTaskFinish,
   recordTaskStart,
   redactLocalProjectMetadata,
+  TelemetryStoreSchema,
 } from "../src/telemetry/index.js";
+import { AnonymousDiagnosticPayloadSchema } from "../src/telemetry/schema.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -602,6 +608,155 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       store.consent.accepted = true;
 
       expect(isTelemetryActive(tempDir)).toBe(false);
+    });
+  });
+
+  describe("Telemetry Schema v2.0 & Diff Categorization", () => {
+    it("parses a legacy 1.0.0 store into the 2.0.0 shape without losing values", () => {
+      const legacy = {
+        schemaVersion: "1.0.0",
+        mode: "local",
+        anonymousProjectId: "11111111-2222-3333-4444-555555555555",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        detectedStacks: ["nodejs"],
+        taskTimings: {},
+        extensions: { ".ts": { ext: ".ts", commits: 2, linesAdded: 10, linesDeleted: 1 } },
+        models: { "gemini/flash": { family: "gemini/flash", tier: "tier-3", commits: 2 } },
+        summary: { totalCommits: 2, totalLinesAdded: 10, estimatedCostSavingsPct: 96 },
+        lastUpdated: "2025-01-01T00:00:00.000Z",
+      };
+
+      const parsed = TelemetryStoreSchema.parse(legacy);
+      expect(parsed.schemaVersion).toBe("1.0.0");
+      expect(parsed.summary.totalCommits).toBe(2);
+      expect(parsed.summary.totalLinesDeleted).toBe(0);
+      expect(parsed.summary.contractCompliancePct).toBe(100);
+      expect(parsed.summary.tierCommits).toEqual({ "tier-1": 0, "tier-2": 0, "tier-3": 0 });
+      expect(parsed.extensions[".ts"]?.category).toBe("source");
+      expect(parsed.models["gemini/flash"]?.estimatedCostUsd).toBe(0);
+      expect(parsed.models["gemini/flash"]?.sourceLinesAdded).toBe(0);
+    });
+
+    it("defaults a fresh store schema version to 2.0.0", () => {
+      const store = loadTelemetry(tempDir);
+      expect(store.schemaVersion).toBe("2.0.0");
+      expect(store.summary.estimatedTokensSaved).toBe(0);
+      expect(store.summary.tierCommits["tier-1"]).toBe(0);
+    });
+
+    it("keeps the legacy community payload alias bound to the diagnostic payload", () => {
+      const store = loadTelemetry(tempDir);
+      const payload = buildAnonymousCommunityPayload(store);
+
+      expect(AnonymousCommunityPayloadSchema.safeParse(payload).success).toBe(true);
+      expect(AnonymousDiagnosticPayloadSchema.safeParse(payload).success).toBe(true);
+      // 1.x consumers read `dispatchedAt`; the v2 payload must still expose it.
+      expect(typeof payload.dispatchedAt).toBe("string");
+    });
+
+    it("classifies changed files into source, test, docs and config categories", () => {
+      expect(classifyFileCategory("src/telemetry/detector.ts")).toBe("source");
+      expect(classifyFileCategory("src\\main.py")).toBe("source");
+      expect(classifyFileCategory("scripts/deploy.ps1")).toBe("source");
+      expect(classifyFileCategory("tests/telemetry.test.ts")).toBe("test");
+      expect(classifyFileCategory("test/helpers.ts")).toBe("test");
+      expect(classifyFileCategory("__tests__/app.tsx")).toBe("test");
+      expect(classifyFileCategory("src/lib/utils.spec.js")).toBe("test");
+      expect(classifyFileCategory("docs/contexto/plan.md")).toBe("docs");
+      expect(classifyFileCategory("README.md")).toBe("docs");
+      expect(classifyFileCategory("CHANGELOG")).toBe("docs");
+      expect(classifyFileCategory("LICENSE.txt")).toBe("docs");
+      expect(classifyFileCategory("package.json")).toBe("config");
+      expect(classifyFileCategory(".github/workflows/ci.yml")).toBe("config");
+      expect(classifyFileCategory(".claude-plugin/plugin.json")).toBe("config");
+      expect(classifyFileCategory(".gitignore")).toBe("config");
+      expect(classifyFileCategory("")).toBe("source");
+    });
+
+    it("identifies governance and configuration surfaces", () => {
+      expect(isGovernanceOrConfigSurface("CLAUDE.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("AGENTS.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("GEMINI.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("package.json")).toBe(true);
+      expect(isGovernanceOrConfigSurface(".github/workflows/ci.yml")).toBe(true);
+      expect(isGovernanceOrConfigSurface(".lognexus/state.json")).toBe(true);
+      expect(isGovernanceOrConfigSurface("README.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("src/telemetry/schema.ts")).toBe(false);
+      expect(isGovernanceOrConfigSurface("tests/telemetry.test.ts")).toBe(false);
+      expect(isGovernanceOrConfigSurface("src/mcp/tools.ts")).toBe(false);
+    });
+
+    it("separates source and test diffs of the same extension without leaking paths", () => {
+      mkdirSync(join(tempDir, "src"), { recursive: true });
+      mkdirSync(join(tempDir, "tests"), { recursive: true });
+      writeFileSync(join(tempDir, "src", "engine.ts"), "const a = 1;\nconst b = 2;\n", "utf8");
+      writeFileSync(
+        join(tempDir, "tests", "engine.test.ts"),
+        "it('a', () => {});\nit('b', () => {});\nit('c', () => {});\n",
+        "utf8",
+      );
+      execSync("git add src tests", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -m "feat: add engine and specs"', { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      const diffs = extractCommitDiffStats(sha, tempDir);
+      const sourceTs = diffs.find((d) => d.ext === ".ts" && d.category === "source");
+      const testTs = diffs.find((d) => d.ext === ".ts" && d.category === "test");
+
+      expect(sourceTs?.linesAdded).toBe(2);
+      expect(testTs?.linesAdded).toBe(3);
+
+      const serialized = JSON.stringify(diffs);
+      expect(serialized).not.toContain("engine");
+      expect(serialized).not.toContain("src/");
+      expect(serialized).not.toContain("tests/");
+      expect(serialized).not.toContain("\u0000");
+    });
+
+    it("classifies doc and config diffs alongside source diffs", () => {
+      mkdirSync(join(tempDir, "docs"), { recursive: true });
+      writeFileSync(join(tempDir, "docs", "guide.md"), "# Guide\nBody\n", "utf8");
+      writeFileSync(join(tempDir, "settings.json"), '{\n  "a": 1\n}\n', "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -m "docs: guide"', { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      const diffs = extractCommitDiffStats(sha, tempDir);
+      expect(diffs.find((d) => d.ext === ".md")?.category).toBe("docs");
+      expect(diffs.find((d) => d.ext === ".json")?.category).toBe("config");
+    });
+  });
+
+  describe("Gemini 4 Hydrogen Routing", () => {
+    it("classifies every Hydrogen identity variant as the hydrogen family", () => {
+      for (const identity of [
+        "Gemini 4 Hydrogen",
+        "Gemini 4 Hydrogen (Executor)",
+        "gemini/hydrogen",
+        "gemini/hydrogen (antigravity)",
+        "google/gemini-4-hydrogen (antigravity)",
+        "google/gemini-4-hydrogen-high (antigravity)",
+      ]) {
+        expect(extractModelFamilyCategory(identity)).toBe("gemini/hydrogen");
+      }
+    });
+
+    it("routes Hydrogen identities to tier-2, never tier-1", () => {
+      for (const identity of [
+        "Gemini 4 Hydrogen",
+        "gemini/hydrogen (antigravity)",
+        "google/gemini-4-hydrogen (antigravity)",
+        "google/gemini-4-hydrogen-high (antigravity)",
+      ]) {
+        expect(inferTierFromAuthor(identity)).toBe("tier-2");
+      }
+    });
+
+    it("keeps Carbon and Argon as tier-1 flagship orchestrators", () => {
+      expect(inferTierFromAuthor("Gemini 4 Carbon (anthropic-cloud)")).toBe("tier-1");
+      expect(inferTierFromAuthor("Gemini 4 Argon (google-antigravity)")).toBe("tier-1");
+      expect(extractModelFamilyCategory("Gemini 4 Carbon (antigravity)")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("Gemini 4 Argon (antigravity)")).toBe("gemini/argon");
     });
   });
 
