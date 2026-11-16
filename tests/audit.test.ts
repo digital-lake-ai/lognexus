@@ -307,6 +307,51 @@ describe("Traceability audit", () => {
     expect(result.violations.some((v) => v.rule === "tier-routing-violation")).toBe(false);
   });
 
+  it("does not warn about tier routing when the note declares a tier-1 issue", () => {
+    commitFile(
+      tempDir,
+      "schema.ts",
+      "export const schema = 1;",
+      "feat(#61/T1): extend telemetry schemas\n\nAuthored-by: gemini/pro (antigravity)\n",
+    );
+    attachNote(
+      JSON.stringify({
+        issue: { id: 61, title: "Telemetry v2", tier: "tier-1" },
+        subtask: { id: "T1", contract: { allowedFiles: ["schema.ts"] } },
+        tier: "tier-1",
+      }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const result = auditBranch(baseBranch, tempDir);
+    expect(result.violations.some((v) => v.rule === "tier-routing-violation")).toBe(false);
+  });
+
+  it.each(["CLAUDE.md", "package.json", ".github/workflows/ci.yml"])(
+    "does not warn about tier routing for the governance surface %s",
+    (fileName) => {
+      mkdirSync(join(tempDir, fileName, ".."), { recursive: true });
+      commitFile(
+        tempDir,
+        fileName,
+        "value: 1",
+        "chore(#9/T1): update governance surface\n\nAuthored-by: gemini/pro (antigravity)\n",
+      );
+      attachNote(
+        JSON.stringify({
+          subtask: { id: "T1", contract: { allowedFiles: [fileName] } },
+          tier: "tier-3",
+        }),
+        "HEAD",
+        { cwd: tempDir },
+      );
+
+      const result = auditBranch(baseBranch, tempDir);
+      expect(result.violations.some((v) => v.rule === "tier-routing-violation")).toBe(false);
+    },
+  );
+
   it("does not flag .lognexus bookkeeping files as outside the allowed set", () => {
     mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
     commitFile(
@@ -485,5 +530,45 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
       checkSelfApproval("deepseek/VS Code (kimi-code)", "gemini/carbon (antigravity)")
         .isSelfApproval,
     ).toBe(false);
+  });
+
+  describe("Gemini 4 Hydrogen normalization", () => {
+    it.each([
+      "gemini 4 hydrogen",
+      "gemini/hydrogen",
+      "gemini/4-hydrogen",
+      "gemini-4-hydrogen",
+      "google/gemini-4-hydrogen",
+      "google/gemini-4-hydrogen-high",
+      "google/gemini-4-hydrogen-high (antigravity)",
+    ])("normalizes %s to the hydrogen family", (value) => {
+      expect(parseIdentity(value)?.family).toBe("gemini/hydrogen");
+    });
+
+    it("collapses the -high reasoning-effort suffix on the flagship families", () => {
+      expect(parseIdentity("google/gemini-4-carbon-high")?.family).toBe("gemini/carbon");
+      expect(parseIdentity("google/gemini-4-argon-high")?.family).toBe("gemini/argon");
+    });
+
+    it("blocks self-approval between Hydrogen display names and their slug aliases", () => {
+      expect(checkSelfApproval("Gemini 4 Hydrogen", "gemini/hydrogen").isSelfApproval).toBe(true);
+      expect(
+        checkSelfApproval("google/gemini-4-hydrogen-high (antigravity)", "Gemini 4 Hydrogen")
+          .isSelfApproval,
+      ).toBe(true);
+    });
+
+    it("permits peer review between Hydrogen and the tier-1 orchestrators", () => {
+      expect(checkSelfApproval("Gemini 4 Hydrogen", "Gemini 4 Carbon").isSelfApproval).toBe(false);
+      expect(checkSelfApproval("Gemini 4 Hydrogen", "Gemini 4 Argon").isSelfApproval).toBe(false);
+      expect(
+        checkSelfApproval("google/gemini-4-hydrogen-high (antigravity)", "gemini/carbon")
+          .isSelfApproval,
+      ).toBe(false);
+      expect(
+        checkSelfApproval("google/gemini-4-hydrogen-high (antigravity)", "gemini/argon")
+          .isSelfApproval,
+      ).toBe(false);
+    });
   });
 });
