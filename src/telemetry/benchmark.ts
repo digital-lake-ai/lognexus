@@ -44,6 +44,33 @@ const TOKEN_SEPARATORS = new Set([
 
 const MIN_FORBIDDEN_TOKEN_LENGTH = 3;
 
+/**
+ * Leaf values whose vocabulary is fixed by the schema, so they can never carry a repository
+ * name. Property *keys* are never inspected — only the values listed here are skipped.
+ */
+const TRUSTED_LEAF_PATHS = new Set([
+  "schemaVersion",
+  "consent.policyVersion",
+  "consent.acceptedAt",
+  "environment.os",
+  "environment.nodeVersion",
+  "environment.lognexusVersion",
+  "generatedAt",
+  "dispatchedAt",
+]);
+
+/** Fixed prefixes that make a `modelBreakdown` family a known vocabulary entry. */
+const CANONICAL_MODEL_FAMILIES = [
+  "gemini/",
+  "claude/",
+  "deepseek/",
+  "openai/",
+  "moonshot/",
+  "qwen/",
+];
+
+const UNKNOWN_MODEL_FAMILY = "unknown/other";
+
 const BENCHMARK_SCAN_IGNORED_DIRS = new Set([".git", "node_modules", ".lognexus"]);
 
 const DEFAULT_SNAPSHOT_NAME = "snapshot-v2.json";
@@ -80,6 +107,12 @@ function confineSnapshotPath(targetDir: string, outputPath: string): string {
  *
  * Every check is a single linear pass over the text — no nested quantifiers and no
  * backtracking — so an adversarial 50k-character payload cannot trigger polynomial ReDoS.
+ *
+ * The forbidden-token scan is JSON-aware: only untrusted *values* are searched, never property
+ * keys and never the fixed schema vocabulary. A payload is written by this project, so its keys
+ * (`lognexusVersion`, `docsLinesAdded`) and its enum values (`nodejs`, `source`) are not
+ * disclosure — and treating them as such made `telemetry snapshot` abort inside any checkout
+ * whose folder happened to be named like a key.
  */
 export function assertZeroPiiLeakage(serialized: string, forbiddenTokens: string[] = []): void {
   if (containsDrivePath(serialized)) {
@@ -114,11 +147,31 @@ export function assertZeroPiiLeakage(serialized: string, forbiddenTokens: string
     }
   }
 
+  const candidates: string[] = [];
   for (const forbidden of forbiddenTokens) {
     const candidate = forbidden.trim().toLowerCase();
     if (candidate.length < MIN_FORBIDDEN_TOKEN_LENGTH) continue;
-    if (lowered.includes(candidate)) {
-      throw new ZeroPiiViolationError("the payload mentions a private project identifier");
+    candidates.push(candidate);
+  }
+  if (candidates.length === 0) return;
+
+  const untrusted = collectUntrustedLeafValues(serialized);
+  if (untrusted === null) {
+    // A payload that is not valid JSON cannot be walked, so fall back to the whole document.
+    for (const candidate of candidates) {
+      if (lowered.includes(candidate)) {
+        throw new ZeroPiiViolationError("the payload mentions a private project identifier");
+      }
+    }
+    return;
+  }
+
+  for (const leaf of untrusted) {
+    const loweredLeaf = leaf.toLowerCase();
+    for (const candidate of candidates) {
+      if (loweredLeaf.includes(candidate)) {
+        throw new ZeroPiiViolationError("the payload mentions a private project identifier");
+      }
     }
   }
 }
@@ -186,6 +239,80 @@ function looksLikeEmail(token: string): boolean {
   if (domain.includes("/") || domain.includes("@")) return false;
 
   return domain.slice(1).includes(".");
+}
+
+/** True when `path` is a fixed schema leaf, matched as whole segments and never as a prefix. */
+function isTrustedLeafPath(path: string): boolean {
+  if (TRUSTED_LEAF_PATHS.has(path)) return true;
+
+  if (path.startsWith("environment.detectedStacks[")) return true;
+  if (path.startsWith("languageBreakdown[") && path.endsWith("].category")) return true;
+  if (path.startsWith("modelBreakdown[") && path.endsWith("].tier")) return true;
+
+  return false;
+}
+
+/** True when a `modelBreakdown` family belongs to the closed, published vocabulary. */
+function isCanonicalModelFamily(path: string, value: string): boolean {
+  if (!path.startsWith("modelBreakdown[") || !path.endsWith("].family")) return false;
+
+  const loweredValue = value.trim().toLowerCase();
+  if (loweredValue === UNKNOWN_MODEL_FAMILY) return true;
+
+  for (const prefix of CANONICAL_MODEL_FAMILIES) {
+    if (loweredValue.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/**
+ * Walks a JSON document and returns every leaf string whose content could disclose a private
+ * identifier, or `null` when the input is not valid JSON.
+ *
+ * Keys are skipped by construction: only values are collected. The walk is a single scan in
+ * array order with an explicit stack, so a deeply nested adversarial document cannot overflow
+ * the call stack and no check backtracks.
+ */
+function collectUntrustedLeafValues(serialized: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+
+  const leaves: string[] = [];
+  const stack: Array<{ value: unknown; path: string }> = [{ value: parsed, path: "" }];
+
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (frame === undefined) break;
+    const { value, path } = frame;
+
+    if (typeof value === "string") {
+      if (isTrustedLeafPath(path)) continue;
+      if (isCanonicalModelFamily(path, value)) continue;
+      leaves.push(value);
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      for (let index = value.length - 1; index >= 0; index -= 1) {
+        stack.push({ value: value[index], path: `${path}[${index}]` });
+      }
+      continue;
+    }
+
+    if (value !== null && typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>);
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        const [key, child] = entries[index];
+        stack.push({ value: child, path: path === "" ? key : `${path}.${key}` });
+      }
+    }
+  }
+
+  return leaves;
 }
 
 /**

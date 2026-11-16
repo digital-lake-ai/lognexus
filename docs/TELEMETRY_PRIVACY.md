@@ -122,7 +122,7 @@ Since 2.0.0 every commit is priced by the lines it actually changed rather than 
 | Class | Typical extensions | Weight |
 | :--- | :--- | :--- |
 | `source` | `.ts`, `.py`, `.go`, `.rs` | Full reasoning cost. |
-| `test` | `*.test.ts`, `*.spec.ts` | Reduces the rework ratio; priced below source. |
+| `test` | `*.test.ts`, `*.spec.ts` | Priced at the source rate (same authoring effort). |
 | `docs` | `.md`, `.txt` | Cheapest — documentation churn is not engineering cost. |
 | `config` | `.json`, `.yml`, `.toml` | Cheapest — counted, never priced as logic. |
 

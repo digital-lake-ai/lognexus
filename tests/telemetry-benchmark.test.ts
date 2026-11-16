@@ -18,6 +18,7 @@ import {
   exportTelemetrySnapshot,
   formatCohortMarkdownReport,
   generateCohortBenchmarkReportFile,
+  ZeroPiiViolationError,
 } from "../src/telemetry/index.js";
 
 const initRepo = (dir: string): void => {
@@ -245,6 +246,74 @@ describe("Zero-PII Snapshot Exporter & Cohort Benchmark", () => {
       ).toThrow(/private project identifier/);
       // Tokens shorter than three characters are too generic to be meaningful.
       expect(() => assertZeroPiiLeakage('{"project":"ab"}', ["ab"])).not.toThrow();
+    });
+
+    it("scopes the private-token scan to leaf values and never to schema keys", () => {
+      // `lognexusVersion` is a property name, not disclosure.
+      expect(() => assertZeroPiiLeakage('{"lognexusVersion":"1.3.7"}', ["lognexus"])).not.toThrow();
+      expect(() =>
+        assertZeroPiiLeakage('{"environment":{"os":"nodejs"}}', ["nodejs"]),
+      ).not.toThrow();
+      expect(() =>
+        assertZeroPiiLeakage(
+          JSON.stringify({
+            environment: { detectedStacks: ["typescript", "nodejs"] },
+            languageBreakdown: [{ ext: ".ts", category: "source" }],
+            modelBreakdown: [{ family: "gemini/argon", tier: "tier-1" }],
+          }),
+          ["nodejs", "source", "gemini"],
+        ),
+      ).not.toThrow();
+
+      // The same token in a value that is not fixed vocabulary still aborts.
+      expect(() =>
+        assertZeroPiiLeakage('{"scope":{"branch":"feature/LogNexus"}}', ["LogNexus"]),
+      ).toThrow(/private project identifier/);
+      expect(() =>
+        assertZeroPiiLeakage('{"modelBreakdown":[{"family":"LogNexus/custom"}]}', ["LogNexus"]),
+      ).toThrow(/private project identifier/);
+      expect(() =>
+        assertZeroPiiLeakage('{"languageBreakdown":[{"ext":".LogNexus"}]}', ["LogNexus"]),
+      ).toThrow(/private project identifier/);
+      expect(() =>
+        assertZeroPiiLeakage('{"project":"my-private-repo"}', ["my-private-repo"]),
+      ).toThrow(ZeroPiiViolationError);
+    });
+
+    it("falls back to a whole-document scan when the payload is not JSON", () => {
+      expect(() => assertZeroPiiLeakage("raw text mentioning LogNexus", ["LogNexus"])).toThrow(
+        /private project identifier/,
+      );
+    });
+
+    it("exports a snapshot from a checkout whose folder name matches a schema key", () => {
+      const root = mkdtempSync(join(tmpdir(), "bench-case-"));
+      created.push(root);
+      const repoDir = join(root, "LogNexus");
+      mkdirSync(repoDir, { recursive: true });
+      initRepo(repoDir);
+      writeFileSync(join(repoDir, "tsconfig.json"), "{}\n", "utf8");
+      commitFile(
+        repoDir,
+        "src/module.ts",
+        "export const value = 1;\n",
+        "feat(#61/T1): seed module",
+      );
+
+      // The folder name appears in the payload only as the string "LogNexus" inside fixed
+      // schema keys such as `lognexusVersion`, which is why the guard must ignore keys.
+      const { filePath, payload } = exportTelemetrySnapshot(repoDir);
+      expect(existsSync(filePath)).toBe(true);
+      expect(payload.environment.lognexusVersion.length).toBeGreaterThan(0);
+      expect(JSON.stringify(payload)).not.toContain(repoDir);
+
+      // The same token in an untrusted leaf still aborts.
+      expect(() =>
+        assertZeroPiiLeakage('{"scope":{"branch":"issue/LogNexus"}}', ["LogNexus"]),
+      ).toThrow(ZeroPiiViolationError);
+      expect(() =>
+        assertZeroPiiLeakage('{"project":"my-private-repo"}', ["my-private-repo"]),
+      ).toThrow(ZeroPiiViolationError);
     });
 
     it("scans a 50,000-character adversarial payload in under 200ms", () => {

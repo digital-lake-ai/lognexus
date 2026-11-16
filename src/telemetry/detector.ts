@@ -296,14 +296,17 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   if (trimmed.includes("kimi") || trimmed.includes("moonshot")) return "moonshot/kimi";
   if (trimmed.includes("qwen")) return "qwen/coder";
 
-  const compact = trimmed.replace(/\s+/g, "");
-  const slashMatch = compact.match(/^([a-z0-9_-]+\/[a-z0-9_.-]+)/i);
+  // Only a `provider/model` slug survives. A bare human name — a Git `user.name` with no slash
+  // and no model marker — is anonymous history, and returning its first word would publish a
+  // person's name into `modelBreakdown`.
+  const head = trimmed.split(/[<(]/)[0].trim();
+  const compactHead = head.replace(/\s+/g, "");
+  const slashMatch = compactHead.match(/^([a-z0-9_-]+\/[a-z0-9_.-]+)/i);
   if (slashMatch) {
     return slashMatch[1];
   }
 
-  const firstWord = trimmed.split(/\s+/)[0];
-  return firstWord || "unknown/other";
+  return "unknown/other";
 }
 
 export type AuthorTier = "tier-1" | "tier-2" | "tier-3";

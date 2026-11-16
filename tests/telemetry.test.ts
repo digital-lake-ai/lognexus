@@ -151,6 +151,16 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
     });
 
+    it("never publishes a human Git identity as a model family", () => {
+      expect(extractModelFamilyCategory("Jane Doe <jane@example.com>")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Organization-Bot")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Jane Doe")).toBe("unknown/other");
+      // A provider/model slug still survives next to an address.
+      expect(extractModelFamilyCategory("someone/random <random@example.com>")).toBe(
+        "someone/random",
+      );
+    });
+
     it("categorizes frontier agent identities", () => {
       expect(
         extractModelFamilyCategory("Gemini 4 Argon (Master Architecture & Security Orchestrator)"),
