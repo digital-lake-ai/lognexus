@@ -8,6 +8,7 @@ import {
   type LognexusState,
   LognexusStateSchema,
   type SubtaskContract,
+  type SubtaskIsolation,
   type SubtaskState,
   SubtaskStateSchema,
 } from "./schema.js";
@@ -175,6 +176,8 @@ export const SUBTASK_ID_PATTERN = /^T\d+(?:-[a-zA-Z0-9]+)?$/;
 
 const TIERS: ActiveIssueState["tier"][] = ["tier-1", "tier-2", "tier-3"];
 const DECISION_BUDGETS: SubtaskContract["decisionBudget"][] = ["none", "narrow", "full"];
+const ISOLATION_MODES: readonly SubtaskIsolation[] = ["shared", "worktree", "branch", "subagent"];
+const ASSIGNEE_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_. -]+(?:\s*\([^()\r\n]+\))?$/;
 
 export interface ParsedSetTaskArgs {
   taskId: string;
@@ -205,6 +208,8 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
   let forbiddenFiles: string[] | undefined;
   let decisionBudget: SubtaskContract["decisionBudget"] | undefined;
   let verificationCmd: string | undefined;
+  let assignee: string | undefined;
+  let isolation: SubtaskIsolation | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -250,6 +255,28 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
         index += 1;
         break;
       }
+      case "--assignee": {
+        const value = readFlagValue(args, index, arg).trim();
+        if (!ASSIGNEE_PATTERN.test(value)) {
+          throw new Error(
+            `Invalid assignee '${value}'. Expected '<provider>/<model>' or '<provider>/<model> (<client>)'.`,
+          );
+        }
+        assignee = value;
+        index += 1;
+        break;
+      }
+      case "--isolation": {
+        const value = readFlagValue(args, index, arg).toLowerCase();
+        if (!(ISOLATION_MODES as readonly string[]).includes(value)) {
+          throw new Error(
+            `Invalid isolation mode '${value}'. Expected one of: ${ISOLATION_MODES.join(", ")}.`,
+          );
+        }
+        isolation = value as SubtaskIsolation;
+        index += 1;
+        break;
+      }
       default:
         throw new Error(`Unknown flag '${arg}'.`);
     }
@@ -267,12 +294,16 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
     allowedFiles !== undefined ||
     forbiddenFiles !== undefined ||
     decisionBudget !== undefined ||
-    verificationCmd !== undefined
+    verificationCmd !== undefined ||
+    assignee !== undefined ||
+    isolation !== undefined
       ? {
           allowedFiles: allowedFiles ?? [],
           forbiddenFiles: forbiddenFiles ?? [],
           decisionBudget: decisionBudget ?? "none",
           verificationCmd,
+          ...(assignee !== undefined ? { assignee } : {}),
+          ...(isolation !== undefined ? { isolation } : {}),
         }
       : undefined;
 

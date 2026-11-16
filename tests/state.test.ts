@@ -151,6 +151,32 @@ describe("State Manager & Schema", () => {
     expect((state.currentSubtask as Record<string, unknown>).allowedFiles).toBeUndefined();
   });
 
+  it("hoists assignee and isolation declared at the subtask root", () => {
+    mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+    writeFileSync(
+      join(tempDir, ".lognexus", "state.json"),
+      JSON.stringify({
+        schemaVersion: "1.0.0",
+        activeIssue: null,
+        currentSubtask: {
+          id: "T4",
+          title: "Subagent contract",
+          status: "in-progress",
+          allowedFiles: ["src/state/schema.ts"],
+          assignee: "claude/sonnet",
+          isolation: "subagent",
+        },
+        completedSubtasks: [],
+      }),
+      "utf8",
+    );
+
+    const state = loadState(tempDir);
+    expect(state.currentSubtask?.contract?.assignee).toBe("claude/sonnet");
+    expect(state.currentSubtask?.contract?.isolation).toBe("subagent");
+    expect((state.currentSubtask as Record<string, unknown>).assignee).toBeUndefined();
+  });
+
   it("loadState rescues valid blocks, warns on stderr and writes a backup on schema errors", () => {
     mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
     const badPayload = JSON.stringify({
@@ -345,6 +371,27 @@ describe("parseSetTaskArgs", () => {
     expect(() => parseSetTaskArgs(["T1", "--tier", "tier-9"])).toThrow(/Invalid tier/);
     expect(() => parseSetTaskArgs(["T1", "--budget", "unbounded"])).toThrow(
       /Invalid decision budget/,
+    );
+  });
+
+  it("parses --assignee and --isolation and rejects invalid values", () => {
+    const parsed = parseSetTaskArgs([
+      "T4",
+      "Dispatch",
+      "--assignee",
+      "google/gemini-4-hydrogen-high (antigravity)",
+      "--isolation",
+      "subagent",
+    ]);
+    expect(parsed.contract?.assignee).toBe("google/gemini-4-hydrogen-high (antigravity)");
+    expect(parsed.contract?.isolation).toBe("subagent");
+
+    expect(() => parseSetTaskArgs(["T4", "--assignee", "no-slash"])).toThrow(/Invalid assignee/);
+    expect(() => parseSetTaskArgs(["T4", "--assignee", "claude/sonnet\nReviewed-by: x"])).toThrow(
+      /Invalid assignee/,
+    );
+    expect(() => parseSetTaskArgs(["T4", "--isolation", "docker"])).toThrow(
+      /Invalid isolation mode/,
     );
   });
 });

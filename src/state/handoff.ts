@@ -4,12 +4,18 @@ import { basename, join, relative, resolve } from "node:path";
 import { extractTrailers } from "../audit/audit.js";
 import { getCliVersion } from "../cli.js";
 import { getNote } from "../notes/notes.js";
+import { type EffectiveReviewGateMode, resolveRoutingProfile } from "../routing/profile.js";
 import { ensureLocalGitExclude } from "../update/gate.js";
 import { loadState } from "./manager.js";
+import type { SubtaskIsolation } from "./schema.js";
 
+/** @deprecated Use `.lognexus/routing.md` (`implementer`) or `contract.assignee` instead. */
 export const IMPLEMENTER_IDENTITY = "deepseek/VS Code (kimi-code)";
+/** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
 export const AUDITOR_IDENTITY = "google/gemini-3.8-flash-high (antigravity)";
+/** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
 export const ARCHITECT_IDENTITY = "Gemini 4 Argon";
+/** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
 export const CO_ARCHITECT_IDENTITY = "Gemini 4 Carbon";
 
 /** Hard ceiling on implementation files a single subtask may touch in one turn. */
@@ -54,7 +60,16 @@ export interface ContextHandoff {
     tier: string;
     decisionBudget: string;
     allowedFiles: string[];
+    forbiddenFiles?: string[];
+    assignee?: string;
+    isolation?: SubtaskIsolation;
   } | null;
+  routing?: {
+    implementer: string | null;
+    reviewer: string | null;
+    reviewGate: EffectiveReviewGateMode;
+    profileLabel: string;
+  };
   contextBudget?: ContextBudgetStatus;
   scopeDrift: HandoffScopeDrift;
   completedSubtasks: HandoffSubtaskEntry[];
@@ -320,18 +335,24 @@ export function evaluateContextBudget(targetDir: string = process.cwd()): Contex
   };
 }
 
-function resolveNextAction(state: ReturnType<typeof loadState>): string {
-  if (state.currentSubtask === null) {
-    return `Cross-Model Auditor: ${AUDITOR_IDENTITY} under supervision of ${ARCHITECT_IDENTITY}`;
+function resolveNextAction(
+  state: ReturnType<typeof loadState>,
+  profile: ReturnType<typeof resolveRoutingProfile>,
+): string {
+  if (state.currentSubtask === null || state.currentSubtask.status === "completed") {
+    return profile.reviewer
+      ? `Independent Reviewer: route review to ${profile.reviewer} (review_gate: ${profile.effectiveReviewGate})`
+      : `Independent Reviewer: distinct model required (review_gate: ${profile.effectiveReviewGate})`;
   }
-  if (state.currentSubtask.status === "completed") {
-    return `Cross-Model Auditor: ${AUDITOR_IDENTITY} under supervision of ${ARCHITECT_IDENTITY}`;
-  }
-  return `Implementer: ${IMPLEMENTER_IDENTITY}`;
+  const impl = state.currentSubtask.contract?.assignee ?? profile.implementer;
+  return impl
+    ? `Implementer: ${impl}`
+    : "Implementer: active execution agent (<provider>/<model> (<client>))";
 }
 
 export function generateContextHandoff(targetDir: string = process.cwd()): ContextHandoff {
   const state = loadState(targetDir);
+  const profile = resolveRoutingProfile(targetDir);
   // A completed subtask releases its contract: nothing is pending, so nothing can drift.
   const activeSubtask =
     state.currentSubtask !== null && state.currentSubtask.status !== "completed"
@@ -349,6 +370,7 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
     return summary === null ? entry : { ...entry, title: summary };
   });
 
+  const forbiddenFiles = contract?.forbiddenFiles ?? [];
   return {
     generatedAt: new Date().toISOString(),
     issue: state.activeIssue
@@ -368,12 +390,21 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
           tier: state.activeIssue?.tier ?? "tier-3",
           decisionBudget: contract?.decisionBudget ?? "none",
           allowedFiles: contract?.allowedFiles ?? [],
+          ...(forbiddenFiles.length > 0 ? { forbiddenFiles } : {}),
+          ...(contract?.assignee ? { assignee: contract.assignee } : {}),
+          ...(contract?.isolation ? { isolation: contract.isolation } : {}),
         }
       : null,
+    routing: {
+      implementer: profile.implementer,
+      reviewer: profile.reviewer,
+      reviewGate: profile.effectiveReviewGate,
+      profileLabel: profile.ecosystems.profileLabel,
+    },
     contextBudget: evaluateContextBudget(targetDir),
     scopeDrift: resolveScopeDrift(targetDir, contract?.allowedFiles ?? []),
     completedSubtasks,
-    nextAction: resolveNextAction(state),
+    nextAction: resolveNextAction(state, profile),
   };
 }
 
@@ -405,6 +436,12 @@ export function renderContextHandoff(handoff: ContextHandoff): string {
     lines.push(`- **Title:** ${handoff.contract.title}`);
     lines.push(`- **Tier:** ${handoff.contract.tier}`);
     lines.push(`- **Decision budget:** ${handoff.contract.decisionBudget}`);
+    if (handoff.contract.assignee) {
+      lines.push(`- **Assigned agent:** \`${handoff.contract.assignee}\``);
+    }
+    if (handoff.contract.isolation) {
+      lines.push(`- **Isolation:** ${handoff.contract.isolation}`);
+    }
     lines.push("- **Allowed files:**");
     if (handoff.contract.allowedFiles.length === 0) {
       lines.push("  - _(none declared)_");
@@ -469,11 +506,16 @@ export function renderCompactDispatchPrompt(handoff: ContextHandoff): string {
   const branch = handoff.issue?.branch ?? "current scoped branch";
   const planRef = handoff.planFile ?? ".lognexus/handoff.md";
   const taskRef = handoff.contract ? `subtask ${handoff.contract.id}` : "all planned subtasks";
+  const author =
+    handoff.contract?.assignee ?? handoff.routing?.implementer ?? "<provider>/<model> (<client>)";
+  const forbidden = handoff.contract?.forbiddenFiles ?? [];
+  const forbiddenGuard =
+    forbidden.length > 0 ? `0 changes in ${forbidden.map((f) => `\`${f}\``).join(", ")}, ` : "";
   return [
     `Execute ${issueTag} (${taskRef}) on branch \`${branch}\`.`,
     `1. Read \`${planRef}\`, \`.lognexus/handoff.md\`, and \`.lognexus/state.json\` first (do not inline specs in chat).`,
-    `2. Sign every commit with \`--author "${IMPLEMENTER_IDENTITY}"\` and \`--finish-task\`.`,
-    `3. Governance guards: 0 changes in \`src/mcp/tools.ts\`, 0 \`fetch()\` calls, and strict \`{ shell: false }\`.`,
+    `2. Sign every commit with \`--author "${author}"\` and \`--finish-task\`.`,
+    `3. Governance guards: ${forbiddenGuard}0 \`fetch()\` calls, and strict \`{ shell: false }\`.`,
     `4. Assistant vs. Contract boundary: operate freely with your native IDE/assistant capabilities during conversation and exploration, but once executing the active subtask contract, strictly obey LogNexus contract governance (\`allowedFiles\`, \`forbiddenFiles\`, \`decisionBudget\`, and verification).`,
     `5. Do NOT write \`Reviewed-by:\` trailers, do NOT run \`git push\`, and do NOT open a PR. Run \`npm test && npm run build && npx lognexus audit main\` when done.`,
   ].join("\n");

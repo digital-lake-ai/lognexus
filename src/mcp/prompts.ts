@@ -112,12 +112,13 @@ ${issueLine}
 ${contextBlock}
 ## Rules
 
-1. Decompose the work into ordered subtasks, each named \`[tier-X]\` according to the model tier suited to it.
-2. Every subtask must carry a closed delegation contract. Never leave a subtask open-ended.
-3. Subtasks must not overlap in the files they touch. If they would, split further or sequence them.
-4. Each subtask must end in a state where the verification command passes.
-5. Prefer the lowest tier that can safely complete the subtask. Escalate to tier-1 only for decisions the executor must not make.
-6. Do not invent dependencies or APIs. If a capability is missing, the subtask must say "stop and ask".
+1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files), automatically delegate read-only codebase exploration to \`tier-2\`/\`tier-3\` subagents (zero writes) to save \`tier-1\` tokens.
+2. Decompose the work into ordered subtasks, each named \`[tier-X]\` according to the model tier suited to it, with pre-delimited subagent/isolation assignments awaiting developer confirmation before executing writes.
+3. Every subtask must carry a closed delegation contract. Never leave a subtask open-ended.
+4. Subtasks must not overlap in the files they touch. If they would, split further or sequence them.
+5. Each subtask must end in a state where the verification command passes.
+6. Prefer the lowest tier that can safely complete the subtask. Escalate to tier-1 only for decisions the executor must not make.
+7. Do not invent dependencies or APIs. If a capability is missing, the subtask must say "stop and ask".
 
 ## Tier taxonomy
 
@@ -133,6 +134,7 @@ For each subtask emit exactly:
 
 ### [tier-X] <short imperative title>
 - **Branch / commit:** \`feat(#<issue>/T<n>)\` or \`fix(#<issue>/T<n>)\`
+- **Assigned agent / isolation:** \`<tier-model or auto>\` (\`subagent\` | \`worktree\` | \`shared\`)
 - **Scope:** one or two sentences describing the exact change.
 
 ${CONTRACT_FORMAT}
@@ -160,7 +162,7 @@ ${diffBlock}
 3. **Scope**: no unrelated refactor, no unrequested dependency in \`package.json\`, no dead code or commented-out blocks.
 4. **Correctness**: edge cases, error paths, encoding/line-ending handling and platform differences (Windows vs POSIX) are addressed.
 5. **Traceability**: commits follow \`feat(#N/Tk)\` / \`fix(#N/Tk)\`, and the PR links the issue and the subtask contracts.
-6. **Attribution**: authorship trailers (\`Authored-by\`, \`Reviewed-by\`, \`Last-code-by\`) are present and the reviewer differs from the code author.
+6. **Attribution**: authorship trailers (\`Authored-by\`, \`Reviewed-by\`, \`Last-code-by\`) are present and the reviewer uses a distinct model per \`.lognexus/routing.md\` (\`cross-vendor\` or distinct \`intra-fleet\` model; identical-model self-approval is strictly rejected).
 7. **Tests**: new behaviour is covered by tests that fail when the behaviour is reverted. Tests must not be weakened to make them pass.
 
 ## Output format

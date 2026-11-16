@@ -1,10 +1,16 @@
 import { z } from "zod";
 
+export const SubtaskIsolationSchema = z.enum(["shared", "worktree", "branch", "subagent"]);
+
+export type SubtaskIsolation = z.infer<typeof SubtaskIsolationSchema>;
+
 export const SubtaskContractSchema = z.object({
   allowedFiles: z.array(z.string()).default([]),
   forbiddenFiles: z.array(z.string()).default([]),
   decisionBudget: z.enum(["none", "narrow", "full"]).default("none"),
   verificationCmd: z.string().optional(),
+  assignee: z.string().trim().min(1).optional(),
+  isolation: SubtaskIsolationSchema.optional(),
 });
 
 export type SubtaskContract = z.infer<typeof SubtaskContractSchema>;
@@ -14,6 +20,8 @@ const CONTRACT_KEYS = [
   "forbiddenFiles",
   "decisionBudget",
   "verificationCmd",
+  "assignee",
+  "isolation",
 ] as const;
 
 function hoistContractFields(value: unknown): unknown {

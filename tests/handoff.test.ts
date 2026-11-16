@@ -76,7 +76,10 @@ describe("Context Handoff Generator", () => {
     expect(handoff.contract).toBeNull();
     expect(handoff.completedSubtasks).toEqual([]);
     expect(handoff.version).toBe("1.3.0");
-    expect(handoff.nextAction).toContain(AUDITOR_IDENTITY);
+    expect(handoff.nextAction).toBe(
+      "Independent Reviewer: distinct model required (review_gate: intra-fleet)",
+    );
+    expect(handoff.nextAction).not.toContain("Reviewed-by:");
   });
 
   it("captures the active issue, version and subtask contract", () => {
@@ -105,11 +108,14 @@ describe("Context Handoff Generator", () => {
       tier: "tier-3",
       decisionBudget: "narrow",
       allowedFiles: ["src/state/handoff.ts", "src/cli.ts"],
+      forbiddenFiles: ["src/mcp/tools.ts"],
     });
-    expect(handoff.nextAction).toBe(`Implementer: ${IMPLEMENTER_IDENTITY}`);
+    expect(handoff.nextAction).toBe(
+      "Implementer: active execution agent (<provider>/<model> (<client>))",
+    );
   });
 
-  it("switches the next action to the auditor once the subtask is completed", () => {
+  it("switches the next action to the independent reviewer once the subtask is completed", () => {
     seedState();
     setSubtask("T3", "Implement handoff", undefined, tempDir);
 
@@ -126,8 +132,9 @@ describe("Context Handoff Generator", () => {
 
     const handoff = generateContextHandoff(tempDir);
     expect(handoff.nextAction).toBe(
-      `Cross-Model Auditor: ${AUDITOR_IDENTITY} under supervision of Gemini 4 Argon`,
+      "Independent Reviewer: distinct model required (review_gate: intra-fleet)",
     );
+    expect(handoff.nextAction).not.toContain("Reviewed-by:");
   });
 
   it("flags unauthorized working-tree files as scope drift", () => {
@@ -275,7 +282,7 @@ describe("Context Handoff Generator", () => {
     expect(markdown).toContain("## Completed Subtasks");
     expect(markdown).toContain("## Next Required Action");
     expect(markdown).toContain("`src/cli.ts`");
-    expect(markdown).toContain(IMPLEMENTER_IDENTITY);
+    expect(markdown).toContain("Implementer: active execution agent");
   });
 
   it("writes .lognexus/handoff.md and reloads it from disk", () => {
@@ -291,7 +298,7 @@ describe("Context Handoff Generator", () => {
     expect(written).toContain("## Next Required Action");
   });
 
-  it("renders a compact dispatch prompt referencing the handoff and the implementer identity", () => {
+  it("renders a compact vendor-neutral dispatch prompt without hardcoded forbiddenFiles", () => {
     seedState();
     setSubtask("T3", "Implement handoff", { allowedFiles: [], decisionBudget: "narrow" }, tempDir);
 
@@ -299,10 +306,10 @@ describe("Context Handoff Generator", () => {
     const lines = prompt.split("\n");
 
     expect(lines.length).toBeLessThanOrEqual(12);
-    expect(prompt).toContain(IMPLEMENTER_IDENTITY);
+    expect(prompt).toContain("<provider>/<model> (<client>)");
     expect(prompt).toContain(".lognexus/handoff.md");
     expect(prompt).toContain("Issue #30");
-    expect(prompt).toContain("src/mcp/tools.ts");
+    expect(prompt).not.toContain("src/mcp/tools.ts");
     expect(prompt).toContain("Assistant vs. Contract boundary");
   });
 
@@ -403,7 +410,59 @@ describe("Context Handoff Generator", () => {
     expect(budget.exceeded).toBe(false);
   });
 
-  it("exposes the co-architect identity", () => {
+  it("exposes the deprecated legacy identity constants for backwards compatibility", () => {
     expect(CO_ARCHITECT_IDENTITY).toBe("Gemini 4 Carbon");
+    expect(typeof IMPLEMENTER_IDENTITY).toBe("string");
+    expect(typeof AUDITOR_IDENTITY).toBe("string");
+  });
+
+  it("resolves contract assignee, isolation, forbiddenFiles and routing.md reviewer guidance", () => {
+    seedState();
+    mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+    writeFileSync(
+      join(tempDir, ".lognexus", "routing.md"),
+      "routing: confirm\nreview_gate: intra-fleet\nimplementer: claude/sonnet\nreviewer: claude/opus\n",
+      "utf8",
+    );
+    setSubtask(
+      "T4",
+      "Subagent dispatch",
+      {
+        allowedFiles: ["src/state/handoff.ts"],
+        forbiddenFiles: ["src/mcp/tools.ts"],
+        decisionBudget: "none",
+        assignee: "google/gemini-4-hydrogen-high (antigravity)",
+        isolation: "subagent",
+      },
+      tempDir,
+    );
+
+    const active = generateContextHandoff(tempDir);
+    expect(active.nextAction).toBe("Implementer: google/gemini-4-hydrogen-high (antigravity)");
+    expect(active.contract?.assignee).toBe("google/gemini-4-hydrogen-high (antigravity)");
+    expect(active.contract?.isolation).toBe("subagent");
+    expect(active.contract?.forbiddenFiles).toEqual(["src/mcp/tools.ts"]);
+
+    const md = renderContextHandoff(active);
+    expect(md).toContain("- **Assigned agent:** `google/gemini-4-hydrogen-high (antigravity)`");
+    expect(md).toContain("- **Isolation:** subagent");
+
+    const prompt = renderCompactDispatchPrompt(active);
+    expect(prompt).toContain('--author "google/gemini-4-hydrogen-high (antigravity)"');
+    expect(prompt).toContain("0 changes in `src/mcp/tools.ts`");
+
+    const current = JSON.parse(readFileSync(join(tempDir, ".lognexus", "state.json"), "utf8"));
+    current.currentSubtask.status = "completed";
+    writeFileSync(
+      join(tempDir, ".lognexus", "state.json"),
+      JSON.stringify(current, null, 2),
+      "utf8",
+    );
+
+    const done = generateContextHandoff(tempDir);
+    expect(done.nextAction).toBe(
+      "Independent Reviewer: route review to claude/opus (review_gate: intra-fleet)",
+    );
+    expect(done.nextAction).not.toContain("Reviewed-by:");
   });
 });
