@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  checkAgentEcosystem,
   checkGit,
   checkRulesConfig,
   checkScopeDrift,
@@ -171,6 +172,31 @@ describe("doctor diagnostics", () => {
     it("is the fifth check in the diagnostics table", () => {
       const results = runDiagnostics(process.cwd());
       expect(results[4]?.name).toBe("Version Maturity");
+      expect(results[5]?.name).toBe("Agent Ecosystem");
     });
+  });
+
+  it("ignores commented routing directives and warns on unknown keys in routing.md", () => {
+    const logDir = join(tempDir, ".lognexus");
+    mkdirSync(logDir);
+    writeFileSync(
+      join(logDir, "routing.md"),
+      "# routing: off\nrouting: confirm\nunknown_setting: true\n",
+      "utf8",
+    );
+
+    const check = checkRulesConfig(tempDir);
+    expect(check.status).toBe("warn");
+    expect(check.message).toContain("routing mode: confirm");
+    expect(check.message).toContain("Unknown routing key 'unknown_setting'");
+  });
+
+  it("reports detected agent ecosystem profile and effective review_gate", () => {
+    mkdirSync(join(tempDir, ".claude"));
+    const check = checkAgentEcosystem(tempDir);
+    expect(check.name).toBe("Agent Ecosystem");
+    expect(check.status).toBe("pass");
+    expect(check.message).toContain("single-client (claude-code)");
+    expect(check.message).toContain("review_gate: intra-fleet");
   });
 });

@@ -22,6 +22,7 @@ export {
   executeAtomicCommit,
 } from "./commit.js";
 export {
+  checkAgentEcosystem,
   checkGit,
   checkGitHubCli,
   checkRulesConfig,
@@ -74,6 +75,7 @@ export {
   pushNotes,
   searchNotesMemory,
 } from "./notes/notes.js";
+export * from "./routing/profile.js";
 export { DEFAULT_ROUTING_TEMPLATE, initProject, LOGNEXUS_GITIGNORE_ENTRIES } from "./scaffold.js";
 export {
   ARCHITECT_IDENTITY,

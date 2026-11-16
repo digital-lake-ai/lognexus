@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseRoutingConfigContent } from "../src/routing/profile.js";
 import { initProject, LOGNEXUS_GITIGNORE_ENTRIES } from "../src/scaffold.js";
 
 describe("initProject", () => {
@@ -71,6 +72,15 @@ describe("initProject", () => {
     expect(content).toContain("contract_governance:");
     expect(content).toContain("max_subtask_files: 6");
     expect(content).toContain("max_subtask_loc: 1200");
+    expect(content).toContain("review_gate: auto");
+    expect(content).toContain("# implementer: auto");
+    expect(content).toContain("# reviewer: auto");
+    expect(content).toContain("Cross-family review is recommended");
+
+    const parsed = parseRoutingConfigContent(content);
+    expect(parsed.routingMode).toBe("confirm");
+    expect(parsed.configuredReviewGate).toBe("auto");
+    expect(parsed.warnings).toEqual([]);
   });
 });
 

@@ -1,6 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { rejectNotesReference, validateGitReference } from "../git/safe.js";
 import { getNote } from "../notes/notes.js";
+import {
+  type EffectiveReviewGateMode,
+  parseRoutingConfigContent,
+  resolveRoutingProfile,
+} from "../routing/profile.js";
 import { inferTierFromAuthor, isGovernanceOrConfigSurface } from "../telemetry/detector.js";
 import { getJourneyTimeline, type TimelineItem } from "../timeline/timeline.js";
 
@@ -84,21 +89,40 @@ function extractFamily(value: string): string | null {
  * Stripping them is a `startsWith` probe rather than a regex alternation, so normalization
  * stays linear in the length of the identity string.
  */
-const CANONICAL_PROVIDER_PREFIXES = ["google/", "vertex/", "vertexai/"];
-
-/** `-high` is a reasoning-effort suffix on the same model, not a different family. */
-const HIGH_VARIANT_SUFFIX = "-high";
+const EFFORT_VARIANT_SUFFIXES = [
+  "-extra-high",
+  "-xtrahigh",
+  "-xhigh",
+  "-minimal",
+  "-medium",
+  "-high",
+  "-low",
+  "-none",
+] as const;
+const PROVIDER_ALIASES: ReadonlyArray<readonly [readonly string[], string]> = [
+  [["google/", "vertex/", "vertexai/"], "gemini"],
+  [["anthropic/"], "claude"],
+];
 
 function stripCanonicalDecorations(collapsed: string): string {
   let slug = collapsed;
-  for (const prefix of CANONICAL_PROVIDER_PREFIXES) {
-    if (slug.startsWith(prefix)) {
-      slug = slug.slice(prefix.length);
-      break;
-    }
+  for (let i = 0; i < 2; i++) {
+    const suffix = EFFORT_VARIANT_SUFFIXES.find((candidate) => slug.endsWith(candidate));
+    if (!suffix) break;
+    slug = slug.slice(0, -suffix.length);
   }
-  if (slug.endsWith(HIGH_VARIANT_SUFFIX)) {
-    slug = slug.slice(0, -HIGH_VARIANT_SUFFIX.length);
+
+  for (const [prefixes, target] of PROVIDER_ALIASES) {
+    const prefix = prefixes.find((p) => slug.startsWith(p));
+    if (!prefix) continue;
+    const rest = slug.slice(prefix.length);
+    if (rest.startsWith(`${target}-`)) slug = `${target}/${rest.slice(target.length + 1)}`;
+    else slug = rest.startsWith(`${target}/`) ? rest : `${target}/${rest}`;
+    break;
+  }
+  if (slug.startsWith("claude-")) slug = `claude/${slug.slice("claude-".length)}`;
+  if (slug.startsWith("claude/")) {
+    slug = slug.replace(/^claude\/([a-z0-9-]+)-(\d+)-(\d+)$/, "claude/$1-$2.$3");
   }
   return slug;
 }
@@ -110,9 +134,8 @@ function canonicalBasename(slug: string): string {
 }
 
 /**
- * Normalizes flagship display names and provider-prefixed model slugs onto a single
- * canonical family identifier so `Gemini 4 Carbon` and `gemini/carbon (antigravity)`
- * (or `google/gemini-4-carbon-high`) cannot bypass the self-approval gate via formatting differences.
+ * Normalizes display names, provider prefixes, dash/dot versions, and effort suffixes onto a
+ * canonical family identifier so formatting or reasoning-effort differences cannot bypass review gates.
  */
 function normalizeCanonicalFamily(raw: string): string {
   const collapsed = raw
@@ -122,8 +145,7 @@ function normalizeCanonicalFamily(raw: string): string {
   const slug = stripCanonicalDecorations(collapsed);
   const basename = canonicalBasename(slug);
 
-  const family = CANONICAL_FLAGSHIP_BASENAMES.get(basename);
-  return family ?? raw;
+  return CANONICAL_FLAGSHIP_BASENAMES.get(basename) ?? slug;
 }
 
 /**
@@ -187,23 +209,73 @@ export function extractTrailers(commitBody: string): {
   return { author, reviewer };
 }
 
-export function checkSelfApproval(
+export interface ReviewGateCheckResult {
+  violated: boolean;
+  severity: "error" | "warn";
+  message?: string;
+}
+
+/**
+ * Derives vendor strictly from the normalized model family prefix before `/`,
+ * never from parenthetical client qualifiers.
+ */
+export function extractVendor(identity: Identity): string {
+  return identity.family.split("/")[0];
+}
+
+/**
+ * Evaluates review-gate separation under the resolved `review_gate` mode.
+ * Identical full identity (`author.full === reviewer.full`) is an unbreakable error floor in all modes.
+ */
+export function checkReviewGate(
   authorStr: string | null,
   reviewerStr: string | null,
-): { isSelfApproval: boolean; message?: string } {
+  mode: EffectiveReviewGateMode = "intra-fleet",
+): ReviewGateCheckResult {
   const author = parseIdentity(authorStr);
   const reviewer = parseIdentity(reviewerStr);
+  if (author === null || reviewer === null) {
+    return { violated: false, severity: "error" };
+  }
 
-  if (author !== null && reviewer !== null) {
-    if (author.full === reviewer.full || author.family === reviewer.family) {
+  if (author.full === reviewer.full) {
+    return {
+      violated: true,
+      severity: "error",
+      message: `Self-approval detected: author '${authorStr}' and reviewer '${reviewerStr}' share the same identity ('${author.full}').`,
+    };
+  }
+
+  if (mode === "off") return { violated: false, severity: "warn" };
+
+  if (author.family === reviewer.family) {
+    return {
+      violated: true,
+      severity: mode === "advisory" ? "warn" : "error",
+      message: `Self-approval detected: author '${authorStr}' and reviewer '${reviewerStr}' share the same model family ('${author.family}')${mode === "advisory" ? " (advisory review_gate mode)" : ""}.`,
+    };
+  }
+
+  if (mode === "cross-vendor") {
+    const vendor = extractVendor(author);
+    if (vendor === extractVendor(reviewer)) {
       return {
-        isSelfApproval: true,
-        message: `Self-approval detected: author '${authorStr}' and reviewer '${reviewerStr}' share the same identity or model family ('${author.family}').`,
+        violated: true,
+        severity: "error",
+        message: `Cross-vendor review-gate violation: author '${authorStr}' and reviewer '${reviewerStr}' share the same vendor ('${vendor}').`,
       };
     }
   }
 
-  return { isSelfApproval: false };
+  return { violated: false, severity: mode === "advisory" ? "warn" : "error" };
+}
+
+export function checkSelfApproval(
+  authorStr: string | null,
+  reviewerStr: string | null,
+): { isSelfApproval: boolean; message?: string } {
+  const res = checkReviewGate(authorStr, reviewerStr, "intra-fleet");
+  return res.violated ? { isSelfApproval: true, message: res.message } : { isSelfApproval: false };
 }
 
 function normalizePath(value: string): string {
@@ -301,7 +373,37 @@ function isBookkeepingFile(file: string): boolean {
   return file.startsWith(".lognexus/") || file.startsWith("docs/contexto/");
 }
 
-function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
+const GATE_STRICTNESS: Record<EffectiveReviewGateMode, number> = {
+  off: 0,
+  advisory: 1,
+  "intra-fleet": 2,
+  "cross-vendor": 3,
+};
+
+function readGitFileAtRef(ref: string, filePath: string, targetDir: string): string | null {
+  try {
+    const safeRef = validateGitReference(ref);
+    return execFileSync("git", ["show", `${safeRef}:${filePath}`], {
+      cwd: targetDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function parseEffectiveGate(content: string): EffectiveReviewGateMode {
+  const { configuredReviewGate } = parseRoutingConfigContent(content);
+  return configuredReviewGate === "auto" ? "intra-fleet" : configuredReviewGate;
+}
+
+function auditCommit(
+  item: TimelineItem,
+  targetDir: string,
+  gateMode: EffectiveReviewGateMode,
+): AuditViolation[] {
   const violations: AuditViolation[] = [];
   const base = { commitSha: item.sha, shortSha: item.shortSha };
 
@@ -314,16 +416,32 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
     });
   }
 
-  const selfApprovalCheck = checkSelfApproval(item.author, item.reviewer);
-  if (selfApprovalCheck.isSelfApproval) {
+  const gateCheck = checkReviewGate(item.author, item.reviewer, gateMode);
+  if (gateCheck.violated) {
     violations.push({
       ...base,
       rule: "review-gate-separation",
       message:
-        selfApprovalCheck.message ??
+        gateCheck.message ??
         `Self-approval detected: author '${item.author}' and reviewer '${item.reviewer}' share the same identity.`,
-      severity: "error",
+      severity: gateCheck.severity,
     });
+  }
+
+  const changedFiles = listCommitFiles(item.sha, targetDir);
+  if (changedFiles.includes(".lognexus/routing.md")) {
+    const commitRouting = readGitFileAtRef(item.sha, ".lognexus/routing.md", targetDir);
+    if (commitRouting !== null) {
+      const commitGate = parseEffectiveGate(commitRouting);
+      if (GATE_STRICTNESS[commitGate] < GATE_STRICTNESS[gateMode]) {
+        violations.push({
+          ...base,
+          rule: "review-gate-separation",
+          message: `Commit modifies .lognexus/routing.md and weakens review_gate from '${gateMode}' to '${commitGate}'; base branch gate '${gateMode}' remains enforced.`,
+          severity: "warn",
+        });
+      }
+    }
   }
 
   const note = getNote(item.sha, { cwd: targetDir });
@@ -356,7 +474,6 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
   if (contract !== null) {
     const allowedFiles = toStringList(contract.allowedFiles);
     const forbiddenFiles = toStringList(contract.forbiddenFiles);
-    const changedFiles = listCommitFiles(item.sha, targetDir);
 
     const forbidden = changedFiles.filter((file) =>
       forbiddenFiles.some((rule) => matchesPath(file, rule)),
@@ -407,10 +524,18 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
 export function auditBranch(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
+  options?: { reviewGateMode?: EffectiveReviewGateMode },
 ): AuditResult {
   const safeBase = rejectNotesReference(baseBranch, "audit base branch");
+  const baseRoutingRaw = readGitFileAtRef(safeBase, ".lognexus/routing.md", targetDir);
+  const gateMode: EffectiveReviewGateMode =
+    options?.reviewGateMode ??
+    (baseRoutingRaw !== null
+      ? parseEffectiveGate(baseRoutingRaw)
+      : resolveRoutingProfile(targetDir).effectiveReviewGate);
+
   const timeline = getJourneyTimeline(safeBase, targetDir);
-  const violations = timeline.items.flatMap((item) => auditCommit(item, targetDir));
+  const violations = timeline.items.flatMap((item) => auditCommit(item, targetDir, gateMode));
 
   const normalizedCurrent = timeline.branch.replace(/^refs\/heads\//, "");
   const normalizedBase = safeBase.replace(/^refs\/heads\//, "").replace(/^origin\//, "");

@@ -594,6 +594,8 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain("[tier-X]");
       expect(text).toContain("Allowed files");
       expect(text).toContain("Decision budget");
+      expect(text).toContain("Assigned agent / isolation");
+      expect(text).toContain("subagents");
     });
 
     it("gets the lognexus-review prompt with the gate checklist", async () => {
@@ -608,6 +610,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       const text = prompt.messages[0].content.text;
       expect(text).toContain("issue/7-mcp-server");
       expect(text).toContain("review gate");
+      expect(text).toContain("intra-fleet");
       expect(text).toContain("Verdict");
       expect(text).toContain("npm test");
     });

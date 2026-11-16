@@ -187,6 +187,7 @@ State Subcommands:
   lognexus state [show]             Display current active issue and task state
   lognexus state sync               Sync state from current Git branch & GitHub
   lognexus state set-task <id> [t]  Set active subtask (e.g. lognexus state set-task T1 "Add schema")
+                                    [--assignee "<identity>"] [--isolation <mode>]
   lognexus state finish-task <id>   Mark subtask as completed (e.g. lognexus state finish-task T1)
   lognexus state clear              Reset persistent state to empty
 
@@ -292,9 +293,9 @@ async function handleDoctor() {
   console.log("\nDiagnostic complete.\n");
 }
 
-async function handleStatus() {
+export async function handleStatus(targetDir: string = process.cwd()) {
   printHeader();
-  const st = getProjectStatus();
+  const st = getProjectStatus(targetDir);
 
   console.log(`Git Repository:     ${st.isInsideGit ? "Yes" : "No"}`);
   console.log(`Current Branch:     ${st.branch}`);
@@ -303,6 +304,8 @@ async function handleStatus() {
   );
   console.log(`Active Issue:       ${st.activeIssue ?? "(none — on base branch)"}`);
   console.log(`Rules Routing Mode: ${st.routingMode}`);
+  console.log(`Ecosystem Profile:  ${st.ecosystemProfile}`);
+  console.log(`Review Gate Mode:   ${st.reviewGateMode}`);
   console.log(`Recommended Tier:   ${st.recommendedTier}`);
   if (st.scopeDrift.detected) {
     console.log(
@@ -316,13 +319,13 @@ async function handleStatus() {
   console.log("");
 }
 
-async function handleState(args: string[]) {
+export async function handleState(args: string[], targetDir: string = process.cwd()) {
   const sub = args[0]?.toLowerCase() || "show";
 
   switch (sub) {
     case "show": {
       printHeader();
-      const state = loadState();
+      const state = loadState(targetDir);
       console.log("Persistent Agent State (.lognexus/state.json):\n");
 
       if (state.activeIssue) {
@@ -344,6 +347,12 @@ async function handleState(args: string[]) {
           console.log(`  Title:           ${state.currentSubtask.title}`);
         }
         if (state.currentSubtask.contract) {
+          if (state.currentSubtask.contract.assignee) {
+            console.log(`  Assigned Agent:  ${state.currentSubtask.contract.assignee}`);
+          }
+          if (state.currentSubtask.contract.isolation) {
+            console.log(`  Isolation Mode:  ${state.currentSubtask.contract.isolation}`);
+          }
           console.log(
             `  Allowed Files:   ${state.currentSubtask.contract.allowedFiles.join(", ") || "(all)"}`,
           );
@@ -366,7 +375,7 @@ async function handleState(args: string[]) {
     case "sync": {
       printHeader();
       console.log("Synchronizing state from current Git branch and GitHub...\n");
-      const synced = syncStateFromGit();
+      const synced = syncStateFromGit(targetDir);
       if (synced.activeIssue) {
         console.log(
           `[OK] Synchronized with Issue #${synced.activeIssue.id} (${synced.activeIssue.title})`,
@@ -395,7 +404,7 @@ async function handleState(args: string[]) {
         process.exit(1);
       }
       printHeader();
-      setSubtask(parsed.taskId, parsed.title, parsed.contract, undefined, { tier: parsed.tier });
+      setSubtask(parsed.taskId, parsed.title, parsed.contract, targetDir, { tier: parsed.tier });
       console.log(
         `[OK] Active subtask set to: ${parsed.taskId}${parsed.title ? ` — ${parsed.title}` : ""}\n`,
       );
@@ -409,14 +418,14 @@ async function handleState(args: string[]) {
         process.exit(1);
       }
       printHeader();
-      finishSubtask(taskId);
+      finishSubtask(taskId, targetDir);
       console.log(`[OK] Subtask ${taskId} marked as completed.\n`);
       break;
     }
 
     case "clear": {
       printHeader();
-      clearState();
+      clearState(targetDir);
       console.log("[OK] Persistent state cleared.\n");
       break;
     }

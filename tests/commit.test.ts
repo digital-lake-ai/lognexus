@@ -574,4 +574,60 @@ describe("Commit tier routing (inference, escalation and audit trail)", () => {
       expect(output).toContain("tier-routing-violation");
     });
   });
+
+  describe("Adaptive review_gate enforcement", () => {
+    it("blocks same-vendor review when routing.md declares review_gate: cross-vendor", () => {
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".lognexus", "routing.md"),
+        "routing: confirm\nreview_gate: cross-vendor\n",
+        "utf8",
+      );
+      writeFileSync(join(tempDir, "feature.ts"), "export const x = 1;\n", "utf8");
+      execSync("git add feature.ts", { cwd: tempDir, stdio: "ignore" });
+
+      expect(() => {
+        executeAtomicCommit({
+          message: "feat(#63/T2): test cross-vendor gate",
+          author: "google/gemini-4-hydrogen-high (antigravity)",
+          reviewer: "Gemini 4 Argon",
+          targetDir: tempDir,
+        });
+      }).toThrow(/Review-gate separation violation/);
+    });
+
+    it("warns without blocking in advisory mode for distinct identities of the same family, while keeping identical identity blocked", () => {
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".lognexus", "routing.md"),
+        "routing: confirm\nreview_gate: advisory\n",
+        "utf8",
+      );
+      writeFileSync(join(tempDir, "feature.ts"), "export const x = 1;\n", "utf8");
+      execSync("git add feature.ts", { cwd: tempDir, stdio: "ignore" });
+
+      expect(() => {
+        executeAtomicCommit({
+          message: "feat(#63/T2): identical identity still blocked",
+          author: "claude/sonnet-4.6-high (claude-code)",
+          reviewer: "claude/sonnet-4.6-high (claude-code)",
+          targetDir: tempDir,
+        });
+      }).toThrow(/Review-gate separation violation/);
+
+      const warnSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const res = executeAtomicCommit({
+          message: "feat(#63/T2): advisory mode allows with warning",
+          author: "claude/sonnet-4.6-high (claude-code)",
+          reviewer: "anthropic/claude-sonnet-4-6-low (cursor)",
+          targetDir: tempDir,
+        });
+        expect(res.noteAttached).toBe(true);
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[WARN]"));
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
 });

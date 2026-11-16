@@ -207,6 +207,22 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor(null)).toBeNull();
     });
 
+    it("classifies o1, o3, gpt-5, deepseek-r1, and gemini-pro-high tiers correctly", () => {
+      expect(inferTierFromAuthor("openai/o1")).toBe("tier-1");
+      expect(inferTierFromAuthor("openai/o3")).toBe("tier-1");
+      expect(inferTierFromAuthor("openai/o3-xhigh")).toBe("tier-1");
+      expect(inferTierFromAuthor("openai/o3-mini")).toBe("tier-2");
+      expect(inferTierFromAuthor("openai/gpt-5")).toBe("tier-1");
+      expect(inferTierFromAuthor("openai/gpt-4o-mini")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek/r1")).toBe("tier-1");
+      expect(inferTierFromAuthor("deepseek/v3")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek/VS Code (kimi-code, orchestrator)")).toBe("tier-3");
+      expect(extractModelFamilyCategory("gemini-3.8-pro-high")).toBe("gemini/pro");
+      expect(inferTierFromAuthor("gemini-3.8-pro-high")).toBe("tier-1");
+      expect(extractModelFamilyCategory("gemini-2.5-pro-high")).toBe("gemini/pro");
+      expect(inferTierFromAuthor("gemini-2.5-pro-high")).toBe("tier-1");
+    });
+
     it("detects Lua and SphereScript stacks from extensions", () => {
       mkdirSync(join(tempDir, "scripts"), { recursive: true });
       writeFileSync(join(tempDir, "scripts", "macro.lua"), "print('macro')\n", "utf8");

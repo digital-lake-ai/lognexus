@@ -2,9 +2,9 @@ import { execSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { auditBranch } from "../src/audit/audit.js";
-import { getCliVersion } from "../src/cli.js";
+import { getCliVersion, handleState, handleStatus } from "../src/cli.js";
 import { runDiagnostics } from "../src/doctor.js";
 import { MCP_SERVER_VERSION, processMcpMessage } from "../src/mcp/server.js";
 import type { ToolCallResult } from "../src/mcp/tools.js";
@@ -164,4 +164,41 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     expect(stateFinal.currentSubtask).toBeNull();
     expect(stateFinal.completedSubtasks).toEqual([]);
   }, 20000);
+
+  it("wires --assignee and --isolation into state set-task and prints them in state show and status", async () => {
+    initProject(tempDir);
+
+    await handleState(
+      [
+        "set-task",
+        "T5",
+        "Implement CLI wiring",
+        "--assignee",
+        "claude/sonnet",
+        "--isolation",
+        "subagent",
+      ],
+      tempDir,
+    );
+
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await handleState(["show"], tempDir);
+      const showOutput = logs.join("\n");
+      expect(showOutput).toContain("Assigned Agent:  claude/sonnet");
+      expect(showOutput).toContain("Isolation Mode:  subagent");
+
+      logs.length = 0;
+      await handleStatus(tempDir);
+      const statusOutput = logs.join("\n");
+      expect(statusOutput).toContain("Ecosystem Profile:");
+      expect(statusOutput).toContain("Review Gate Mode:");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
 });
