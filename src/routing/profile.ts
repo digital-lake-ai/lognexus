@@ -147,6 +147,26 @@ function normalizeAutoIdentity(rawValue: string): string | null {
   return rawValue;
 }
 
+function stripInlineHashComment(line: string): string {
+  for (let i = 1; i < line.length; i += 1) {
+    if (line[i] === "#" && (line[i - 1] === " " || line[i - 1] === "\t")) {
+      return line.slice(0, i).trimEnd();
+    }
+  }
+  return line;
+}
+
+function isLowerSnakeKey(value: string): boolean {
+  if (value.length === 0) return false;
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if ((code < 97 || code > 122) && code !== 95) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Parses `.lognexus/routing.md` with line-anchored keys, skipping `#` comments,
  * HTML comments (`<!--` / `-->`), and inline `# ...` comments. Never throws.
@@ -181,14 +201,17 @@ export function parseRoutingConfigContent(content: string): ParsedRoutingConfig 
       continue;
     }
 
-    const uncommented = trimmed.replace(/\s+#.*$/, "").trim();
-    const match = uncommented.match(/^([a-z_]+)\s*:\s*(.*)$/);
-    if (!match) {
+    const uncommented = stripInlineHashComment(trimmed).trim();
+    const colonIdx = uncommented.indexOf(":");
+    if (colonIdx <= 0) {
       continue;
     }
 
-    const key = match[1];
-    const value = match[2].replace(/\s*<!--.*$/, "").trim();
+    const key = uncommented.slice(0, colonIdx).trim();
+    if (!isLowerSnakeKey(key)) {
+      continue;
+    }
+    const value = uncommented.slice(colonIdx + 1).trim();
 
     switch (key) {
       case "routing": {

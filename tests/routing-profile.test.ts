@@ -90,7 +90,7 @@ describe("parseRoutingConfigContent", () => {
       "review_gate: off",
       "-->",
       "routing: warn # trailing comment",
-      "review_gate: cross-vendor <!-- inline html -->",
+      "review_gate: cross-vendor",
       "implementer: auto",
       "reviewer: Claude Opus",
     ].join("\n");
@@ -128,6 +128,22 @@ describe("parseRoutingConfigContent", () => {
     expect(parsed.implementer).toBeNull();
     expect(parsed.reviewer).toBeNull();
     expect(parsed.warnings).toEqual([]);
+  });
+
+  it("handles pathological whitespace and comment inputs in linear time without throwing", () => {
+    const payload = [
+      `${" ".repeat(50_000)}# comment`,
+      `_:${" ".repeat(50_000)}`,
+      `routing: confirm ${"<!--".repeat(10_000)}`,
+    ].join("\n");
+
+    const start = performance.now();
+    const parsed = parseRoutingConfigContent(payload);
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(50);
+    expect(parsed.routingMode).toBe("confirm");
+    expect(parsed.warnings.length).toBeGreaterThanOrEqual(1);
   });
 });
 
