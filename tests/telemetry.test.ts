@@ -31,6 +31,7 @@ import {
   recordTaskFinish,
   recordTaskStart,
   redactLocalProjectMetadata,
+  syncTelemetryFromGitNotes,
   TelemetryStoreSchema,
 } from "../src/telemetry/index.js";
 import { AnonymousDiagnosticPayloadSchema } from "../src/telemetry/schema.js";
@@ -323,10 +324,12 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content).toContain("`.ts`");
 
       const store = loadTelemetry(tempDir);
-      expect(store.summary.totalCommits).toBe(1);
-      expect(store.summary.totalLinesAdded).toBe(1);
+      // Both commits in history are reconciled: the unscoped backfill replays the full log,
+      // and the parentless initial commit now reports its README diff as well.
+      expect(store.summary.totalCommits).toBe(2);
+      expect(store.summary.totalLinesAdded).toBe(2);
       expect(store.extensions[".ts"]?.commits).toBe(1);
-      expect(Object.values(store.models)[0]?.commits).toBe(1);
+      expect(Object.values(store.models).reduce((sum, m) => sum + m.commits, 0)).toBe(2);
       expect(store.summary.estimatedCostSavingsPct).toBe(96);
     });
 
@@ -403,7 +406,10 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       writeFileSync(join(tempDir, "app.py"), "print('hello')\n", "utf8");
       execSync("git add app.py", { cwd: tempDir, stdio: "ignore" });
-      execSync('git commit -m "feat: python script"', { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "feat: python script" --author "gemini/flash (antigravity) <flash@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
       const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
 
       recordCommitTelemetry({
@@ -419,6 +425,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content).toContain("Executive Metrics Dashboard");
       expect(content).toContain("Multi-Model Swarm Distribution");
       expect(content).toContain("Cost Efficiency & Model-Tier ROI Evaluation");
+      // The unscoped reconciliation replays the whole log, so the initial commit is priced
+      // under the repository's configured Git identity rather than the recording author.
       expect(content).toContain("`gemini/flash`");
       expect(content).toContain("`.py`");
     });
@@ -777,6 +785,247 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       const barrel = await import("../src/telemetry/index.js");
       expect("dispatchCommunityTelemetry" in barrel).toBe(false);
       expect("DEFAULT_TELEMETRY_ENDPOINT" in barrel).toBe(false);
+    });
+  });
+
+  describe("LOC-Weighted ROI Estimator", () => {
+    const writeLines = (relativePath: string, lineCount: number) => {
+      const target = join(tempDir, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      const body = Array.from({ length: lineCount }, (_, i) => `export const value${i} = ${i};`);
+      writeFileSync(target, `${body.join("\n")}\n`, "utf8");
+    };
+
+    const commitAndRecord = (message: string, author: string, tier: string) => {
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(`git commit -q -m "${message}"`, { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+      recordCommitTelemetry({ sha, author, tier, targetDir: tempDir });
+      return sha;
+    };
+
+    it("prices a heavy refactor far above a one-line change on the same tier", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      // Recorded straight from the commit so the incremental and replayed aggregates both
+      // price the same commit identically.
+      writeLines("src/small.ts", 1);
+      commitAndRecord("feat(#61/T1): one line", "gemini/flash", "tier-3");
+      const smallModel = loadTelemetry(tempDir).models["gemini/flash"];
+      const smallCost = smallModel?.estimatedCostUsd ?? 0;
+      const smallTokens =
+        (smallModel?.estimatedInputTokens ?? 0) + (smallModel?.estimatedOutputTokens ?? 0);
+
+      writeLines("src/large.ts", 100);
+      commitAndRecord("feat(#61/T2): hundred lines", "gemini/flash", "tier-3");
+      const largeModel = loadTelemetry(tempDir).models["gemini/flash"];
+      const largeCost = largeModel?.estimatedCostUsd ?? 0;
+      const largeTokens =
+        (largeModel?.estimatedInputTokens ?? 0) + (largeModel?.estimatedOutputTokens ?? 0);
+
+      expect(largeModel?.sourceLinesAdded).toBe(101);
+      // `docsLinesAdded` folds documentation and configuration together. Here it is entirely
+      // configuration: the telemetry store the recorder itself writes (47 plus 43 lines).
+      expect(largeModel?.docsLinesAdded).toBe(90);
+
+      const deltaCost = Number((largeCost - smallCost).toFixed(6));
+      const deltaTokens = largeTokens - smallTokens;
+      // 100 source lines cost 100x the per-line rate plus a token floor far above the
+      // single-line commit, so a refactor can never be priced like a typo fix.
+      expect(deltaCost).toBeCloseTo(0.002886, 6);
+      expect(deltaTokens).toBe(3888);
+    });
+
+    it("prices source lines above documentation lines within one commit", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      writeLines("src/engine.ts", 10);
+      mkdirSync(join(tempDir, "docs"), { recursive: true });
+      writeFileSync(join(tempDir, "docs", "guide.md"), "# Guide\n".repeat(20), "utf8");
+      commitAndRecord("feat(#61/T3): engine and guide", "claude/haiku", "tier-3");
+
+      const model = loadTelemetry(tempDir).models["claude/haiku"];
+      expect(model?.sourceLinesAdded).toBe(10);
+      // 20 guide lines plus the telemetry store the recorder writes during the commit (see
+      // the bucket's total above); both land in the fold used for pricing.
+      expect(model?.docsLinesAdded).toBe(67);
+      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 67 doc/config lines at 0.000002.
+      expect(model?.estimatedCostUsd).toBeCloseTo(0.002214, 6);
+    });
+
+    it("scales the frontier baseline with the LOC actually shipped", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      writeLines("src/engine.ts", 100);
+      commitAndRecord("feat(#61/T4): engine", "gemini/flash", "tier-3");
+
+      const summary = loadTelemetry(tempDir).summary;
+      expect(summary.totalCommits).toBe(1);
+      expect(summary.tierCommits["tier-3"]).toBe(1);
+      // Tier-1 baseline for 100 source lines + the 47 lines of the telemetry store the
+      // recorder writes alongside them: 0.05 + 100*0.00015 + 47*0.00004.
+      expect(summary.estimatedBaselineCostUsd).toBe(0.067);
+      expect(summary.estimatedActualCostUsd).toBe(0.003);
+      expect(summary.estimatedCostSavingsUsd).toBe(0.064);
+      expect(summary.estimatedBaselineTokens).toBeGreaterThan(summary.estimatedActualTokens);
+      expect(summary.estimatedTokensSaved).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Scoped Filters & Git-Derived Metrics", () => {
+    const note = (sha: string, payload: Record<string, unknown>) => {
+      execFileSync(
+        "git",
+        ["notes", "--ref=lognexus", "add", "-f", "-m", JSON.stringify(payload), sha],
+        { cwd: tempDir, stdio: "ignore", shell: false },
+      );
+    };
+
+    const commitFile = (
+      relativePath: string,
+      body: string,
+      message: string,
+      author = "gemini/flash <flash@example.com>",
+    ) => {
+      const target = join(tempDir, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, body, "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(`git commit -q -m "${message}" --author "${author}"`, {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+      return execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+    };
+
+    it("preserves an explicit tier-3 recorded by a modern schema note", () => {
+      const sha = commitFile(
+        "worker.ts",
+        "export const run = () => {};\n",
+        "feat(#58/T1): add worker",
+        "google/gemini-3.8-flash-high <flash@example.com>",
+      );
+      note(sha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 58 },
+        subtask: { id: "T1" },
+        tier: "tier-3",
+      });
+
+      enableTelemetry({ cwd: tempDir });
+      const store = syncTelemetryFromGitNotes(tempDir, { issue: 58 });
+
+      expect(store.summary.totalCommits).toBe(1);
+      expect(store.summary.tierCommits["tier-3"]).toBe(1);
+      expect(store.summary.tierCommits["tier-1"]).toBe(0);
+      expect(store.models["gemini/flash-high"]?.tier).toBe("tier-3");
+    });
+
+    it("filters by numeric, hashed and alphanumeric issue identifiers without touching the store", () => {
+      const numeric = commitFile("numeric.ts", "export const a = 1;\n", "feat(#58/T1): numeric");
+      note(numeric, { issue: { id: 58 }, subtask: { id: "T1" } });
+      const ticket = commitFile("ticket.ts", "export const b = 2;\n", "fix(SLM-201/T1): ticket");
+      note(ticket, { issue: { id: "SLM-201" }, subtask: { id: "T1" } });
+      const other = commitFile("other.ts", "export const c = 3;\n", "feat(#61/T1): other");
+      note(other, { issue: { id: 61 }, subtask: { id: "T1" } });
+
+      enableTelemetry({ cwd: tempDir });
+      const persisted = syncTelemetryFromGitNotes(tempDir);
+      const snapshot = readFileSync(getTelemetryPath(tempDir), "utf8");
+      expect(persisted.summary.totalCommits).toBe(4);
+
+      for (const [issue, expected] of [
+        [58, 1],
+        ["58", 1],
+        ["#58", 1],
+        ["SLM-201", 1],
+        ["slm-201", 1],
+        [61, 1],
+      ] as const) {
+        const scoped = syncTelemetryFromGitNotes(tempDir, { issue });
+        expect(scoped.summary.totalCommits).toBe(expected);
+      }
+
+      expect(readFileSync(getTelemetryPath(tempDir), "utf8")).toBe(snapshot);
+    });
+
+    it("scopes by date window and branch without persisting a projection", () => {
+      execSync("git checkout -q -b feature/telemetry", { cwd: tempDir, stdio: "ignore" });
+      commitFile("branch.ts", "export const branch = true;\n", "feat(#61/T1): branch work");
+
+      enableTelemetry({ cwd: tempDir });
+      syncTelemetryFromGitNotes(tempDir);
+      const snapshot = readFileSync(getTelemetryPath(tempDir), "utf8");
+
+      const byBranch = syncTelemetryFromGitNotes(tempDir, {
+        branch: "feature/telemetry",
+        issue: 61,
+      });
+      expect(byBranch.summary.totalCommits).toBe(1);
+
+      const bySince = syncTelemetryFromGitNotes(tempDir, { since: "2000-01-01" });
+      expect(bySince.summary.totalCommits).toBe(2);
+
+      const future = syncTelemetryFromGitNotes(tempDir, { since: "2099-01-01" });
+      expect(future.summary.totalCommits).toBe(0);
+      expect(future.summary.gitNotesCoveragePct).toBe(100);
+
+      expect(() => syncTelemetryFromGitNotes(tempDir, { since: "--upload-pack=evil" })).toThrow(
+        /Invalid telemetry scope value/,
+      );
+
+      expect(readFileSync(getTelemetryPath(tempDir), "utf8")).toBe(snapshot);
+    });
+
+    it("derives cadence, contract compliance, rework ratio and coverage from Git", () => {
+      const contracted = commitFile(
+        "src/engine.ts",
+        "export const engine = 1;\n",
+        "feat(#61/T1): engine",
+      );
+      note(contracted, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 61 },
+        subtask: { id: "T1", contract: { allowedFiles: ["src/engine.ts"] } },
+      });
+
+      const escaped = commitFile(
+        "src/escape.ts",
+        "export const escape = 1;\n",
+        "feat(#61/T2): escape",
+      );
+      note(escaped, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 61 },
+        subtask: { id: "T2", contract: { allowedFiles: ["src/engine.ts"] } },
+      });
+
+      commitFile(
+        "src/rework.ts",
+        "export const rework = 1;\n",
+        "fix(#61/T2): repair engine",
+        "antigravity/lead-orchestrator <lead@example.com>",
+      );
+
+      enableTelemetry({ cwd: tempDir });
+      const store = syncTelemetryFromGitNotes(tempDir);
+      const summary = store.summary;
+
+      expect(summary.contractedCommits).toBe(2);
+      expect(summary.contractCompliancePct).toBe(50);
+      expect(summary.reworkCommits).toBe(1);
+      expect(summary.reworkRatioPct).toBe(25);
+      // Every commit in history carries a Git Note.
+      expect(summary.gitNotesCoveragePct).toBe(100);
+      expect(summary.escalatedCommits).toBe(0);
+      // Active span is the distance between the first and the last commit, measured end to
+      // end; only a single-commit history can report a zero span.
+      expect(summary.activeDevelopmentSpanSec).toBeGreaterThan(0);
+      // The median cadence is censored below one minute so a burst of commits in the same
+      // minute reads as zero instead of as a sub-second interval.
+      expect(summary.medianCommitCadenceSec).toBe(0);
+      expect(summary.tierCommits["tier-1"]).toBe(1);
+      expect(summary.tierCommits["tier-3"]).toBe(1);
     });
   });
 });
