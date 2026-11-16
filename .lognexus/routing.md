@@ -1,9 +1,11 @@
-# Model-Tier Routing Configuration
+# Model-Tier Routing Configuration (LogNexus Maintainer Repository)
 
-# Modes: confirm (pause and prompt) | warn (banner only) | off (silent)
 routing: confirm
+review_gate: intra-fleet
+implementer: google/gemini-4-hydrogen-high (antigravity)
+reviewer: Gemini 4 Argon
 
-# Operational Tier Taxonomy (Advisory across Claude, OpenAI, Gemini, DeepSeek)
-# tier-1 (Reasoning / Arch / Review): Claude Opus, OpenAI o3/GPT, Gemini Pro, DeepSeek R1
-# tier-2 (Context / Triage / Discovery): Claude Sonnet, GPT-4.1, Gemini Flash/Pro (1M), DeepSeek V3
-# tier-3 (Scoped Execution / Commits): Claude Haiku, GPT-4o-mini, DeepSeek Chat (V3), Gemini Flash
+# Operational Tier Taxonomy
+# tier-1 (Architecture / Orchestration / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Claude Opus, OpenAI o3/GPT-5, DeepSeek R1
+# tier-2 (Scoped Multi-File Implementation / Discovery): Gemini 4 Hydrogen, Gemini 3.8 Flash High, Claude Sonnet, Kimi K3
+# tier-3 (Focused Single-Contract Execution): Gemini 3.8 Flash, Claude Haiku, DeepSeek V3 (Chat), GPT-4o-mini

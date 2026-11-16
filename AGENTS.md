@@ -30,11 +30,12 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 
 ---
 
-## 3. Mandatory Cross-Model Review Gate (`Authored-by` ≠ `Reviewed-by`)
+## 3. Mandatory Independent Review Gate (`Authored-by` ≠ `Reviewed-by`)
 - **PROHIBIDO AUTO-APROBAR:**
-  - An agent or model cannot review or approve its own code.
-  - The PR author and the reviewer MUST belong to different model families:
-    - Example: `Authored-by: gemini/flash (antigravity)` → Reviewed by: `deepseek/chat`, `claude/sonnet`, or `openai/gpt-4o`.
+  - An agent or model cannot review or approve its own code. Same canonical model family across any reasoning-effort suffix (`-none | -minimal | -low | -medium | -high | -xhigh | -xtrahigh | -extra-high`) is strictly blocked.
+  - Two independent review modes are supported (configured via `review_gate` in `.lognexus/routing.md`):
+    1. **Cross-Vendor Review** *(recommended best practice for milestone releases)*: the reviewer belongs to a different provider family than the author (e.g., `gemini/*` reviewed by `claude/*`, `openai/*`, or `deepseek/*`).
+    2. **Intra-Fleet Distinct-Model Review** *(supported for single-provider workflows such as Antigravity or Claude Code)*: the reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Carbon` or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus` reviewing `Claude Sonnet` or `Claude Haiku`).
   - Every PR body must carry the review snapshot and signed provenance trailers:
     ```markdown
     Authored-by: <family>/<version> (<client>)
@@ -45,7 +46,7 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 - **Anti-Spoofing Rule (non-negotiable):**
   - **No author agent (`Authored-by`) may write `Reviewed-by:` trailers or run `gh pr merge`.**
   - The review sign-off belongs exclusively to the independent reviewer. An author who writes its own `Reviewed-by:` trailer — under any model name, including one attributed to a different model family — is forging the gate.
-  - The reviewer must derive `Reviewed-by:` from an actual review of the delivered commits, performed through a client whose model family differs from the one in `Authored-by`.
+  - The reviewer must derive `Reviewed-by:` from an actual review of the delivered commits, performed in an independent session whose canonical model family differs from `Authored-by`.
   - Merge execution is also reserved to the independent reviewer or repository orchestrator after the sign-off exists; the author never merges its own work.
 
 - **`Planned-by` registration for external master plans:**
@@ -72,8 +73,11 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 
 ---
 
-## 5. Native Assistant Autonomy & Contract Execution Governance
-- **Native Assistant Autonomy:** during conversation, exploration and diagnosis, use every native capability of your host assistant (subagents, parallel tool calls, long-context reads, web search, IDE indexing) without artificial per-turn limits. Investigating a problem deeply is part of the job, not a contract violation.
+## 5. Native Assistant Autonomy, Two-Stage Delegation & Contract Governance
+- **Native Assistant Autonomy & Non-Invasive Two-Stage Delegation:**
+  - **Casual / single-scope queries (`<= 3` files) or outside active LogNexus governance:** stay conversational and non-invasive; do not unnecessarily spawn subagents.
+  - **Deep pre-plan codebase exploration (`> 3` files / multi-module analysis under LogNexus governance):** the Tier-1 orchestrator automatically delegates read-only exploration to Tier-2/Tier-3 subagents without prompting first and with zero file writes to conserve Tier-1 tokens.
+  - **Pre-delimited plan presentation:** before launching any implementation writes, the Tier-1 orchestrator emits the `T1..Tn` plan with pre-assigned subagent/model (`--assignee`), tier, isolation mode (`--isolation`), and file/LOC budgets, awaiting explicit developer confirmation.
 - **Strict Contract Execution Governance:** the moment a subtask contract becomes active, execution is bound by it. Modify only `allowedFiles`, never touch `forbiddenFiles`, stay inside the declared `decisionBudget`, and treat `verificationCmd` as the gate. Exploration freedom does not extend to unapproved writes.
 - **Subtask Context Budget & Handoff:** keep the contract itself scoped — `CONTEXT_MAX_FILES` (6 implementation files) and `CONTEXT_MAX_LOC` (1200 lines), with test files exempt from the file count. `evaluateContextBudget()` reports the active contract against that ceiling and the handoff embeds a split recommendation when it is exceeded. An oversized contract is legal but must be split before the next subtask starts, and `lognexus handoff --prompt` renders the compact dispatch prompt for the next agent — prefer it over pasting instructions between sessions.
 - **Token Hygiene (Zero Lockfile / Build-Artifact Reads):** Agents MUST NOT read `node_modules/`, `package-lock.json` (or other dependency lockfiles), `dist/`, `dist-pypi/`, or `coverage/` into context. Inspect `package.json` for declared dependency ranges, or run targeted CLI queries (`npm ls <pkg> --depth=0`) when exact resolved versions are needed. `.geminiignore`, `.aiexclude`, `.cursorignore` and the `permissions.deny` rules in `.claude/settings.json` enforce this exclusion workspace-wide; `lognexus init --protect-tokens` scaffolds them in downstream repositories.
@@ -81,7 +85,7 @@ All AI agents (Claude, Gemini, DeepSeek, OpenAI, Cursor, Antigravity) operating 
 ---
 
 ## 6. Canonical Identities & Closed-PR Policy
-- The principal architect declares itself with the canonical name **`Gemini 4 Argon`** — never abbreviated as `Gemini/Pro`, `Pro` or any other variant. External master plans are recorded with the `Planned-by:` trailer defined in §3.
+- The principal architect declares itself with the canonical name **`Gemini 4 Argon`** (`gemini/argon`) — never abbreviated as `Gemini/Pro`, `Pro` or any other variant. External master plans are recorded with the `Planned-by:` trailer defined in §3.
 - **`Gemini 4 Carbon`** (`gemini/carbon`) is recognised alongside `Gemini 4 Argon` (`gemini/argon`) as a co-flagship Tier-1 Principal Architect, Orchestrator & Independent Reviewer — never abbreviated as `Gemini/Pro`, `Pro`, or bare `Carbon`/`Argon`.
-- The canonical DeepSeek implementer identity is **`deepseek/VS Code (kimi-code)`** in `Authored-by:` trailers — never `deepseek/chat`, `deepseek/r1` or any other variant.
+- **`Gemini 4 Hydrogen`** (`gemini/hydrogen` / `google/gemini-4-hydrogen-high (antigravity)`) is recognised as a canonical Tier-2 implementer alongside **`google/gemini-3.8-flash-high (antigravity)`** and **`deepseek/VS Code (kimi-code)`** (never `deepseek/chat`, `deepseek/r1` or any other variant).
 - **Closed-PR policy:** a merged or closed PR is never reopened or reused. Follow-up work starts from a new issue and a new scoped branch cut from `main`.
