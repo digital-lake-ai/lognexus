@@ -1,0 +1,33 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-16T00:14:39.400Z",
+  "issue": {
+    "id": 61,
+    "title": "feat(telemetry): add Telemetry Engine v2.0 with LOC-weighted ROI, scoped filters and cohort benchmarks"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Upgrade telemetry schemas to v2.0 and add Gemini 4 Hydrogen & source-vs-docs diff classification",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/schema.ts",
+        "src/telemetry/detector.ts",
+        "tests/telemetry.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        "server.json",
+        "pyproject.toml",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npm test && npm run build"
+    }
+  },
+  "tier": "tier-3"
+}
