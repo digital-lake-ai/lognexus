@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { type AgentEcosystemId, detectAgentEcosystems } from "./routing/profile.js";
 
 export interface InitResult {
   created: string[];
@@ -11,9 +12,16 @@ export const DEFAULT_ROUTING_TEMPLATE = `# Model-Tier Routing Configuration
 # Modes: confirm (pause and prompt) | warn (banner only) | off (silent)
 routing: confirm
 
+# Review Gate: auto | cross-vendor | intra-fleet | advisory | off
+review_gate: auto
+# implementer: auto
+# reviewer: auto
+
+# Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Opus -> Sonnet, Argon/Carbon -> Hydrogen/Flash) works out of the box for single-provider teams.
+
 # Operational Tier Taxonomy (Empirical recommendations across Gemini, Claude, OpenAI, DeepSeek, Kimi)
-# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Claude Opus, OpenAI o3/o1, DeepSeek R1
-# tier-2 (Orchestration / Large Context >500 lines): Gemini 3.8 Flash High / Pro (1M), Claude Sonnet, Kimi K3 / K2.7 Code
+# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Claude Opus, OpenAI o3/GPT-5, DeepSeek R1
+# tier-2 (Orchestration / Large Context >500 lines): Gemini 4 Hydrogen, Gemini 3.8 Flash High, Claude Sonnet, Kimi K3 / K2.7 Code
 # tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini Flash, DeepSeek V3 (Chat), Kimi Code, Claude Haiku, GPT-4o-mini
 
 # Native Assistant Autonomy & Contract Execution Governance
@@ -203,28 +211,19 @@ function ensureClaudeDenySettings(targetDir: string, result: InitResult): void {
   result.created.push(relativePath);
 }
 
-function anyExists(targetDir: string, names: readonly string[]): boolean {
-  return names.some((name) => existsSync(join(targetDir, name)));
-}
-
 /**
  * Detects which agent ecosystems the repository already uses and scaffolds only the
  * matching exclusion files. A greenfield repository gets the universal core so the
  * protection is in place before any agent marker appears.
  */
 function scaffoldTokenShield(targetDir: string, result: InitResult): void {
-  const gemini = anyExists(targetDir, [
-    ".gemini",
-    "GEMINI.md",
-    ".agents",
-    ".geminiignore",
-    ".aiexclude",
-  ]);
-  const claude = anyExists(targetDir, [".claude", ".claude-plugin", "CLAUDE.md"]);
-  const cursor = anyExists(targetDir, [".cursor", ".cursorrules", ".cursorignore"]);
-  const roo = anyExists(targetDir, [".roo", ".rooignore"]);
-  const windsurf = anyExists(targetDir, [".windsurf", ".codeiumignore"]);
-  const aider = anyExists(targetDir, [".aiderignore", ".aider.conf.yml"]);
+  const detectedSet = new Set<AgentEcosystemId>(detectAgentEcosystems(targetDir).all);
+  const gemini = detectedSet.has("antigravity");
+  const claude = detectedSet.has("claude-code");
+  const cursor = detectedSet.has("cursor");
+  const roo = detectedSet.has("roo");
+  const windsurf = detectedSet.has("windsurf");
+  const aider = detectedSet.has("aider");
   const detected = gemini || claude || cursor || roo || windsurf || aider;
 
   if (gemini || !detected) {

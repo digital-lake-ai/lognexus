@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { resolveRoutingProfile } from "./routing/profile.js";
 import { countPublishedReleases, detectHostProjectVersion, getScopeDrift } from "./status.js";
 
 export interface DiagnosticCheck {
@@ -92,15 +93,19 @@ export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticC
   const lognexusDir = join(targetDir, ".lognexus");
 
   if (existsSync(lognexusDir)) {
-    const routingFile = join(lognexusDir, "routing.md");
-    if (existsSync(routingFile)) {
-      const content = readFileSync(routingFile, "utf8");
-      const match = content.match(/routing:\s*(confirm|warn|off)/i);
-      const mode = match ? match[1].toLowerCase() : "unknown";
+    const profile = resolveRoutingProfile(targetDir);
+    if (profile.hasRoutingFile) {
+      if (profile.warnings.length > 0) {
+        return {
+          name: "LogNexus Rules",
+          status: "warn",
+          message: `Found .lognexus/routing.md (routing mode: ${profile.routingMode}, review_gate: ${profile.effectiveReviewGate}) — warning(s): ${profile.warnings.join("; ")}`,
+        };
+      }
       return {
         name: "LogNexus Rules",
         status: "pass",
-        message: `Found .lognexus/ (routing mode: ${mode})`,
+        message: `Found .lognexus/ (routing mode: ${profile.routingMode}, review_gate: ${profile.effectiveReviewGate})`,
       };
     }
     return {
@@ -197,6 +202,15 @@ export function checkVersionMaturity(targetDir: string = process.cwd()): Diagnos
   };
 }
 
+export function checkAgentEcosystem(targetDir: string = process.cwd()): DiagnosticCheck {
+  const profile = resolveRoutingProfile(targetDir);
+  return {
+    name: "Agent Ecosystem",
+    status: "pass",
+    message: `Profile: ${profile.ecosystems.profileLabel} · review_gate: ${profile.effectiveReviewGate}`,
+  };
+}
+
 export function runDiagnostics(targetDir: string = process.cwd()): DiagnosticCheck[] {
   return [
     checkGit(targetDir),
@@ -204,5 +218,6 @@ export function runDiagnostics(targetDir: string = process.cwd()): DiagnosticChe
     checkRulesConfig(targetDir),
     checkScopeDrift(targetDir),
     checkVersionMaturity(targetDir),
+    checkAgentEcosystem(targetDir),
   ];
 }

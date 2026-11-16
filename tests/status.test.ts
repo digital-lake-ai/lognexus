@@ -47,6 +47,38 @@ describe("getProjectStatus", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("tailors recommendedTier to a single detected ecosystem without vendor nagging", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lognexus-status-claude-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: dir, stdio: "ignore", shell: false });
+      mkdirSync(join(dir, ".claude"));
+      const status = getProjectStatus(dir);
+
+      expect(status.ecosystemProfile).toBe("single-client (claude-code)");
+      expect(status.reviewGateMode).toBe("intra-fleet");
+      expect(status.recommendedTier).toContain("Claude Opus");
+      expect(status.recommendedTier).not.toContain("Gemini");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores commented routing directives when reporting routingMode", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lognexus-status-comments-"));
+    try {
+      mkdirSync(join(dir, ".lognexus"));
+      writeFileSync(
+        join(dir, ".lognexus", "routing.md"),
+        "# routing: off\n<!-- routing: off -->\nrouting: warn\n",
+        "utf8",
+      );
+      const status = getProjectStatus(dir);
+      expect(status.routingMode).toBe("warn");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("host project SemVer visibility", () => {

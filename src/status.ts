@@ -2,6 +2,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { extractIssueNumber } from "./branch.js";
+import {
+  type AgentEcosystemId,
+  type EffectiveReviewGateMode,
+  resolveRoutingProfile,
+} from "./routing/profile.js";
 
 export interface ProjectStatus {
   branch: string;
@@ -9,6 +14,8 @@ export interface ProjectStatus {
   activeIssue: string | null;
   routingMode: string;
   recommendedTier: string;
+  ecosystemProfile: string;
+  reviewGateMode: EffectiveReviewGateMode;
   scopeDrift: ScopeDrift;
   projectVersion: string | null;
   publishedReleases: number;
@@ -159,6 +166,47 @@ export function countPublishedReleases(targetDir: string = process.cwd()): numbe
   }
 }
 
+const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
+  Record<AgentEcosystemId, { readonly base: string; readonly issue: string }>
+> = {
+  antigravity: {
+    base: "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon)",
+    issue: "tier-3 (Scoped Execution: Gemini 3.8 Flash / Gemini 4 Hydrogen)",
+  },
+  "claude-code": {
+    base: "tier-1 (Reasoning / Planning: Claude Opus)",
+    issue: "tier-3 (Scoped Execution: Claude Haiku / Claude Sonnet)",
+  },
+  cursor: {
+    base: "tier-1 (Reasoning / Planning: Cursor Frontier / Tier-1)",
+    issue: "tier-3 (Scoped Execution: Cursor Fast / Tier-3)",
+  },
+  codex: {
+    base: "tier-1 (Reasoning / Planning: OpenAI o3 / GPT-5)",
+    issue: "tier-3 (Scoped Execution: OpenAI GPT-4o-mini / o3-mini)",
+  },
+  kimi: {
+    base: "tier-1 (Reasoning / Planning: Kimi K3 Thinking / Tier-1)",
+    issue: "tier-3 (Scoped Execution: Kimi Code / Tier-3)",
+  },
+  zed: {
+    base: "tier-1 (Reasoning / Planning: Zed Configured Tier-1 Model)",
+    issue: "tier-3 (Scoped Execution: Zed Configured Tier-3 Model)",
+  },
+  windsurf: {
+    base: "tier-1 (Reasoning / Planning: Windsurf Configured Tier-1 Model)",
+    issue: "tier-3 (Scoped Execution: Windsurf Configured Tier-3 Model)",
+  },
+  roo: {
+    base: "tier-1 (Reasoning / Planning: Roo Code Configured Tier-1 Model)",
+    issue: "tier-3 (Scoped Execution: Roo Code Configured Tier-3 Model)",
+  },
+  aider: {
+    base: "tier-1 (Reasoning / Planning: Aider Architect Model)",
+    issue: "tier-3 (Scoped Execution: Aider Editor Model)",
+  },
+};
+
 export function getProjectStatus(targetDir: string = process.cwd()): ProjectStatus {
   let isInsideGit = false;
   let branch = "detached";
@@ -191,20 +239,17 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     activeIssue = `#${issueNumber}`;
   }
 
-  let routingMode = "not configured";
-  const routingFile = join(targetDir, ".lognexus", "routing.md");
-  if (existsSync(routingFile)) {
-    const content = readFileSync(routingFile, "utf8");
-    const m = content.match(/routing:\s*(confirm|warn|off)/i);
-    if (m) routingMode = m[1].toLowerCase();
-  }
+  const profile = resolveRoutingProfile(targetDir);
+  const routingMode = profile.hasRoutingFile ? profile.routingMode : "not configured";
 
-  let recommendedTier =
-    "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon, Claude Opus, OpenAI o3, DeepSeek R1)";
-  if (activeIssue) {
-    recommendedTier =
-      "tier-3 (Scoped Execution: Claude Haiku, GPT-4o-mini, DeepSeek Chat, Gemini Flash)";
-  }
+  const singleEcosystem =
+    profile.ecosystems.strong.length === 1 ? profile.ecosystems.strong[0] : null;
+  const singleLabels = singleEcosystem ? SINGLE_ECOSYSTEM_TIER_LABELS[singleEcosystem] : undefined;
+  const recommendedTier = activeIssue
+    ? (singleLabels?.issue ??
+      "tier-3 (Scoped Execution: Claude Haiku, GPT-4o-mini, DeepSeek Chat, Gemini Flash)")
+    : (singleLabels?.base ??
+      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon, Claude Opus, OpenAI o3, DeepSeek R1)");
 
   return {
     branch,
@@ -212,6 +257,8 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     activeIssue,
     routingMode,
     recommendedTier,
+    ecosystemProfile: profile.ecosystems.profileLabel,
+    reviewGateMode: profile.effectiveReviewGate,
     scopeDrift: isInsideGit
       ? getScopeDrift(targetDir)
       : { detected: false, unauthorizedFiles: [], allowedFiles: [] },
