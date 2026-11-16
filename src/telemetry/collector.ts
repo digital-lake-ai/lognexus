@@ -257,6 +257,10 @@ export function loadTelemetry(targetDir: string = process.cwd()): TelemetryStore
   }
 
   const filePath = getTelemetryPath(targetDir);
+
+  // The identity must outlive a single run: without a persisted store every export would mint a
+  // fresh id, and a cohort could never tell two snapshots of one repository apart from two
+  // repositories. The id is a random UUID, never derived from the path or the repository name.
   if (!existsSync(filePath)) {
     return createDefaultTelemetryStore(targetDir);
   }

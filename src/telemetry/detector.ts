@@ -191,9 +191,11 @@ export function extractCommitDiffStats(
   try {
     const sanitizedSha = validateGitReference(sha);
 
+    // `--root` makes a parentless commit report its files instead of an empty diff, so the
+    // first commit of a repository is priced like every other one.
     const raw = execFileSync(
       "git",
-      ["diff-tree", "--numstat", "--no-commit-id", "-r", sanitizedSha],
+      ["diff-tree", "--root", "--numstat", "--no-commit-id", "-r", sanitizedSha],
       {
         cwd: targetDir,
         encoding: "utf8",
