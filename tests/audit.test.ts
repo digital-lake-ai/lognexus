@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   auditBranch,
+  checkReviewGate,
   checkSelfApproval,
   extractTrailers,
+  extractVendor,
   parseIdentity,
 } from "../src/audit/audit.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
@@ -569,6 +571,141 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
         checkSelfApproval("google/gemini-4-hydrogen-high (antigravity)", "gemini/argon")
           .isSelfApproval,
       ).toBe(false);
+    });
+  });
+
+  describe("Universal effort-suffix, provider alias, and vendor normalization", () => {
+    it.each([
+      ["openai/o3-xhigh", "openai/o3"],
+      ["openai/o3-extra-high", "openai/o3"],
+      ["openai/gpt-5.4-medium", "openai/gpt-5.4"],
+      ["deepseek/r1-low", "deepseek/r1"],
+      ["deepseek/r1-minimal", "deepseek/r1"],
+      ["claude/sonnet-high", "claude/sonnet"],
+      ["claude/sonnet-none", "claude/sonnet"],
+      ["anthropic/claude-sonnet-4-6-high", "claude/sonnet-4.6"],
+      ["claude/opus-4-5", "claude/opus-4.5"],
+      ["claude-opus-5-5-medium", "claude/opus-5.5"],
+      ["deepseek/VS Code (kimi-code)", "deepseek/vs-code"],
+    ])("normalizes %s to %s", (input, expected) => {
+      expect(parseIdentity(input)?.family).toBe(expected);
+    });
+
+    it("does not collapse -max, -thinking, -mini, or tier suffixes", () => {
+      expect(parseIdentity("qwen/qwen-max")?.family).toBe("qwen/qwen-max");
+      expect(parseIdentity("qwen/qwen-plus")?.family).toBe("qwen/qwen-plus");
+      expect(parseIdentity("openai/gpt-5.1-codex-max")?.family).toBe("openai/gpt-5.1-codex-max");
+      expect(parseIdentity("openai/gpt-5.1-codex")?.family).toBe("openai/gpt-5.1-codex");
+      expect(parseIdentity("kimi/k2-thinking")?.family).toBe("kimi/k2-thinking");
+      expect(parseIdentity("kimi/k2")?.family).toBe("kimi/k2");
+      expect(parseIdentity("openai/o3-mini")?.family).toBe("openai/o3-mini");
+    });
+
+    it("derives vendor strictly from the model family prefix, never from client qualifiers", () => {
+      const ds = parseIdentity("deepseek/VS Code (kimi-code)");
+      const claude = parseIdentity("anthropic/claude-sonnet-4-6-high (cursor)");
+      const gemini = parseIdentity("google/gemini-4-hydrogen-high (antigravity)");
+      expect(ds).not.toBeNull();
+      expect(claude).not.toBeNull();
+      expect(gemini).not.toBeNull();
+      if (ds) expect(extractVendor(ds)).toBe("deepseek");
+      if (claude) expect(extractVendor(claude)).toBe("claude");
+      if (gemini) expect(extractVendor(gemini)).toBe("gemini");
+    });
+  });
+
+  describe("checkReviewGate across all modes and hard floor", () => {
+    it("enforces identical-identity hard floor in every mode including advisory and off", () => {
+      for (const mode of ["intra-fleet", "cross-vendor", "advisory", "off"] as const) {
+        const res = checkReviewGate("claude/sonnet-4.6", "claude/sonnet-4.6", mode);
+        expect(res.violated).toBe(true);
+        expect(res.severity).toBe("error");
+      }
+    });
+
+    it("blocks cross-effort self-approval in intra-fleet and cross-vendor modes", () => {
+      const intra = checkReviewGate(
+        "anthropic/claude-sonnet-4-6-high",
+        "claude/sonnet-4.6-low",
+        "intra-fleet",
+      );
+      expect(intra.violated).toBe(true);
+      expect(intra.severity).toBe("error");
+
+      const intraDistinct = checkReviewGate("claude/opus-4.5", "claude/sonnet-4.6", "intra-fleet");
+      expect(intraDistinct.violated).toBe(false);
+    });
+
+    it("blocks same-vendor different-family reviews only in cross-vendor mode", () => {
+      const sameVendor = checkReviewGate("claude/opus-4.5", "claude/sonnet-4.6", "cross-vendor");
+      expect(sameVendor.violated).toBe(true);
+      expect(sameVendor.severity).toBe("error");
+
+      const diffVendor = checkReviewGate("claude/opus-4.5", "openai/o3-xhigh", "cross-vendor");
+      expect(diffVendor.violated).toBe(false);
+    });
+
+    it("downgrades distinct-identity same-family to warn in advisory and skips in off", () => {
+      const adv = checkReviewGate(
+        "claude/sonnet-4.6-high (claude-code)",
+        "claude/sonnet-4.6-low (cursor)",
+        "advisory",
+      );
+      expect(adv.violated).toBe(true);
+      expect(adv.severity).toBe("warn");
+
+      const off = checkReviewGate(
+        "claude/sonnet-4.6-high (claude-code)",
+        "claude/sonnet-4.6-low (cursor)",
+        "off",
+      );
+      expect(off.violated).toBe(false);
+    });
+  });
+
+  describe("Tamper-proof base-ref review_gate in auditBranch", () => {
+    it("enforces base branch review_gate and warns when a PR weakens .lognexus/routing.md", () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "lognexus-audit-tamper-"));
+      try {
+        execSync("git init", { cwd: tempDir, stdio: "ignore" });
+        execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+        execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+        execSync('git config commit.gpgsign "false"', { cwd: tempDir, stdio: "ignore" });
+
+        mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+        commitFile(
+          tempDir,
+          ".lognexus/routing.md",
+          "routing: confirm\nreview_gate: cross-vendor\n",
+          "chore: seed base routing",
+        );
+        const baseBranch = git("branch --show-current", tempDir) || "main";
+        execSync("git checkout -b issue/63-tamper-check", { cwd: tempDir, stdio: "ignore" });
+
+        commitFile(
+          tempDir,
+          ".lognexus/routing.md",
+          "routing: confirm\nreview_gate: off\n",
+          "chore(#63/T1): attempt to weaken review_gate\n\nAuthored-by: gemini/hydrogen\nReviewed-by: gemini/argon\n",
+        );
+        attachCurrentStateToCommit("HEAD", { cwd: tempDir, force: true });
+
+        const result = auditBranch(baseBranch, tempDir);
+        const gateErrors = result.violations.filter(
+          (v) => v.rule === "review-gate-separation" && v.severity === "error",
+        );
+        const gateWarns = result.violations.filter(
+          (v) => v.rule === "review-gate-separation" && v.severity === "warn",
+        );
+
+        expect(gateErrors).toHaveLength(1);
+        expect(gateErrors[0].message).toContain("Cross-vendor review-gate violation");
+        expect(gateWarns).toHaveLength(1);
+        expect(gateWarns[0].message).toContain("weakens review_gate");
+        expect(result.passed).toBe(false);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
     });
   });
 });

@@ -2,9 +2,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkSelfApproval } from "./audit/audit.js";
+import { checkReviewGate } from "./audit/audit.js";
 import { SCOPED_BRANCH_TEMPLATE } from "./branch.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
+import { resolveRoutingProfile } from "./routing/profile.js";
 import { refreshContextHandoff } from "./state/handoff.js";
 import { finishSubtask, loadState } from "./state/manager.js";
 import { inferActiveIssueFromBranch } from "./state/sync.js";
@@ -276,10 +277,14 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
 
   // 2. Pre-flight check: review gate separation
   if (author && reviewer) {
-    const check = checkSelfApproval(author, reviewer);
-    if (check.isSelfApproval) {
-      recordReviewGateBlock(cwd);
-      throw new Error(`Review-gate separation violation: ${check.message}`);
+    const gateMode = resolveRoutingProfile(cwd).effectiveReviewGate;
+    const check = checkReviewGate(author, reviewer, gateMode);
+    if (check.violated) {
+      if (check.severity === "error") {
+        recordReviewGateBlock(cwd);
+        throw new Error(`Review-gate separation violation: ${check.message}`);
+      }
+      console.error(`[WARN] Review-gate separation: ${check.message}`);
     }
   }
 

@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { checkSelfApproval, extractTrailers } from "../audit/audit.js";
+import { checkReviewGate, extractTrailers } from "../audit/audit.js";
 import { getCliVersion } from "../cli.js";
 import { validateGitReference } from "../git/safe.js";
+import { resolveRoutingProfile } from "../routing/profile.js";
 import { loadState } from "../state/manager.js";
 import { attachNote, type NoteOptions } from "./notes.js";
 
@@ -147,9 +148,13 @@ export function attachCurrentStateToCommit(
     const commitBody = getCommitMessage(commitRef, cwd);
     if (commitBody) {
       const { author, reviewer } = extractTrailers(commitBody);
-      const check = checkSelfApproval(author, reviewer);
-      if (check.isSelfApproval) {
-        throw new Error(`Review-gate separation violation: ${check.message}`);
+      const gateMode = resolveRoutingProfile(cwd).effectiveReviewGate;
+      const check = checkReviewGate(author, reviewer, gateMode);
+      if (check.violated) {
+        if (check.severity === "error") {
+          throw new Error(`Review-gate separation violation: ${check.message}`);
+        }
+        console.error(`[WARN] Review-gate separation: ${check.message}`);
       }
     }
   }

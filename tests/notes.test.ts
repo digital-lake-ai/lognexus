@@ -140,6 +140,41 @@ describe("Git Notes (Quiet Mode)", () => {
       attachCurrentStateToCommit("HEAD", { cwd: tempDir });
     }).not.toThrow();
   });
+
+  it("enforces cross-vendor and advisory review_gate modes on attachCurrentStateToCommit", () => {
+    mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+    writeFileSync(
+      join(tempDir, ".lognexus", "routing.md"),
+      "routing: confirm\nreview_gate: cross-vendor\n",
+      "utf8",
+    );
+    writeFileSync(join(tempDir, "file4.txt"), "cross-vendor check", "utf8");
+    execSync("git add file4.txt", { cwd: tempDir, stdio: "ignore" });
+    const msgFile = join(tmpdir(), `msg-cv-${Date.now()}.txt`);
+    writeFileSync(
+      msgFile,
+      "feat(#63/T2): test cross-vendor\n\nAuthored-by: gemini/flash\nReviewed-by: gemini/pro\n",
+      "utf8",
+    );
+    try {
+      execSync(`git commit -F "${msgFile}"`, { cwd: tempDir, stdio: "ignore" });
+    } finally {
+      rmSync(msgFile, { force: true });
+    }
+
+    expect(() => {
+      attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    }).toThrow(/Review-gate separation violation/);
+
+    writeFileSync(
+      join(tempDir, ".lognexus", "routing.md"),
+      "routing: confirm\nreview_gate: advisory\n",
+      "utf8",
+    );
+    expect(() => {
+      attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    }).not.toThrow();
+  });
 });
 
 describe("Memory Recall (Git Notes search)", () => {
