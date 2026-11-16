@@ -193,6 +193,7 @@ function accumulateCategoryLines(
   summary: TelemetryStore["summary"],
   category: DiffCategory,
   linesAdded: number,
+  linesDeleted: number,
 ): void {
   if (category === "test") {
     summary.testLinesAdded += linesAdded;
@@ -202,7 +203,34 @@ function accumulateCategoryLines(
     summary.configLinesAdded += linesAdded;
   } else {
     summary.sourceLinesAdded += linesAdded;
+    summary.sourceLinesDeleted += linesDeleted;
   }
+}
+
+/**
+ * Folds one diff bucket into the per-extension roll-up.
+ *
+ * A commit that touches `.ts` files in both `src/` and `tests/` is one `.ts` commit, so the
+ * commit counter only moves on the first sighting of the extension, while the line totals
+ * always accumulate — otherwise the second bucket's lines would be dropped.
+ */
+function accumulateExtensionLines(
+  extensions: Record<string, ExtensionStat>,
+  item: DiffStatItem,
+  isNewExtInCommit: boolean,
+): void {
+  const existing: ExtensionStat = extensions[item.ext] ?? {
+    ext: item.ext,
+    category: item.category,
+    commits: 0,
+    linesAdded: 0,
+    linesDeleted: 0,
+  };
+  if (isNewExtInCommit) existing.commits += 1;
+  if (item.category === "source") existing.category = "source";
+  existing.linesAdded += item.linesAdded;
+  existing.linesDeleted += item.linesDeleted;
+  extensions[item.ext] = existing;
 }
 
 /** Totals a commit's added lines per diff category for the LOC-weighted pricing model. */
@@ -396,10 +424,20 @@ export function updateCostSavingsEstimate(store: TelemetryStore): void {
     actualOutputTokens += model.estimatedOutputTokens;
   }
 
-  sum.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
-  for (const model of models) {
-    const tier = resolvePricingTier(model.tier);
-    sum.tierCommits[tier] += model.commits;
+  // `tierCommits` is accumulated per commit by the callers, so a mixed-tier history keeps its
+  // real split. It is only re-derived from the model buckets when the totals disagree — as a
+  // legacy store would, or one assembled by hand without going through a commit recorder.
+  const declaredTierCommits = sum.tierCommits;
+  const declaredTierTotal =
+    (declaredTierCommits?.["tier-1"] ?? 0) +
+    (declaredTierCommits?.["tier-2"] ?? 0) +
+    (declaredTierCommits?.["tier-3"] ?? 0);
+  if (declaredTierCommits === undefined || declaredTierTotal !== totalCommits) {
+    sum.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
+    for (const model of models) {
+      const tier = resolvePricingTier(model.tier);
+      sum.tierCommits[tier] += model.commits;
+    }
   }
 
   if (totalCommits === 0) {
@@ -459,23 +497,12 @@ export function recordCommitTelemetry(options: {
   for (const item of diffItems) {
     commitAdded += item.linesAdded;
     commitDeleted += item.linesDeleted;
-    accumulateCategoryLines(store.summary, item.category, item.linesAdded);
+    accumulateCategoryLines(store.summary, item.category, item.linesAdded, item.linesDeleted);
 
     // One commit touching `.ts` in `src/` and `tests/` counts as a single `.ts` commit.
-    if (seenExts.has(item.ext)) continue;
-    seenExts.add(item.ext);
-
-    const existing: ExtensionStat = store.extensions[item.ext] ?? {
-      ext: item.ext,
-      category: item.category,
-      commits: 0,
-      linesAdded: 0,
-      linesDeleted: 0,
-    };
-    existing.commits += 1;
-    existing.linesAdded += item.linesAdded;
-    existing.linesDeleted += item.linesDeleted;
-    store.extensions[item.ext] = existing;
+    const isNewExtInCommit = !seenExts.has(item.ext);
+    if (isNewExtInCommit) seenExts.add(item.ext);
+    accumulateExtensionLines(store.extensions, item, isNewExtInCommit);
   }
 
   store.summary.totalCommits += 1;
@@ -489,6 +516,12 @@ export function recordCommitTelemetry(options: {
   existingModel.commits += 1;
   accumulateModelPricing(existingModel, linesByCategory(diffItems));
   store.models[modelKey] = existingModel;
+
+  const pricingTier = resolvePricingTier(tier);
+  if (store.summary.tierCommits === undefined) {
+    store.summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
+  }
+  store.summary.tierCommits[pricingTier] += 1;
 
   updateCostSavingsEstimate(store);
   saveTelemetry(store, cwd);
@@ -525,7 +558,9 @@ function readScopedCommits(
   targetDir: string,
   filter: ScopedTelemetryFilter | undefined,
 ): ScopedCommit[] {
-  const args = ["log", GIT_LOG_FORMAT, "--no-color"];
+  // Merge commits carry no authored diff of their own, so counting them would inflate the
+  // commit totals and dilute the rework and coverage ratios.
+  const args = ["log", "--no-merges", GIT_LOG_FORMAT, "--no-color"];
 
   if (filter?.since !== undefined && filter.since !== "") {
     // Rejecting a leading dash keeps the value from ever being parsed as a Git flag.
@@ -594,7 +629,7 @@ function listChangedFiles(sha: string, targetDir: string): string[] {
   try {
     const raw = execFileSync(
       "git",
-      ["diff-tree", "--no-commit-id", "--name-only", "-r", validateGitReference(sha)],
+      ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", validateGitReference(sha)],
       {
         cwd: targetDir,
         encoding: "utf8",
@@ -711,15 +746,16 @@ export function syncTelemetryFromGitNotes(
   const extensions: Record<string, ExtensionStat> = {};
   const models: Record<string, ModelStat> = {};
   const notedSubtasks = new Set<string>();
-  const coverageScope = scoped ? commits : commits.filter((commit) => notedShas.has(commit.sha));
   const summary = store.summary;
 
   // Every aggregate is re-derived from the scanned commits, including the per-category line
   // counters; carrying a previous partial recording over would double count the same commit.
   summary.sourceLinesAdded = 0;
+  summary.sourceLinesDeleted = 0;
   summary.testLinesAdded = 0;
   summary.docsLinesAdded = 0;
   summary.configLinesAdded = 0;
+  summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
 
   let totalLinesAdded = 0;
   let totalLinesDeleted = 0;
@@ -795,22 +831,11 @@ export function syncTelemetryFromGitNotes(
     for (const item of diffItems) {
       totalLinesAdded += item.linesAdded;
       totalLinesDeleted += item.linesDeleted;
-      accumulateCategoryLines(store.summary, item.category, item.linesAdded);
+      accumulateCategoryLines(store.summary, item.category, item.linesAdded, item.linesDeleted);
 
-      if (seenExts.has(item.ext)) continue;
-      seenExts.add(item.ext);
-
-      const existing: ExtensionStat = extensions[item.ext] ?? {
-        ext: item.ext,
-        category: item.category,
-        commits: 0,
-        linesAdded: 0,
-        linesDeleted: 0,
-      };
-      existing.commits += 1;
-      existing.linesAdded += item.linesAdded;
-      existing.linesDeleted += item.linesDeleted;
-      extensions[item.ext] = existing;
+      const isNewExtInCommit = !seenExts.has(item.ext);
+      if (isNewExtInCommit) seenExts.add(item.ext);
+      accumulateExtensionLines(extensions, item, isNewExtInCommit);
     }
 
     const modelKey = extractModelFamilyCategory(author);
@@ -819,6 +844,8 @@ export function syncTelemetryFromGitNotes(
     existingModel.commits += 1;
     accumulateModelPricing(existingModel, linesByCategory(diffItems));
     models[modelKey] = existingModel;
+
+    summary.tierCommits[resolvePricingTier(tier)] += 1;
   }
 
   store.extensions = extensions;
@@ -827,7 +854,7 @@ export function syncTelemetryFromGitNotes(
   summary.totalLinesAdded = totalLinesAdded;
   summary.totalLinesDeleted = totalLinesDeleted;
   summary.totalSubtasksCompleted = Math.max(summary.totalSubtasksCompleted, notedSubtasks.size);
-  summary.gitNotesCoveragePct = percentage(coveredCommits, coverageScope.length, 100);
+  summary.gitNotesCoveragePct = percentage(coveredCommits, commitsInScope, 100);
   summary.contractedCommits = contractedCommits;
   summary.contractCompliancePct = percentage(compliantCommits, contractedCommits, 100);
   summary.escalatedCommits = escalatedCommits;

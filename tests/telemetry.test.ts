@@ -1032,8 +1032,9 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(summary.contractCompliancePct).toBe(50);
       expect(summary.reworkCommits).toBe(1);
       expect(summary.reworkRatioPct).toBe(25);
-      // Every commit in history carries a Git Note.
-      expect(summary.gitNotesCoveragePct).toBe(100);
+      // Only the two explicitly noted commits carry a Git Note; the coverage is a real ratio
+      // over the scanned history, not a tautological share of the noted subset.
+      expect(summary.gitNotesCoveragePct).toBe(50);
       expect(summary.escalatedCommits).toBe(0);
       // Active span is the distance between the first and the last commit, measured end to
       // end; only a single-commit history can report a zero span.
@@ -1043,6 +1044,137 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(summary.medianCommitCadenceSec).toBe(0);
       expect(summary.tierCommits["tier-1"]).toBe(1);
       expect(summary.tierCommits["tier-3"]).toBe(1);
+    });
+
+    it("reports full coverage when every commit in the scope carries a note", () => {
+      const first = commitFile("src/scope-a.ts", "export const a = 1;\n", "feat(#61/T1): a");
+      note(first, { $schema: "lognexus/note/v1", issue: { id: 61 }, subtask: { id: "T1" } });
+
+      // A commit outside the requested issue, deliberately left without a note.
+      commitFile("src/other.ts", "export const other = 1;\n", "feat(#58/T1): other");
+
+      const second = commitFile("src/scope-b.ts", "export const b = 1;\n", "feat(#61/T2): b");
+      note(second, { $schema: "lognexus/note/v1", issue: { id: 61 }, subtask: { id: "T2" } });
+
+      const scoped = syncTelemetryFromGitNotes(tempDir, { issue: 61 });
+      expect(scoped.summary.totalCommits).toBe(2);
+      expect(scoped.summary.gitNotesCoveragePct).toBe(100);
+
+      // The same history read without a scope exposes the unnoted commit.
+      const unscoped = syncTelemetryFromGitNotes(tempDir);
+      expect(unscoped.summary.totalCommits).toBe(4);
+      expect(unscoped.summary.gitNotesCoveragePct).toBe(50);
+    });
+
+    it("rolls one commit's source and test lines into a single extension entry", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const source = join(tempDir, "src", "engine.ts");
+      const tests = join(tempDir, "tests", "engine.test.ts");
+      mkdirSync(dirname(source), { recursive: true });
+      mkdirSync(dirname(tests), { recursive: true });
+      writeFileSync(source, "export const engine = 1;\n", "utf8");
+      writeFileSync(tests, "expect(engine).toBe(1);\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "feat(#61/T3): engine and its test"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+
+      const store = syncTelemetryFromGitNotes(tempDir);
+      const ts = store.extensions[".ts"];
+      expect(ts).toBeDefined();
+      // Both files are `.ts`, so the commit is counted once and both line totals are kept.
+      expect(ts.commits).toBe(1);
+      expect(ts.linesAdded).toBe(2);
+      expect(ts.category).toBe("source");
+    });
+
+    it("counts source lines removed so the deletion total is not always zero", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      writeFileSync(join(tempDir, "module.ts"), "export const a = 1;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "feat(#61/T4): add module"', { cwd: tempDir, stdio: "ignore" });
+
+      // `README.md` is a docs file, so these edits exercise the source counter in isolation.
+      writeFileSync(join(tempDir, "README.md"), "# Test Repo\n\nExtra line.\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "docs(#61/T4): expand readme"', { cwd: tempDir, stdio: "ignore" });
+
+      writeFileSync(join(tempDir, "module.ts"), "", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "refactor(#61/T4): trim module"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+
+      const summary = syncTelemetryFromGitNotes(tempDir).summary;
+      expect(summary.sourceLinesAdded).toBe(1);
+      expect(summary.sourceLinesDeleted).toBe(1);
+    });
+
+    it("excludes merge commits from the commit aggregates", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      execSync("git checkout -q -b feature/merge", { cwd: tempDir, stdio: "ignore" });
+      commitFile("src/side.ts", "export const side = 1;\n", "feat(#61/T5): side branch");
+      execSync("git checkout -q -", { cwd: tempDir, stdio: "ignore" });
+      // Both branches must carry their own commits, otherwise Git fast-forwards and no merge
+      // commit is ever created — the very thing this test needs to observe.
+      const mainFile = join(tempDir, "src", "main-line.ts");
+      mkdirSync(dirname(mainFile), { recursive: true });
+      writeFileSync(mainFile, "export const mainLine = 1;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "feat(#61/T5): mainline" --author "gemini/flash <flash@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
+      execSync('git merge -q --no-ff feature/merge -m "chore(#61/T5): merge side branch"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+
+      // The merge commit really is in history; it is the scan that must skip it.
+      const total = execSync("git rev-list --count HEAD", {
+        cwd: tempDir,
+        encoding: "utf8",
+      }).trim();
+      expect(Number(total)).toBe(4);
+      const merges = execSync("git rev-list --merges --count HEAD", {
+        cwd: tempDir,
+        encoding: "utf8",
+      }).trim();
+      expect(Number(merges)).toBe(1);
+
+      const summary = syncTelemetryFromGitNotes(tempDir).summary;
+      expect(summary.totalCommits).toBe(3);
+      expect(summary.reworkCommits).toBe(0);
+    });
+
+    it("preserves a mixed-tier commit distribution instead of collapsing to the last tier", () => {
+      // Both identities collapse to the same model family (`gemini/flash`) while routing to
+      // different tiers, so the buckets merge and the tier split must not be re-derived from
+      // them — re-deriving it would overwrite the history with the last commit's tier.
+      const high = "google/gemini-3.8-flash <flash@example.com>";
+      const lite = "google/gemini-3.8-flash-lite <lite@example.com>";
+
+      const tier2a = commitFile("src/a.ts", "export const a = 1;\n", "feat(#61/T6): a", high);
+      const tier2b = commitFile("src/b.ts", "export const b = 1;\n", "feat(#61/T6): b", high);
+      commitFile("src/c.ts", "export const c = 1;\n", "feat(#61/T6): c", lite);
+      for (const sha of [tier2a, tier2b]) {
+        note(sha, { $schema: "lognexus/note/v1", issue: { id: 61 }, subtask: { id: "T6" } });
+      }
+
+      const store = syncTelemetryFromGitNotes(tempDir);
+      expect(store.summary.totalCommits).toBe(4);
+      // The fixture's bootstrap commit is authored by the test runner and lands in the
+      // anonymous bucket, which falls back to the default tier; the two model identities
+      // collapse into one family bucket.
+      expect(store.models["gemini/flash"].commits).toBe(3);
+      expect(store.summary.tierCommits["tier-1"]).toBe(0);
+      expect(store.summary.tierCommits["tier-2"]).toBe(2);
+      expect(store.summary.tierCommits["tier-3"]).toBe(2);
     });
   });
 });
