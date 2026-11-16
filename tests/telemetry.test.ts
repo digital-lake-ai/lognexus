@@ -903,12 +903,14 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       body: string,
       message: string,
       author = "gemini/flash <flash@example.com>",
+      dateIso?: string,
     ) => {
       const target = join(tempDir, relativePath);
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, body, "utf8");
       execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
-      execSync(`git commit -q -m "${message}" --author "${author}"`, {
+      const dateFlag = dateIso ? ` --date "${dateIso}"` : "";
+      execSync(`git commit -q -m "${message}" --author "${author}"${dateFlag}`, {
         cwd: tempDir,
         stdio: "ignore",
       });
@@ -995,10 +997,15 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("derives cadence, contract compliance, rework ratio and coverage from Git", () => {
+      const baseMs = Date.parse(
+        execSync("git log -1 --format=%aI HEAD", { cwd: tempDir, encoding: "utf8" }).trim(),
+      );
       const contracted = commitFile(
         "src/engine.ts",
         "export const engine = 1;\n",
         "feat(#61/T1): engine",
+        "gemini/flash <flash@example.com>",
+        new Date(baseMs + 60_000).toISOString(),
       );
       note(contracted, {
         $schema: "lognexus/note/v1",
@@ -1010,6 +1017,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         "src/escape.ts",
         "export const escape = 1;\n",
         "feat(#61/T2): escape",
+        "gemini/flash <flash@example.com>",
+        new Date(baseMs + 180_000).toISOString(),
       );
       note(escaped, {
         $schema: "lognexus/note/v1",
@@ -1022,6 +1031,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         "export const rework = 1;\n",
         "fix(#61/T2): repair engine",
         "antigravity/lead-orchestrator <lead@example.com>",
+        new Date(baseMs + 420_000).toISOString(),
       );
 
       enableTelemetry({ cwd: tempDir });
@@ -1036,12 +1046,10 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       // over the scanned history, not a tautological share of the noted subset.
       expect(summary.gitNotesCoveragePct).toBe(50);
       expect(summary.escalatedCommits).toBe(0);
-      // Active span is the distance between the first and the last commit, measured end to
-      // end; only a single-commit history can report a zero span.
-      expect(summary.activeDevelopmentSpanSec).toBeGreaterThan(0);
-      // The median cadence is censored below one minute so a burst of commits in the same
-      // minute reads as zero instead of as a sub-second interval.
-      expect(summary.medianCommitCadenceSec).toBe(0);
+      // Both temporal metrics come from the recorded author timestamps, which the fixture
+      // pins explicitly: deltas of 60s, 120s and 240s give a 420s span and a 120s median.
+      expect(summary.activeDevelopmentSpanSec).toBe(420);
+      expect(summary.medianCommitCadenceSec).toBe(120);
       expect(summary.tierCommits["tier-1"]).toBe(1);
       expect(summary.tierCommits["tier-3"]).toBe(1);
     });
