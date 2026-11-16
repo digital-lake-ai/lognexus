@@ -273,11 +273,11 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   }
 
   // Well-known model family heuristics
+  if (trimmed.includes("gemini") && trimmed.includes("pro")) return "gemini/pro";
   if (trimmed.includes("gemini") && (trimmed.includes("flash-high") || trimmed.includes("high"))) {
     return "gemini/flash-high";
   }
   if (trimmed.includes("gemini") && trimmed.includes("flash")) return "gemini/flash";
-  if (trimmed.includes("gemini") && trimmed.includes("pro")) return "gemini/pro";
   if (trimmed.includes("gemini")) return "gemini/generic";
   if (trimmed.includes("claude") && trimmed.includes("sonnet")) return "claude/sonnet";
   if (trimmed.includes("claude") && trimmed.includes("haiku")) return "claude/haiku";
@@ -355,12 +355,43 @@ const TIER_2_MARKERS = [
   "openai/gpt",
 ];
 
+const EFFORT_SUFFIXES = [
+  "-extra-high",
+  "-xtrahigh",
+  "-xhigh",
+  "-minimal",
+  "-medium",
+  "-high",
+  "-low",
+  "-none",
+] as const;
+
 /**
  * Infers the routing tier of an author identity, so commit telemetry and the audit
  * can detect tier-1 models working outside their scope.
  */
 export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | null {
   if (!identityStr) return null;
+
+  let head = identityStr.split("(")[0].trim().toLowerCase();
+  for (let i = 0; i < 2; i++) {
+    const suffix = EFFORT_SUFFIXES.find((candidate) => head.endsWith(candidate));
+    if (!suffix) break;
+    head = head.slice(0, -suffix.length);
+  }
+
+  if (/(?:^|[/_-])(?:gpt-4o-mini|flash-lite)(?:$|[/_-])/.test(head)) {
+    return "tier-3";
+  }
+  if (/(?:^|[/_-])(?:o1-mini|o3-mini|o4-mini)(?:$|[/_-])/.test(head)) {
+    return "tier-2";
+  }
+  if (/(?:^|[/_-])(?:o1|o3|o4|gpt-5(?:\.\d+)?)(?:$|[/_-])/.test(head)) {
+    return "tier-1";
+  }
+  if (head.includes("deepseek") && /(?:^|[/_-])(?:r1|reasoner)(?:$|[/_-])/.test(head)) {
+    return "tier-1";
+  }
 
   // Collapse slug separators so 'gemini-3.8-pro' matches the 'gemini/pro' marker.
   const normalized = normalizeIdentity(identityStr);
