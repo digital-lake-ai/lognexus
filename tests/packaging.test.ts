@@ -90,6 +90,8 @@ describe("CLI --help & Biome schema parity", () => {
     expect(usage).toContain("--stage-allowed");
     expect(usage).toContain("--prompt");
     expect(usage).toContain("--protect-tokens");
+    expect(usage).toContain("--assignee");
+    expect(usage).toContain("--isolation");
   });
 
   it("documents the scoped telemetry subcommands in printUsage()", () => {

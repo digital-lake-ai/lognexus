@@ -164,4 +164,28 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     expect(stateFinal.currentSubtask).toBeNull();
     expect(stateFinal.completedSubtasks).toEqual([]);
   }, 20000);
+
+  it("wires --assignee and --isolation into state set-task and prints them in state show and status", () => {
+    initProject(tempDir);
+    const cliPath = join(process.cwd(), "dist/cli.js");
+
+    execSync(
+      `node "${cliPath}" state set-task T5 "Implement CLI wiring" --assignee "claude/sonnet" --isolation subagent`,
+      { cwd: tempDir, stdio: "pipe" },
+    );
+
+    const showOutput = execSync(`node "${cliPath}" state show`, {
+      cwd: tempDir,
+      encoding: "utf8",
+    });
+    expect(showOutput).toContain("Assigned Agent:  claude/sonnet");
+    expect(showOutput).toContain("Isolation Mode:  subagent");
+
+    const statusOutput = execSync(`node "${cliPath}" status`, {
+      cwd: tempDir,
+      encoding: "utf8",
+    });
+    expect(statusOutput).toContain("Ecosystem Profile:");
+    expect(statusOutput).toContain("Review Gate Mode:");
+  });
 });
