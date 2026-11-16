@@ -10,7 +10,7 @@ export interface GitNotePayload {
   generator: string;
   version: string;
   timestamp: string;
-  issue: { id: number; title: string } | null;
+  issue: { id: number; title: string; tier?: string } | null;
   subtask: {
     id: string;
     title: string;
@@ -80,8 +80,8 @@ export function buildStateNotePayload(
   const meta =
     options.commitSha !== undefined ? inferCommitSubjectMeta(options.commitSha, targetDir) : null;
 
-  let issue = state.activeIssue
-    ? { id: state.activeIssue.id, title: state.activeIssue.title }
+  let issue: GitNotePayload["issue"] = state.activeIssue
+    ? { id: state.activeIssue.id, title: state.activeIssue.title, tier: state.activeIssue.tier }
     : null;
   if (issue === null && meta !== null && meta.issueId !== null) {
     issue = { id: meta.issueId, title: meta.subject };

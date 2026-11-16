@@ -490,4 +490,88 @@ describe("Commit tier routing (inference, escalation and audit trail)", () => {
 
     expect(stderrChunks.join("")).not.toContain("tier-routing-violation");
   });
+
+  describe("Tier-1 orchestrator issues and governance surfaces", () => {
+    const captureCommit = (options: {
+      files: string[];
+      message: string;
+      tier?: "tier-1" | "tier-2" | "tier-3";
+      commitTier?: "tier-1" | "tier-2" | "tier-3";
+    }): string => {
+      setSubtask(
+        "T1",
+        "Tier routing",
+        { allowedFiles: options.files, forbiddenFiles: [], decisionBudget: "none" },
+        tempDir,
+        options.tier ? { tier: options.tier } : undefined,
+      );
+      for (const file of options.files) {
+        mkdirSync(join(tempDir, file, ".."), { recursive: true });
+        writeFileSync(join(tempDir, file), "export const value = 1;\n", "utf8");
+        execSync(`git add "${file}"`, { cwd: tempDir, stdio: "ignore" });
+      }
+
+      const stderrChunks: string[] = [];
+      const spy = vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+        stderrChunks.push(String(chunk));
+        return true;
+      });
+
+      try {
+        executeAtomicCommit({
+          message: options.message,
+          author: "gemini/pro (antigravity)",
+          tier: options.commitTier,
+          targetDir: tempDir,
+        });
+      } finally {
+        spy.mockRestore();
+      }
+
+      return stderrChunks.join("");
+    };
+
+    it("does not warn a tier-1 author on an issue declared tier-1", () => {
+      const output = captureCommit({
+        files: ["src/schema.ts"],
+        message: "feat(#61/T1): extend telemetry schemas",
+        tier: "tier-1",
+      });
+
+      expect(output).not.toContain("tier-routing-violation");
+      const note = readNote();
+      expect((note.issue as { tier?: string }).tier).toBe("tier-1");
+    });
+
+    it("does not warn when the commit passes --tier tier-1 explicitly", () => {
+      const output = captureCommit({
+        files: ["src/schema.ts"],
+        message: "feat(#61/T1): extend telemetry schemas",
+        tier: "tier-3",
+        commitTier: "tier-1",
+      });
+
+      expect(output).not.toContain("tier-routing-violation");
+    });
+
+    it.each([
+      ["CLAUDE.md", "docs(#61/T1): document governance"],
+      ["package.json", "chore(#61/T1): declare scripts"],
+      [".github/workflows/ci.yml", "ci(#61/T1): add workflow"],
+    ])("does not warn a tier-1 author editing the governance surface %s", (file, message) => {
+      const output = captureCommit({ files: [file], message, tier: "tier-3" });
+
+      expect(output).not.toContain("tier-routing-violation");
+    });
+
+    it("still warns a tier-1 author on an undeclared tier-3 contract", () => {
+      const output = captureCommit({
+        files: ["src/schema.ts"],
+        message: "feat(#61/T1): extend telemetry schemas",
+        tier: "tier-3",
+      });
+
+      expect(output).toContain("tier-routing-violation");
+    });
+  });
 });

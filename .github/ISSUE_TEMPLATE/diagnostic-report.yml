@@ -11,7 +11,8 @@ body:
         LogNexus makes **zero network calls** and stores everything on your machine. A diagnostic report only travels if **you** decide to open this issue.
 
         Before submitting, please confirm:
-        - You are pasting **only** LogNexus output (`lognexus telemetry report`, `lognexus doctor`, `lognexus status`).
+        - You are pasting **only** LogNexus output (`lognexus telemetry report`, `lognexus telemetry snapshot`, `lognexus doctor`, `lognexus status`).
+        - A scoped report (`lognexus telemetry report --issue <id>`) or an exported snapshot (`lognexus telemetry snapshot`) is the smallest useful attachment. Both are already redacted of paths and project names, but read them before pasting.
         - Identify your workspace exclusively by its **Anonymous Project ID** (`anonymousProjectId` UUIDv4). **Never** include your repository name, project codename, or organization name.
         - You are **not** pasting source code, commit messages, absolute or relative file paths, repository remotes, branch URLs, or credentials.
         - You may redact anything you are unsure about. A partial report is more useful than a leaked one.
@@ -82,6 +83,24 @@ body:
         ## 1. Executive Metrics Dashboard
         | Metric | Measured Value | Notes |
         ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: snapshot
+    attributes:
+      label: Zero-PII snapshot (optional)
+      description: |
+        Paste the contents of a file produced by `lognexus telemetry snapshot`, or the output of
+        `lognexus telemetry inspect --issue <id>`. Both are generated locally and are never uploaded
+        by LogNexus itself. Read the JSON before pasting and keep only the `anonymousProjectId`.
+      render: json
+      placeholder: |
+        {
+          "schemaVersion": "2.0.0",
+          "anonymousProjectId": "e4f8d2c1-4b3e-412a-9c0f-7e6d5b4a3c2d",
+          ...
+        }
     validations:
       required: false
 

@@ -27,13 +27,21 @@ import {
 import { syncStateFromGit } from "./state/sync.js";
 import { getProjectStatus } from "./status.js";
 import {
-  buildAnonymousCommunityPayload,
+  aggregateBenchmarkCohort,
+  exportTelemetrySnapshot,
+  formatCohortMarkdownReport,
+  generateCohortBenchmarkReportFile,
+} from "./telemetry/benchmark.js";
+import {
+  buildAnonymousDiagnosticPayload,
   clearTelemetry,
   disableTelemetry,
   enableTelemetry,
   isTelemetryGloballyDisabled,
   LOCAL_ONLY_TELEMETRY_ERROR,
   loadTelemetry,
+  type ScopedTelemetryFilter,
+  syncTelemetryFromGitNotes,
 } from "./telemetry/collector.js";
 import { generateTelemetryReportFile } from "./telemetry/report.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
@@ -151,7 +159,14 @@ Telemetry Subcommands:
   lognexus telemetry [status]       Show current telemetry mode and project metrics
   lognexus telemetry enable         Enable local telemetry (zero network calls, strictly local storage)
   lognexus telemetry inspect        Inspect the exact Zero-PII payload before sending
-  lognexus telemetry report [-o f]  Generate .lognexus/telemetry.md report with ROI metrics
+  lognexus telemetry report [-o f] [--issue <id>] [--since <iso>] [--branch <ref>]
+                                    Generate .lognexus/telemetry.md report with ROI metrics
+  lognexus telemetry inspect [--issue <id>] [--since <iso>] [--branch <ref>]
+                                    Print the Zero-PII payload, optionally scoped
+  lognexus telemetry snapshot [-o f] [--issue <id>] [--since <iso>] [--branch <ref>]
+                                    Write a Zero-PII .lognexus/snapshot-v2.json, never uploaded
+  lognexus telemetry benchmark <paths...> [-o f] [--json]
+                                    Aggregate exported snapshots into a cohort benchmark
   lognexus telemetry disable        Disable all telemetry immediately
   lognexus telemetry clear          Reset local telemetry store
 
@@ -744,6 +759,69 @@ async function handleCommit(args: string[]) {
   }
 }
 
+interface ParsedTelemetryFlags {
+  filter: ScopedTelemetryFilter;
+  outputPath?: string;
+  positionals: string[];
+  json: boolean;
+}
+
+/**
+ * Parses the scoping flags shared by `telemetry inspect`, `report` and `snapshot`.
+ *
+ * A missing flag value or an unrecognised `-` prefixed argument aborts instead of being
+ * silently ignored, so a scoped command can never fall back to the whole history unnoticed.
+ */
+function parseTelemetryScopeFlags(args: string[], allowPositionals = false): ParsedTelemetryFlags {
+  const filter: ScopedTelemetryFilter = {};
+  const positionals: string[] = [];
+  let outputPath: string | undefined;
+  let json = false;
+
+  const readValue = (flag: string, index: number): string => {
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith("-") || value.trim() === "") {
+      console.error(`[FAIL] ${flag} requires a value.\n`);
+      process.exit(1);
+    }
+    return value;
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+
+    if (arg === "--issue") {
+      filter.issue = readValue("--issue", index);
+      index += 1;
+    } else if (arg === "--since") {
+      filter.since = readValue("--since", index);
+      index += 1;
+    } else if (arg === "--branch") {
+      filter.branch = readValue("--branch", index);
+      index += 1;
+    } else if (arg === "--output" || arg === "-o") {
+      outputPath = readValue(arg, index);
+      index += 1;
+    } else if (arg === "--json") {
+      json = true;
+    } else if (arg.startsWith("-")) {
+      console.error(`[FAIL] Unknown telemetry flag: ${arg}\n`);
+      process.exit(1);
+    } else if (allowPositionals) {
+      positionals.push(arg);
+    } else {
+      console.error(`[FAIL] Unexpected telemetry argument: ${arg}\n`);
+      process.exit(1);
+    }
+  }
+
+  return { filter, outputPath, positionals, json };
+}
+
+function hasFilterScope(filter: ScopedTelemetryFilter): boolean {
+  return filter.issue !== undefined || filter.since !== undefined || filter.branch !== undefined;
+}
+
 async function handleTelemetry(args: string[]) {
   const sub = args[0]?.toLowerCase() || "status";
 
@@ -808,8 +886,21 @@ async function handleTelemetry(args: string[]) {
 
     case "inspect": {
       printHeader();
-      const store = loadTelemetry();
-      const payload = buildAnonymousCommunityPayload(store);
+      const { filter } = parseTelemetryScopeFlags(args.slice(1));
+      const store = hasFilterScope(filter)
+        ? syncTelemetryFromGitNotes(process.cwd(), filter)
+        : loadTelemetry();
+      const payload = buildAnonymousDiagnosticPayload(store, filter);
+      if (hasFilterScope(filter)) {
+        const scope = [
+          filter.issue === undefined ? null : `issue=${String(filter.issue)}`,
+          filter.since === undefined ? null : `since=${filter.since}`,
+          filter.branch === undefined ? null : `branch=${filter.branch}`,
+        ]
+          .filter((part): part is string => part !== null)
+          .join(", ");
+        console.log(`Scoped view (in-memory only, the store is not rewritten): ${scope}\n`);
+      }
       console.log("Anonymous Telemetry Payload (Zero-PII Audit):\n");
       console.log(JSON.stringify(payload, null, 2));
       console.log(
@@ -820,12 +911,8 @@ async function handleTelemetry(args: string[]) {
 
     case "report": {
       printHeader();
-      let outputPath: string | undefined;
-      const outIdx = args.findIndex((a) => a === "--output" || a === "-o");
-      if (outIdx !== -1 && args[outIdx + 1]) {
-        outputPath = args[outIdx + 1];
-      }
-      const res = generateTelemetryReportFile(process.cwd(), outputPath);
+      const { filter, outputPath } = parseTelemetryScopeFlags(args.slice(1));
+      const res = generateTelemetryReportFile(process.cwd(), outputPath, filter);
       console.log("[OK] Telemetry & ROI Performance Report generated:");
       console.log(`     Output file: ${res.filePath}`);
       console.log(
@@ -833,6 +920,65 @@ async function handleTelemetry(args: string[]) {
       );
       console.log("     'gh issue create --template diagnostic-report.yml --body-file <file>'.\n");
       console.log(res.content);
+      break;
+    }
+
+    case "snapshot": {
+      printHeader();
+      const { filter, outputPath } = parseTelemetryScopeFlags(args.slice(1));
+      try {
+        const res = exportTelemetrySnapshot(process.cwd(), outputPath, filter);
+        console.log("[OK] Zero-PII diagnostic snapshot exported:");
+        console.log(`     Output file: ${res.filePath}`);
+        console.log(`     Anonymous Project ID: ${res.payload.anonymousProjectId}`);
+        console.log(`     Schema version: ${res.payload.schemaVersion}`);
+        console.log("     Scope contains no code, paths, remotes or identities.");
+        console.log(
+          "     Nothing was uploaded. Share the file yourself, or aggregate it with 'lognexus telemetry benchmark'.\n",
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[FAIL] Snapshot export aborted: ${msg}\n`);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case "benchmark": {
+      const { outputPath, positionals, json } = parseTelemetryScopeFlags(args.slice(1), true);
+      if (positionals.length === 0) {
+        console.error(
+          "[FAIL] telemetry benchmark requires at least one snapshot file or directory.\n",
+        );
+        console.error(
+          "       Run 'lognexus telemetry snapshot' first, then pass its output path.\n",
+        );
+        process.exit(1);
+      }
+
+      try {
+        if (outputPath !== undefined) {
+          const res = generateCohortBenchmarkReportFile(positionals, outputPath, process.cwd());
+          console.log("[OK] Cohort benchmark report generated:");
+          console.log(`     Output file: ${res.filePath}`);
+          console.log(`     Projects aggregated: ${res.cohort.cohortSize}`);
+          console.log(`     Commits aggregated:  ${res.cohort.totals.commits}\n`);
+          if (json) console.log(JSON.stringify(res.cohort, null, 2));
+          break;
+        }
+
+        const cohort = aggregateBenchmarkCohort(positionals, process.cwd());
+        if (json) {
+          console.log(JSON.stringify(cohort, null, 2));
+        } else {
+          printHeader();
+          console.log(formatCohortMarkdownReport(cohort));
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[FAIL] Cohort benchmark aborted: ${msg}\n`);
+        process.exit(1);
+      }
       break;
     }
 

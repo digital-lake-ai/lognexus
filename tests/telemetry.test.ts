@@ -5,7 +5,11 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/index.js";
-import { inferTierFromAuthor } from "../src/telemetry/detector.js";
+import {
+  classifyFileCategory,
+  inferTierFromAuthor,
+  isGovernanceOrConfigSurface,
+} from "../src/telemetry/detector.js";
 import {
   AnonymousCommunityPayloadSchema,
   buildAnonymousCommunityPayload,
@@ -27,7 +31,10 @@ import {
   recordTaskFinish,
   recordTaskStart,
   redactLocalProjectMetadata,
+  syncTelemetryFromGitNotes,
+  TelemetryStoreSchema,
 } from "../src/telemetry/index.js";
+import { AnonymousDiagnosticPayloadSchema } from "../src/telemetry/schema.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -142,6 +149,16 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code)")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory("deepseek/vs-code")).toBe("deepseek/v3");
       expect(extractModelFamilyCategory(undefined)).toBe("unknown/other");
+    });
+
+    it("never publishes a human Git identity as a model family", () => {
+      expect(extractModelFamilyCategory("Jane Doe <jane@example.com>")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Organization-Bot")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Jane Doe")).toBe("unknown/other");
+      // A provider/model slug still survives next to an address.
+      expect(extractModelFamilyCategory("someone/random <random@example.com>")).toBe(
+        "someone/random",
+      );
     });
 
     it("categorizes frontier agent identities", () => {
@@ -317,10 +334,12 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content).toContain("`.ts`");
 
       const store = loadTelemetry(tempDir);
-      expect(store.summary.totalCommits).toBe(1);
-      expect(store.summary.totalLinesAdded).toBe(1);
+      // Both commits in history are reconciled: the unscoped backfill replays the full log,
+      // and the parentless initial commit now reports its README diff as well.
+      expect(store.summary.totalCommits).toBe(2);
+      expect(store.summary.totalLinesAdded).toBe(2);
       expect(store.extensions[".ts"]?.commits).toBe(1);
-      expect(Object.values(store.models)[0]?.commits).toBe(1);
+      expect(Object.values(store.models).reduce((sum, m) => sum + m.commits, 0)).toBe(2);
       expect(store.summary.estimatedCostSavingsPct).toBe(96);
     });
 
@@ -397,7 +416,10 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       writeFileSync(join(tempDir, "app.py"), "print('hello')\n", "utf8");
       execSync("git add app.py", { cwd: tempDir, stdio: "ignore" });
-      execSync('git commit -m "feat: python script"', { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "feat: python script" --author "gemini/flash (antigravity) <flash@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
       const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
 
       recordCommitTelemetry({
@@ -413,6 +435,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(content).toContain("Executive Metrics Dashboard");
       expect(content).toContain("Multi-Model Swarm Distribution");
       expect(content).toContain("Cost Efficiency & Model-Tier ROI Evaluation");
+      // The unscoped reconciliation replays the whole log, so the initial commit is priced
+      // under the repository's configured Git identity rather than the recording author.
       expect(content).toContain("`gemini/flash`");
       expect(content).toContain("`.py`");
     });
@@ -605,12 +629,168 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
   });
 
+  describe("Telemetry Schema v2.0 & Diff Categorization", () => {
+    it("parses a legacy 1.0.0 store into the 2.0.0 shape without losing values", () => {
+      const legacy = {
+        schemaVersion: "1.0.0",
+        mode: "local",
+        anonymousProjectId: "11111111-2222-3333-4444-555555555555",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        detectedStacks: ["nodejs"],
+        taskTimings: {},
+        extensions: { ".ts": { ext: ".ts", commits: 2, linesAdded: 10, linesDeleted: 1 } },
+        models: { "gemini/flash": { family: "gemini/flash", tier: "tier-3", commits: 2 } },
+        summary: { totalCommits: 2, totalLinesAdded: 10, estimatedCostSavingsPct: 96 },
+        lastUpdated: "2025-01-01T00:00:00.000Z",
+      };
+
+      const parsed = TelemetryStoreSchema.parse(legacy);
+      expect(parsed.schemaVersion).toBe("1.0.0");
+      expect(parsed.summary.totalCommits).toBe(2);
+      expect(parsed.summary.totalLinesDeleted).toBe(0);
+      expect(parsed.summary.contractCompliancePct).toBe(100);
+      expect(parsed.summary.tierCommits).toEqual({ "tier-1": 0, "tier-2": 0, "tier-3": 0 });
+      expect(parsed.extensions[".ts"]?.category).toBe("source");
+      expect(parsed.models["gemini/flash"]?.estimatedCostUsd).toBe(0);
+      expect(parsed.models["gemini/flash"]?.sourceLinesAdded).toBe(0);
+    });
+
+    it("defaults a fresh store schema version to 2.0.0", () => {
+      const store = loadTelemetry(tempDir);
+      expect(store.schemaVersion).toBe("2.0.0");
+      expect(store.summary.estimatedTokensSaved).toBe(0);
+      expect(store.summary.tierCommits["tier-1"]).toBe(0);
+    });
+
+    it("keeps the legacy community payload alias bound to the diagnostic payload", () => {
+      const store = loadTelemetry(tempDir);
+      const payload = buildAnonymousCommunityPayload(store);
+
+      expect(AnonymousCommunityPayloadSchema.safeParse(payload).success).toBe(true);
+      expect(AnonymousDiagnosticPayloadSchema.safeParse(payload).success).toBe(true);
+      // 1.x consumers read `dispatchedAt`; the v2 payload must still expose it.
+      expect(typeof payload.dispatchedAt).toBe("string");
+    });
+
+    it("classifies changed files into source, test, docs and config categories", () => {
+      expect(classifyFileCategory("src/telemetry/detector.ts")).toBe("source");
+      expect(classifyFileCategory("src\\main.py")).toBe("source");
+      expect(classifyFileCategory("scripts/deploy.ps1")).toBe("source");
+      expect(classifyFileCategory("tests/telemetry.test.ts")).toBe("test");
+      expect(classifyFileCategory("test/helpers.ts")).toBe("test");
+      expect(classifyFileCategory("__tests__/app.tsx")).toBe("test");
+      expect(classifyFileCategory("src/lib/utils.spec.js")).toBe("test");
+      expect(classifyFileCategory("docs/contexto/plan.md")).toBe("docs");
+      expect(classifyFileCategory("README.md")).toBe("docs");
+      expect(classifyFileCategory("CHANGELOG")).toBe("docs");
+      expect(classifyFileCategory("LICENSE.txt")).toBe("docs");
+      expect(classifyFileCategory("package.json")).toBe("config");
+      expect(classifyFileCategory(".github/workflows/ci.yml")).toBe("config");
+      expect(classifyFileCategory(".claude-plugin/plugin.json")).toBe("config");
+      expect(classifyFileCategory(".gitignore")).toBe("config");
+      expect(classifyFileCategory("")).toBe("source");
+    });
+
+    it("identifies governance and configuration surfaces", () => {
+      expect(isGovernanceOrConfigSurface("CLAUDE.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("AGENTS.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("GEMINI.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("package.json")).toBe(true);
+      expect(isGovernanceOrConfigSurface(".github/workflows/ci.yml")).toBe(true);
+      expect(isGovernanceOrConfigSurface(".lognexus/state.json")).toBe(true);
+      expect(isGovernanceOrConfigSurface("README.md")).toBe(true);
+      expect(isGovernanceOrConfigSurface("src/telemetry/schema.ts")).toBe(false);
+      expect(isGovernanceOrConfigSurface("tests/telemetry.test.ts")).toBe(false);
+      expect(isGovernanceOrConfigSurface("src/mcp/tools.ts")).toBe(false);
+    });
+
+    it("separates source and test diffs of the same extension without leaking paths", () => {
+      mkdirSync(join(tempDir, "src"), { recursive: true });
+      mkdirSync(join(tempDir, "tests"), { recursive: true });
+      writeFileSync(join(tempDir, "src", "engine.ts"), "const a = 1;\nconst b = 2;\n", "utf8");
+      writeFileSync(
+        join(tempDir, "tests", "engine.test.ts"),
+        "it('a', () => {});\nit('b', () => {});\nit('c', () => {});\n",
+        "utf8",
+      );
+      execSync("git add src tests", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -m "feat: add engine and specs"', { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      const diffs = extractCommitDiffStats(sha, tempDir);
+      const sourceTs = diffs.find((d) => d.ext === ".ts" && d.category === "source");
+      const testTs = diffs.find((d) => d.ext === ".ts" && d.category === "test");
+
+      expect(sourceTs?.linesAdded).toBe(2);
+      expect(testTs?.linesAdded).toBe(3);
+
+      const serialized = JSON.stringify(diffs);
+      expect(serialized).not.toContain("engine");
+      expect(serialized).not.toContain("src/");
+      expect(serialized).not.toContain("tests/");
+      expect(serialized).not.toContain("\u0000");
+    });
+
+    it("classifies doc and config diffs alongside source diffs", () => {
+      mkdirSync(join(tempDir, "docs"), { recursive: true });
+      writeFileSync(join(tempDir, "docs", "guide.md"), "# Guide\nBody\n", "utf8");
+      writeFileSync(join(tempDir, "settings.json"), '{\n  "a": 1\n}\n', "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -m "docs: guide"', { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      const diffs = extractCommitDiffStats(sha, tempDir);
+      expect(diffs.find((d) => d.ext === ".md")?.category).toBe("docs");
+      expect(diffs.find((d) => d.ext === ".json")?.category).toBe("config");
+    });
+  });
+
+  describe("Gemini 4 Hydrogen Routing", () => {
+    it("classifies every Hydrogen identity variant as the hydrogen family", () => {
+      for (const identity of [
+        "Gemini 4 Hydrogen",
+        "Gemini 4 Hydrogen (Executor)",
+        "gemini/hydrogen",
+        "gemini/hydrogen (antigravity)",
+        "google/gemini-4-hydrogen (antigravity)",
+        "google/gemini-4-hydrogen-high (antigravity)",
+      ]) {
+        expect(extractModelFamilyCategory(identity)).toBe("gemini/hydrogen");
+      }
+    });
+
+    it("routes Hydrogen identities to tier-2, never tier-1", () => {
+      for (const identity of [
+        "Gemini 4 Hydrogen",
+        "gemini/hydrogen (antigravity)",
+        "google/gemini-4-hydrogen (antigravity)",
+        "google/gemini-4-hydrogen-high (antigravity)",
+      ]) {
+        expect(inferTierFromAuthor(identity)).toBe("tier-2");
+      }
+    });
+
+    it("keeps Carbon and Argon as tier-1 flagship orchestrators", () => {
+      expect(inferTierFromAuthor("Gemini 4 Carbon (anthropic-cloud)")).toBe("tier-1");
+      expect(inferTierFromAuthor("Gemini 4 Argon (google-antigravity)")).toBe("tier-1");
+      expect(extractModelFamilyCategory("Gemini 4 Carbon (antigravity)")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("Gemini 4 Argon (antigravity)")).toBe("gemini/argon");
+    });
+  });
+
   describe("Offline Guarantee", () => {
     const readSource = (file: string) =>
       readFileSync(join(repoRoot, "src", "telemetry", file), "utf8");
 
     it("contains no fetch() calls to remote endpoints in telemetry sources", () => {
-      for (const file of ["collector.ts", "detector.ts", "index.ts", "report.ts", "schema.ts"]) {
+      for (const file of [
+        "benchmark.ts",
+        "collector.ts",
+        "detector.ts",
+        "index.ts",
+        "report.ts",
+        "schema.ts",
+      ]) {
         const source = readSource(file);
         expect(source).not.toMatch(/\bfetch\s*\(/);
         expect(source).not.toMatch(/https?:\/\/[^\s"'`]+/);
@@ -622,6 +802,387 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       const barrel = await import("../src/telemetry/index.js");
       expect("dispatchCommunityTelemetry" in barrel).toBe(false);
       expect("DEFAULT_TELEMETRY_ENDPOINT" in barrel).toBe(false);
+    });
+  });
+
+  describe("LOC-Weighted ROI Estimator", () => {
+    const writeLines = (relativePath: string, lineCount: number) => {
+      const target = join(tempDir, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      const body = Array.from({ length: lineCount }, (_, i) => `export const value${i} = ${i};`);
+      writeFileSync(target, `${body.join("\n")}\n`, "utf8");
+    };
+
+    const commitAndRecord = (message: string, author: string, tier: string) => {
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(`git commit -q -m "${message}"`, { cwd: tempDir, stdio: "ignore" });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+      recordCommitTelemetry({ sha, author, tier, targetDir: tempDir });
+      return sha;
+    };
+
+    it("prices a heavy refactor far above a one-line change on the same tier", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      // Recorded straight from the commit so the incremental and replayed aggregates both
+      // price the same commit identically.
+      writeLines("src/small.ts", 1);
+      commitAndRecord("feat(#61/T1): one line", "gemini/flash", "tier-3");
+      const smallModel = loadTelemetry(tempDir).models["gemini/flash"];
+      const smallCost = smallModel?.estimatedCostUsd ?? 0;
+      const smallTokens =
+        (smallModel?.estimatedInputTokens ?? 0) + (smallModel?.estimatedOutputTokens ?? 0);
+
+      writeLines("src/large.ts", 100);
+      commitAndRecord("feat(#61/T2): hundred lines", "gemini/flash", "tier-3");
+      const largeModel = loadTelemetry(tempDir).models["gemini/flash"];
+      const largeCost = largeModel?.estimatedCostUsd ?? 0;
+      const largeTokens =
+        (largeModel?.estimatedInputTokens ?? 0) + (largeModel?.estimatedOutputTokens ?? 0);
+
+      expect(largeModel?.sourceLinesAdded).toBe(101);
+      // `docsLinesAdded` folds documentation and configuration together. Here it is entirely
+      // configuration: the telemetry store the recorder itself writes (47 plus 43 lines).
+      expect(largeModel?.docsLinesAdded).toBe(90);
+
+      const deltaCost = Number((largeCost - smallCost).toFixed(6));
+      const deltaTokens = largeTokens - smallTokens;
+      // 100 source lines cost 100x the per-line rate plus a token floor far above the
+      // single-line commit, so a refactor can never be priced like a typo fix.
+      expect(deltaCost).toBeCloseTo(0.002886, 6);
+      expect(deltaTokens).toBe(3888);
+    });
+
+    it("prices source lines above documentation lines within one commit", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      writeLines("src/engine.ts", 10);
+      mkdirSync(join(tempDir, "docs"), { recursive: true });
+      writeFileSync(join(tempDir, "docs", "guide.md"), "# Guide\n".repeat(20), "utf8");
+      commitAndRecord("feat(#61/T3): engine and guide", "claude/haiku", "tier-3");
+
+      const model = loadTelemetry(tempDir).models["claude/haiku"];
+      expect(model?.sourceLinesAdded).toBe(10);
+      // 20 guide lines plus the telemetry store the recorder writes during the commit (see
+      // the bucket's total above); both land in the fold used for pricing.
+      expect(model?.docsLinesAdded).toBe(67);
+      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 67 doc/config lines at 0.000002.
+      expect(model?.estimatedCostUsd).toBeCloseTo(0.002214, 6);
+    });
+
+    it("scales the frontier baseline with the LOC actually shipped", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      writeLines("src/engine.ts", 100);
+      commitAndRecord("feat(#61/T4): engine", "gemini/flash", "tier-3");
+
+      const summary = loadTelemetry(tempDir).summary;
+      expect(summary.totalCommits).toBe(1);
+      expect(summary.tierCommits["tier-3"]).toBe(1);
+      // Tier-1 baseline for 100 source lines + the 47 lines of the telemetry store the
+      // recorder writes alongside them: 0.05 + 100*0.00015 + 47*0.00004.
+      expect(summary.estimatedBaselineCostUsd).toBe(0.067);
+      expect(summary.estimatedActualCostUsd).toBe(0.003);
+      expect(summary.estimatedCostSavingsUsd).toBe(0.064);
+      expect(summary.estimatedBaselineTokens).toBeGreaterThan(summary.estimatedActualTokens);
+      expect(summary.estimatedTokensSaved).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Scoped Filters & Git-Derived Metrics", () => {
+    const note = (sha: string, payload: Record<string, unknown>) => {
+      execFileSync(
+        "git",
+        ["notes", "--ref=lognexus", "add", "-f", "-m", JSON.stringify(payload), sha],
+        { cwd: tempDir, stdio: "ignore", shell: false },
+      );
+    };
+
+    const commitFile = (
+      relativePath: string,
+      body: string,
+      message: string,
+      author = "gemini/flash <flash@example.com>",
+      dateIso?: string,
+    ) => {
+      const target = join(tempDir, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, body, "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      const dateFlag = dateIso ? ` --date "${dateIso}"` : "";
+      execSync(`git commit -q -m "${message}" --author "${author}"${dateFlag}`, {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+      return execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+    };
+
+    it("preserves an explicit tier-3 recorded by a modern schema note", () => {
+      const sha = commitFile(
+        "worker.ts",
+        "export const run = () => {};\n",
+        "feat(#58/T1): add worker",
+        "google/gemini-3.8-flash-high <flash@example.com>",
+      );
+      note(sha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 58 },
+        subtask: { id: "T1" },
+        tier: "tier-3",
+      });
+
+      enableTelemetry({ cwd: tempDir });
+      const store = syncTelemetryFromGitNotes(tempDir, { issue: 58 });
+
+      expect(store.summary.totalCommits).toBe(1);
+      expect(store.summary.tierCommits["tier-3"]).toBe(1);
+      expect(store.summary.tierCommits["tier-1"]).toBe(0);
+      expect(store.models["gemini/flash-high"]?.tier).toBe("tier-3");
+    });
+
+    it("filters by numeric, hashed and alphanumeric issue identifiers without touching the store", () => {
+      const numeric = commitFile("numeric.ts", "export const a = 1;\n", "feat(#58/T1): numeric");
+      note(numeric, { issue: { id: 58 }, subtask: { id: "T1" } });
+      const ticket = commitFile("ticket.ts", "export const b = 2;\n", "fix(SLM-201/T1): ticket");
+      note(ticket, { issue: { id: "SLM-201" }, subtask: { id: "T1" } });
+      const other = commitFile("other.ts", "export const c = 3;\n", "feat(#61/T1): other");
+      note(other, { issue: { id: 61 }, subtask: { id: "T1" } });
+
+      enableTelemetry({ cwd: tempDir });
+      const persisted = syncTelemetryFromGitNotes(tempDir);
+      const snapshot = readFileSync(getTelemetryPath(tempDir), "utf8");
+      expect(persisted.summary.totalCommits).toBe(4);
+
+      for (const [issue, expected] of [
+        [58, 1],
+        ["58", 1],
+        ["#58", 1],
+        ["SLM-201", 1],
+        ["slm-201", 1],
+        [61, 1],
+      ] as const) {
+        const scoped = syncTelemetryFromGitNotes(tempDir, { issue });
+        expect(scoped.summary.totalCommits).toBe(expected);
+      }
+
+      expect(readFileSync(getTelemetryPath(tempDir), "utf8")).toBe(snapshot);
+    });
+
+    it("scopes by date window and branch without persisting a projection", () => {
+      execSync("git checkout -q -b feature/telemetry", { cwd: tempDir, stdio: "ignore" });
+      commitFile("branch.ts", "export const branch = true;\n", "feat(#61/T1): branch work");
+
+      enableTelemetry({ cwd: tempDir });
+      syncTelemetryFromGitNotes(tempDir);
+      const snapshot = readFileSync(getTelemetryPath(tempDir), "utf8");
+
+      const byBranch = syncTelemetryFromGitNotes(tempDir, {
+        branch: "feature/telemetry",
+        issue: 61,
+      });
+      expect(byBranch.summary.totalCommits).toBe(1);
+
+      const bySince = syncTelemetryFromGitNotes(tempDir, { since: "2000-01-01" });
+      expect(bySince.summary.totalCommits).toBe(2);
+
+      const future = syncTelemetryFromGitNotes(tempDir, { since: "2099-01-01" });
+      expect(future.summary.totalCommits).toBe(0);
+      expect(future.summary.gitNotesCoveragePct).toBe(100);
+
+      expect(() => syncTelemetryFromGitNotes(tempDir, { since: "--upload-pack=evil" })).toThrow(
+        /Invalid telemetry scope value/,
+      );
+
+      expect(readFileSync(getTelemetryPath(tempDir), "utf8")).toBe(snapshot);
+    });
+
+    it("derives cadence, contract compliance, rework ratio and coverage from Git", () => {
+      const baseMs = Date.parse(
+        execSync("git log -1 --format=%aI HEAD", { cwd: tempDir, encoding: "utf8" }).trim(),
+      );
+      const contracted = commitFile(
+        "src/engine.ts",
+        "export const engine = 1;\n",
+        "feat(#61/T1): engine",
+        "gemini/flash <flash@example.com>",
+        new Date(baseMs + 60_000).toISOString(),
+      );
+      note(contracted, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 61 },
+        subtask: { id: "T1", contract: { allowedFiles: ["src/engine.ts"] } },
+      });
+
+      const escaped = commitFile(
+        "src/escape.ts",
+        "export const escape = 1;\n",
+        "feat(#61/T2): escape",
+        "gemini/flash <flash@example.com>",
+        new Date(baseMs + 180_000).toISOString(),
+      );
+      note(escaped, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 61 },
+        subtask: { id: "T2", contract: { allowedFiles: ["src/engine.ts"] } },
+      });
+
+      commitFile(
+        "src/rework.ts",
+        "export const rework = 1;\n",
+        "fix(#61/T2): repair engine",
+        "antigravity/lead-orchestrator <lead@example.com>",
+        new Date(baseMs + 420_000).toISOString(),
+      );
+
+      enableTelemetry({ cwd: tempDir });
+      const store = syncTelemetryFromGitNotes(tempDir);
+      const summary = store.summary;
+
+      expect(summary.contractedCommits).toBe(2);
+      expect(summary.contractCompliancePct).toBe(50);
+      expect(summary.reworkCommits).toBe(1);
+      expect(summary.reworkRatioPct).toBe(25);
+      // Only the two explicitly noted commits carry a Git Note; the coverage is a real ratio
+      // over the scanned history, not a tautological share of the noted subset.
+      expect(summary.gitNotesCoveragePct).toBe(50);
+      expect(summary.escalatedCommits).toBe(0);
+      // Both temporal metrics come from the recorded author timestamps, which the fixture
+      // pins explicitly: deltas of 60s, 120s and 240s give a 420s span and a 120s median.
+      expect(summary.activeDevelopmentSpanSec).toBe(420);
+      expect(summary.medianCommitCadenceSec).toBe(120);
+      expect(summary.tierCommits["tier-1"]).toBe(1);
+      expect(summary.tierCommits["tier-3"]).toBe(1);
+    });
+
+    it("reports full coverage when every commit in the scope carries a note", () => {
+      const first = commitFile("src/scope-a.ts", "export const a = 1;\n", "feat(#61/T1): a");
+      note(first, { $schema: "lognexus/note/v1", issue: { id: 61 }, subtask: { id: "T1" } });
+
+      // A commit outside the requested issue, deliberately left without a note.
+      commitFile("src/other.ts", "export const other = 1;\n", "feat(#58/T1): other");
+
+      const second = commitFile("src/scope-b.ts", "export const b = 1;\n", "feat(#61/T2): b");
+      note(second, { $schema: "lognexus/note/v1", issue: { id: 61 }, subtask: { id: "T2" } });
+
+      const scoped = syncTelemetryFromGitNotes(tempDir, { issue: 61 });
+      expect(scoped.summary.totalCommits).toBe(2);
+      expect(scoped.summary.gitNotesCoveragePct).toBe(100);
+
+      // The same history read without a scope exposes the unnoted commit.
+      const unscoped = syncTelemetryFromGitNotes(tempDir);
+      expect(unscoped.summary.totalCommits).toBe(4);
+      expect(unscoped.summary.gitNotesCoveragePct).toBe(50);
+    });
+
+    it("rolls one commit's source and test lines into a single extension entry", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      const source = join(tempDir, "src", "engine.ts");
+      const tests = join(tempDir, "tests", "engine.test.ts");
+      mkdirSync(dirname(source), { recursive: true });
+      mkdirSync(dirname(tests), { recursive: true });
+      writeFileSync(source, "export const engine = 1;\n", "utf8");
+      writeFileSync(tests, "expect(engine).toBe(1);\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "feat(#61/T3): engine and its test"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+
+      const store = syncTelemetryFromGitNotes(tempDir);
+      const ts = store.extensions[".ts"];
+      expect(ts).toBeDefined();
+      // Both files are `.ts`, so the commit is counted once and both line totals are kept.
+      expect(ts.commits).toBe(1);
+      expect(ts.linesAdded).toBe(2);
+      expect(ts.category).toBe("source");
+    });
+
+    it("counts source lines removed so the deletion total is not always zero", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      writeFileSync(join(tempDir, "module.ts"), "export const a = 1;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "feat(#61/T4): add module"', { cwd: tempDir, stdio: "ignore" });
+
+      // `README.md` is a docs file, so these edits exercise the source counter in isolation.
+      writeFileSync(join(tempDir, "README.md"), "# Test Repo\n\nExtra line.\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "docs(#61/T4): expand readme"', { cwd: tempDir, stdio: "ignore" });
+
+      writeFileSync(join(tempDir, "module.ts"), "", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "refactor(#61/T4): trim module"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+
+      const summary = syncTelemetryFromGitNotes(tempDir).summary;
+      expect(summary.sourceLinesAdded).toBe(1);
+      expect(summary.sourceLinesDeleted).toBe(1);
+    });
+
+    it("excludes merge commits from the commit aggregates", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      execSync("git checkout -q -b feature/merge", { cwd: tempDir, stdio: "ignore" });
+      commitFile("src/side.ts", "export const side = 1;\n", "feat(#61/T5): side branch");
+      execSync("git checkout -q -", { cwd: tempDir, stdio: "ignore" });
+      // Both branches must carry their own commits, otherwise Git fast-forwards and no merge
+      // commit is ever created — the very thing this test needs to observe.
+      const mainFile = join(tempDir, "src", "main-line.ts");
+      mkdirSync(dirname(mainFile), { recursive: true });
+      writeFileSync(mainFile, "export const mainLine = 1;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "feat(#61/T5): mainline" --author "gemini/flash <flash@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
+      execSync('git merge -q --no-ff feature/merge -m "chore(#61/T5): merge side branch"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+
+      // The merge commit really is in history; it is the scan that must skip it.
+      const total = execSync("git rev-list --count HEAD", {
+        cwd: tempDir,
+        encoding: "utf8",
+      }).trim();
+      expect(Number(total)).toBe(4);
+      const merges = execSync("git rev-list --merges --count HEAD", {
+        cwd: tempDir,
+        encoding: "utf8",
+      }).trim();
+      expect(Number(merges)).toBe(1);
+
+      const summary = syncTelemetryFromGitNotes(tempDir).summary;
+      expect(summary.totalCommits).toBe(3);
+      expect(summary.reworkCommits).toBe(0);
+    });
+
+    it("preserves a mixed-tier commit distribution instead of collapsing to the last tier", () => {
+      // Both identities collapse to the same model family (`gemini/flash`) while routing to
+      // different tiers, so the buckets merge and the tier split must not be re-derived from
+      // them — re-deriving it would overwrite the history with the last commit's tier.
+      const high = "google/gemini-3.8-flash <flash@example.com>";
+      const lite = "google/gemini-3.8-flash-lite <lite@example.com>";
+
+      const tier2a = commitFile("src/a.ts", "export const a = 1;\n", "feat(#61/T6): a", high);
+      const tier2b = commitFile("src/b.ts", "export const b = 1;\n", "feat(#61/T6): b", high);
+      commitFile("src/c.ts", "export const c = 1;\n", "feat(#61/T6): c", lite);
+      for (const sha of [tier2a, tier2b]) {
+        note(sha, { $schema: "lognexus/note/v1", issue: { id: 61 }, subtask: { id: "T6" } });
+      }
+
+      const store = syncTelemetryFromGitNotes(tempDir);
+      expect(store.summary.totalCommits).toBe(4);
+      // The fixture's bootstrap commit is authored by the test runner and lands in the
+      // anonymous bucket, which falls back to the default tier; the two model identities
+      // collapse into one family bucket.
+      expect(store.models["gemini/flash"].commits).toBe(3);
+      expect(store.summary.tierCommits["tier-1"]).toBe(0);
+      expect(store.summary.tierCommits["tier-2"]).toBe(2);
+      expect(store.summary.tierCommits["tier-3"]).toBe(2);
     });
   });
 });

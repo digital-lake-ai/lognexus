@@ -9,7 +9,11 @@ import { refreshContextHandoff } from "./state/handoff.js";
 import { finishSubtask, loadState } from "./state/manager.js";
 import { inferActiveIssueFromBranch } from "./state/sync.js";
 import { recordCommitTelemetry, recordReviewGateBlock } from "./telemetry/collector.js";
-import { type AuthorTier, inferTierFromAuthor } from "./telemetry/detector.js";
+import {
+  type AuthorTier,
+  inferTierFromAuthor,
+  isGovernanceOrConfigSurface,
+} from "./telemetry/detector.js";
 
 export const TIER_VALUES = ["tier-1", "tier-2", "tier-3"] as const;
 
@@ -300,14 +304,19 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   // 3.1 Tier routing guard: tier-1 authors must acknowledge working outside their scope
   const effectiveTier: AuthorTier =
     options.tier ?? inferTierFromAuthor(author) ?? state.activeIssue?.tier ?? "tier-3";
+  const expectedIssueTier = state.activeIssue?.tier ?? "tier-3";
 
+  // A tier-1 issue, an explicit tier-1 override or a pure governance edit all mean the author is
+  // inside its declared scope; only an undeclared tier-1 author on tier-3 work needs an ack.
   if (
     effectiveTier === "tier-1" &&
-    (state.activeIssue?.tier === "tier-3" || state.currentSubtask?.contract) &&
+    expectedIssueTier !== "tier-1" &&
+    options.tier !== "tier-1" &&
+    (expectedIssueTier === "tier-3" || Boolean(state.currentSubtask?.contract)) &&
     !options.escalated
   ) {
     const implementationFiles = stagedFiles.filter(
-      (file) => !file.endsWith(".md") && !file.startsWith(".lognexus/"),
+      (file) => !isGovernanceOrConfigSurface(file) && !file.startsWith(".lognexus/"),
     );
     if (implementationFiles.length > 0) {
       process.stderr.write(

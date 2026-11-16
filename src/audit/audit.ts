@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { rejectNotesReference, validateGitReference } from "../git/safe.js";
 import { getNote } from "../notes/notes.js";
-import { inferTierFromAuthor } from "../telemetry/detector.js";
+import { inferTierFromAuthor, isGovernanceOrConfigSurface } from "../telemetry/detector.js";
 import { getJourneyTimeline, type TimelineItem } from "../timeline/timeline.js";
 
 export interface AuditViolation {
@@ -47,7 +47,9 @@ interface NoteContract {
 }
 
 interface NotePayload {
+  issue?: { tier?: unknown } | null;
   subtask?: { contract?: NoteContract | null } | null;
+  tier?: unknown;
   escalated?: unknown;
 }
 
@@ -77,35 +79,65 @@ function extractFamily(value: string): string | null {
 }
 
 /**
+ * Official provider prefixes that may decorate a flagship slug.
+ *
+ * Stripping them is a `startsWith` probe rather than a regex alternation, so normalization
+ * stays linear in the length of the identity string.
+ */
+const CANONICAL_PROVIDER_PREFIXES = ["google/", "vertex/", "vertexai/"];
+
+/** `-high` is a reasoning-effort suffix on the same model, not a different family. */
+const HIGH_VARIANT_SUFFIX = "-high";
+
+function stripCanonicalDecorations(collapsed: string): string {
+  let slug = collapsed;
+  for (const prefix of CANONICAL_PROVIDER_PREFIXES) {
+    if (slug.startsWith(prefix)) {
+      slug = slug.slice(prefix.length);
+      break;
+    }
+  }
+  if (slug.endsWith(HIGH_VARIANT_SUFFIX)) {
+    slug = slug.slice(0, -HIGH_VARIANT_SUFFIX.length);
+  }
+  return slug;
+}
+
+function canonicalBasename(slug: string): string {
+  if (slug.startsWith("gemini/")) return slug.slice("gemini/".length);
+  if (slug.startsWith("gemini-")) return slug.slice("gemini-".length);
+  return slug;
+}
+
+/**
  * Normalizes flagship display names and provider-prefixed model slugs onto a single
  * canonical family identifier so `Gemini 4 Carbon` and `gemini/carbon (antigravity)`
- * (or `google/gemini-4-carbon`) cannot bypass the self-approval gate via formatting differences.
+ * (or `google/gemini-4-carbon-high`) cannot bypass the self-approval gate via formatting differences.
  */
 function normalizeCanonicalFamily(raw: string): string {
   const collapsed = raw
     .trim()
     .toLowerCase()
     .replace(/[\s_]+/g, "-");
-  if (
-    collapsed === "gemini-4-carbon" ||
-    collapsed === "gemini/carbon" ||
-    collapsed === "gemini/4-carbon" ||
-    collapsed === "google/gemini-4-carbon" ||
-    collapsed === "google/gemini-carbon"
-  ) {
-    return "gemini/carbon";
-  }
-  if (
-    collapsed === "gemini-4-argon" ||
-    collapsed === "gemini/argon" ||
-    collapsed === "gemini/4-argon" ||
-    collapsed === "google/gemini-4-argon" ||
-    collapsed === "google/gemini-argon"
-  ) {
-    return "gemini/argon";
-  }
-  return raw;
+  const slug = stripCanonicalDecorations(collapsed);
+  const basename = canonicalBasename(slug);
+
+  const family = CANONICAL_FLAGSHIP_BASENAMES.get(basename);
+  return family ?? raw;
 }
+
+/**
+ * Tier-1 and tier-2 flagship basenames, keyed by the identity once provider prefix,
+ * `gemini/` binder and `-high` suffix have been removed.
+ */
+const CANONICAL_FLAGSHIP_BASENAMES = new Map<string, string>([
+  ["4-carbon", "gemini/carbon"],
+  ["carbon", "gemini/carbon"],
+  ["4-argon", "gemini/argon"],
+  ["argon", "gemini/argon"],
+  ["4-hydrogen", "gemini/hydrogen"],
+  ["hydrogen", "gemini/hydrogen"],
+]);
 
 export function parseIdentity(value: string | null): Identity | null {
   if (value === null) return null;
@@ -242,8 +274,22 @@ function isEscalationAcknowledged(note: string | null, subject: string): boolean
   }
 }
 
+/**
+ * A tier-1 issue declares its subtasks as orchestrator work, so a tier-1 author editing
+ * implementation files there is inside its scope and needs no escalation acknowledgement.
+ */
+function isTierOneIssue(note: string | null): boolean {
+  if (note === null) return false;
+  try {
+    const parsed = JSON.parse(note) as NotePayload;
+    return parsed?.issue?.tier === "tier-1";
+  } catch {
+    return false;
+  }
+}
+
 function isImplementationFile(file: string): boolean {
-  return !file.endsWith(".md") && !file.startsWith(".lognexus/");
+  return !isGovernanceOrConfigSurface(file) && !file.startsWith(".lognexus/");
 }
 
 /**
@@ -340,6 +386,7 @@ function auditCommit(item: TimelineItem, targetDir: string): AuditViolation[] {
 
     if (
       inferTierFromAuthor(item.author) === "tier-1" &&
+      !isTierOneIssue(note) &&
       !isEscalationAcknowledged(note, item.subject)
     ) {
       const implementationFiles = changedFiles.filter(isImplementationFile);
