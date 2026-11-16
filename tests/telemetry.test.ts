@@ -773,7 +773,14 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       readFileSync(join(repoRoot, "src", "telemetry", file), "utf8");
 
     it("contains no fetch() calls to remote endpoints in telemetry sources", () => {
-      for (const file of ["collector.ts", "detector.ts", "index.ts", "report.ts", "schema.ts"]) {
+      for (const file of [
+        "benchmark.ts",
+        "collector.ts",
+        "detector.ts",
+        "index.ts",
+        "report.ts",
+        "schema.ts",
+      ]) {
         const source = readSource(file);
         expect(source).not.toMatch(/\bfetch\s*\(/);
         expect(source).not.toMatch(/https?:\/\/[^\s"'`]+/);

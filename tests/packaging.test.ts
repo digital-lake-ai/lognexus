@@ -92,6 +92,20 @@ describe("CLI --help & Biome schema parity", () => {
     expect(usage).toContain("--protect-tokens");
   });
 
+  it("documents the scoped telemetry subcommands in printUsage()", () => {
+    const cli = readRepoFile("src/cli.ts");
+    const usage = cli.slice(
+      cli.indexOf("function printUsage()"),
+      cli.indexOf("async function handleInit"),
+    );
+
+    expect(usage).toContain("lognexus telemetry snapshot");
+    expect(usage).toContain("lognexus telemetry benchmark");
+    for (const flag of ["--issue", "--since", "--branch", "--json"]) {
+      expect(usage).toContain(flag);
+    }
+  });
+
   it("pins the Biome $schema to the installed @biomejs/biome version", () => {
     const biome = JSON.parse(readRepoFile("biome.json")) as { $schema: string };
     const pkg = JSON.parse(readRepoFile("node_modules/@biomejs/biome/package.json")) as {

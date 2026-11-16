@@ -80,7 +80,7 @@ npx @digital-lake/lognexus telemetry inspect
 Example payload:
 ```json
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
   "anonymousProjectId": "e4f8d2c1-4b3e-412a-9c0f-7e6d5b4a3c2d",
   "consent": {
     "accepted": false,
@@ -111,6 +111,61 @@ Example payload:
 
 This object is serialized to stdout only. It is never written to a buffer for later upload, because no upload path exists.
 
+The payload now carries `schemaVersion: "2.0.0"`. A `1.0.0` payload is still readable: a stored report from an older version is upgraded in memory on read and re-emitted as `2.0.0`.
+
+---
+
+## 5.1 LOC-Weighted Estimation
+
+Since 2.0.0 every commit is priced by the lines it actually changed rather than by a flat per-commit constant. Each changed line is classified by the file's extension and only aggregate counters survive:
+
+| Class | Typical extensions | Weight |
+| :--- | :--- | :--- |
+| `source` | `.ts`, `.py`, `.go`, `.rs` | Full reasoning cost. |
+| `test` | `*.test.ts`, `*.spec.ts` | Reduces the rework ratio; priced below source. |
+| `docs` | `.md`, `.txt` | Cheapest — documentation churn is not engineering cost. |
+| `config` | `.json`, `.yml`, `.toml` | Cheapest — counted, never priced as logic. |
+
+Only the resulting totals (`linesAdded`, `linesDeleted`, estimated tokens and cost per tier) are persisted. The file extensions are counted as a histogram; the file names they came from are discarded before the store is written.
+
+---
+
+## 5.2 Scoped In-Memory Filtering
+
+`inspect`, `report` and `snapshot` accept three scope flags, and all three filter **in memory only**:
+
+```bash
+# Only the commits of issue #61
+npx @digital-lake/lognexus telemetry report --issue 61
+
+# Only the commits since a given instant
+npx @digital-lake/lognexus telemetry report --since 2026-01-01T00:00:00Z
+
+# Only the commits reachable from a branch
+npx @digital-lake/lognexus telemetry inspect --branch main
+```
+
+A scoped read never rewrites `.lognexus/telemetry.json`: the projection is built from Git history into a temporary store, formatted, and dropped. Mutually compatible scopes combine (`--issue 61 --branch main`), and a missing flag value or an unknown flag aborts with a non-zero exit instead of silently recalculating the whole history.
+
+---
+
+## 5.3 Offline Snapshot and Cohort Benchmark
+
+Two subcommands exist for comparing several machines without any server:
+
+```bash
+# 1. Export a redacted snapshot of one repository
+npx @digital-lake/lognexus telemetry snapshot -o .lognexus/snapshot-v2.json
+
+# 2. Aggregate any number of exported snapshots into a cohort
+npx @digital-lake/lognexus telemetry benchmark ./snapshots -o .lognexus/cohort.md
+npx @digital-lake/lognexus telemetry benchmark ./snapshots --json
+```
+
+- `snapshot` writes a validated, zero-PII JSON document confined to the scanned project. Before the file reaches disk, the serialized content is scanned for the local project folder name and for any absolute path, and the export aborts if either is found.
+- `benchmark` reads only local `.json` files, deduplicates per `anonymousProjectId` (newest `generatedAt` wins), and prints either a Markdown table to stdout or the raw cohort as JSON with `--json`. Nothing is uploaded and no directory is scanned recursively outside the paths you pass.
+- Snapshots are safe to attach to an issue. `.lognexus/snapshot-v2.json` is listed in `.gitignore` so an export never lands in a commit by accident.
+
 ---
 
 ## 6. Network Behavior
@@ -137,6 +192,14 @@ npx @digital-lake/lognexus telemetry enable
 
 # Generate a local .lognexus/telemetry.md report with ROI metrics
 npx @digital-lake/lognexus telemetry report
+
+# Scope the report to one issue, one window or one branch (in-memory only)
+npx @digital-lake/lognexus telemetry report --issue 61
+npx @digital-lake/lognexus telemetry report --since 2026-01-01T00:00:00Z --branch main
+
+# Export a redacted snapshot and aggregate several of them offline
+npx @digital-lake/lognexus telemetry snapshot -o .lognexus/snapshot-v2.json
+npx @digital-lake/lognexus telemetry benchmark ./snapshots --json
 
 # Inspect the exact local payload structure
 npx @digital-lake/lognexus telemetry inspect
