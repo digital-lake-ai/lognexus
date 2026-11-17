@@ -200,6 +200,88 @@ describe("Zero-PII Snapshot Exporter & Cohort Benchmark", () => {
     expect(cohort.cohortSize).toBe(1);
   });
 
+  it("rolls up and renders swarm metrics in cohort benchmarks when swarmCommits > 0", () => {
+    const snapshotDir = mkdtempSync(join(tmpdir(), "lognexus-benchmark-swarm-"));
+    created.push(snapshotDir);
+
+    const snapshotA = {
+      schemaVersion: "2.0.0",
+      anonymousProjectId: "11111111-1111-1111-1111-111111111111",
+      consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+      environment: {
+        os: "linux",
+        nodeVersion: "v20.0.0",
+        lognexusVersion: "1.3.7",
+        detectedStacks: ["typescript"],
+      },
+      summary: {
+        totalCommits: 3,
+        sourceLinesAdded: 30,
+        totalLinesAdded: 30,
+        totalLinesDeleted: 0,
+        totalSubtasksCompleted: 2,
+        swarmCommits: 2,
+        totalSwarmPosts: 8,
+        maxSwarmWorkers: 2,
+      },
+      languageBreakdown: [],
+      modelBreakdown: [],
+    };
+
+    const snapshotB = {
+      schemaVersion: "2.0.0",
+      anonymousProjectId: "22222222-2222-2222-2222-222222222222",
+      consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+      environment: {
+        os: "darwin",
+        nodeVersion: "v20.0.0",
+        lognexusVersion: "1.3.7",
+        detectedStacks: ["python"],
+      },
+      summary: {
+        totalCommits: 4,
+        sourceLinesAdded: 40,
+        totalLinesAdded: 40,
+        totalLinesDeleted: 0,
+        totalSubtasksCompleted: 3,
+        swarmCommits: 3,
+        totalSwarmPosts: 12,
+        maxSwarmWorkers: 4,
+      },
+      languageBreakdown: [],
+      modelBreakdown: [],
+    };
+
+    writeFileSync(join(snapshotDir, "snap-a.json"), JSON.stringify(snapshotA), "utf8");
+    writeFileSync(join(snapshotDir, "snap-b.json"), JSON.stringify(snapshotB), "utf8");
+
+    const cohort = aggregateBenchmarkCohort([snapshotDir]);
+    expect(cohort.totals.swarmCommits).toBe(5);
+    expect(cohort.totals.totalSwarmPosts).toBe(20);
+    expect(cohort.totals.maxSwarmWorkers).toBe(4);
+
+    const markdown = formatCohortMarkdownReport(cohort);
+    expect(markdown).toContain("| Swarm commits | 5 |");
+    expect(markdown).toContain("| Swarm board posts | 20 |");
+    expect(markdown).toContain("| Peak swarm workers | 4 |");
+  });
+
+  it("omits swarm metrics in cohort report when swarmCommits is 0", () => {
+    const snapshotDir = mkdtempSync(join(tmpdir(), "lognexus-benchmark-noswarm-"));
+    created.push(snapshotDir);
+
+    const dir = typescriptProject();
+    exportInto(dir, snapshotDir, "one.json");
+
+    const cohort = aggregateBenchmarkCohort([snapshotDir]);
+    expect(cohort.totals.swarmCommits).toBe(0);
+
+    const markdown = formatCohortMarkdownReport(cohort);
+    expect(markdown).not.toContain("Swarm commits");
+    expect(markdown).not.toContain("Swarm board posts");
+    expect(markdown).not.toContain("Peak swarm workers");
+  });
+
   describe("Zero-PII enforcement", () => {
     it("accepts a clean anonymous payload", () => {
       expect(() =>

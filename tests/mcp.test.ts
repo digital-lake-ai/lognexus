@@ -596,6 +596,9 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain("Decision budget");
       expect(text).toContain("Assigned agent / isolation");
       expect(text).toContain("subagents");
+      expect(text).toContain("Swarm Token-Hygiene");
+      expect(text).toContain("`swarm`");
+      expect(text).toContain("--isolation swarm --swarm-workers <n> --swarm-posts <count>");
     });
 
     it("gets the lognexus-review prompt with the gate checklist", async () => {
