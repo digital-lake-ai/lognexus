@@ -2,10 +2,10 @@
 
 ## Lead Author & Core Architecture
 
-Copyright (c) 2026 [HorchataHTML](https://github.com/digital-lake-ai/lognexus)  
+Copyright (c) 2026 [HorchataHTML](https://github.com/HorchataHTML)  
 Copyright (c) 2026 [Digital Lake](https://github.com/digital-lake-ai) and LogNexus contributors.
 
-**LogNexus** is designed, engineered, and maintained by **[HorchataHTML](https://github.com/digital-lake-ai/lognexus)** and **[Digital Lake](https://github.com/digital-lake-ai)** under the MIT License, including:
+**LogNexus** is designed, engineered, and maintained by **[HorchataHTML](https://github.com/HorchataHTML)** and **[Digital Lake](https://github.com/digital-lake-ai)** under the MIT License, including:
 
 - **Core Runtime & Tooling:** Full TypeScript architecture, repository scaffolding and health diagnostics CLI (`lognexus init`, `doctor`, `status`), Persistent Agent State Engine (`.lognexus/state.json`), Automated Context Handoff (`lognexus handoff`), and optional Multi-Model Token Shield (`init --protect-tokens`).
 - **Traceability, FinOps & Native MCP Server:** Atomic Commit Engine (`lognexus commit`), Git Notes memory graph (`refs/notes/lognexus` / `git-ai` v3), local-first FinOps telemetry & ROI cost-savings engine, and zero-dependency JSON-RPC 2.0 stdio MCP server (`@digital-lake/lognexus` on npm / `lognexus-mcp` on PyPI).

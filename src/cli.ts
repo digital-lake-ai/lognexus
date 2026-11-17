@@ -182,12 +182,15 @@ Commit Command:
     --allow-empty                   Allow creating empty commits
     --tier <tier-1|tier-2|tier-3>   Override the routing tier (defaults to the author tier)
     --escalated                     Acknowledge a tier-1 author working on a tier-3 subtask
+    --swarm-workers <n>             Number of active swarm workers cooperating on subtask
+    --swarm-posts <n>               Total swarm board posts coordinated for subtask
 
 State Subcommands:
   lognexus state [show]             Display current active issue and task state
   lognexus state sync               Sync state from current Git branch & GitHub
   lognexus state set-task <id> [t]  Set active subtask (e.g. lognexus state set-task T1 "Add schema")
-                                    [--assignee "<identity>"] [--isolation <mode>]
+                                    [--assignee "<identity>"] [--isolation <subagent|swarm|worktree|shared>]
+                                    [--swarm-workers <n>] [--swarm-posts <n>]
   lognexus state finish-task <id>   Mark subtask as completed (e.g. lognexus state finish-task T1)
   lognexus state clear              Reset persistent state to empty
 
@@ -353,6 +356,14 @@ export async function handleState(args: string[], targetDir: string = process.cw
           if (state.currentSubtask.contract.isolation) {
             console.log(`  Isolation Mode:  ${state.currentSubtask.contract.isolation}`);
           }
+          if (
+            state.currentSubtask.contract.swarmWorkers !== undefined ||
+            state.currentSubtask.contract.swarmPosts !== undefined
+          ) {
+            console.log(
+              `  Swarm Metrics:   ${state.currentSubtask.contract.swarmWorkers ?? 0} worker(s), ${state.currentSubtask.contract.swarmPosts ?? 0} post(s)`,
+            );
+          }
           console.log(
             `  Allowed Files:   ${state.currentSubtask.contract.allowedFiles.join(", ") || "(all)"}`,
           );
@@ -457,9 +468,36 @@ async function handleNote(args: string[]) {
     }
 
     case "attach": {
-      const commit = args[1] || "HEAD";
+      let commit = "HEAD";
+      let swarmWorkers: number | undefined;
+      let swarmPosts: number | undefined;
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        if (arg === "--swarm-workers") {
+          const val = args[++i];
+          if (!val || !/^\d+$/.test(val)) {
+            console.error("Error: --swarm-workers must be a non-negative integer.\n");
+            process.exit(1);
+          }
+          swarmWorkers = Number.parseInt(val, 10);
+        } else if (arg === "--swarm-posts") {
+          const val = args[++i];
+          if (!val || !/^\d+$/.test(val)) {
+            console.error("Error: --swarm-posts must be a non-negative integer.\n");
+            process.exit(1);
+          }
+          swarmPosts = Number.parseInt(val, 10);
+        } else if (arg.startsWith("-")) {
+          console.error(`Unknown option for note attach: ${arg}\n`);
+          printUsage();
+          process.exit(1);
+        } else {
+          commit = arg;
+        }
+      }
+
       printHeader();
-      const payload = attachCurrentStateToCommit(commit);
+      const payload = attachCurrentStateToCommit(commit, { swarmWorkers, swarmPosts });
       console.log(`[OK] Attached LogNexus note to commit [${commit}] (refs/notes/lognexus):`);
       console.log(
         `     Issue:   ${payload.issue ? `#${payload.issue.id} — ${payload.issue.title}` : "(none)"}`,
@@ -750,6 +788,8 @@ async function handleCommit(args: string[]) {
       tier: parsed.tier,
       escalated: parsed.escalated,
       stageAllowed: parsed.stageAllowed,
+      swarmWorkers: parsed.swarmWorkers,
+      swarmPosts: parsed.swarmPosts,
     });
 
     console.log(`[OK] Committed [${res.shortSha}] ${res.subject}`);
@@ -855,6 +895,11 @@ async function handleTelemetry(args: string[]) {
         `  Detected Stacks:                  ${store.detectedStacks.join(", ") || "(none)"}`,
       );
       console.log(`  Total Commits Monitored:          ${store.summary.totalCommits}`);
+      if (store.summary.swarmCommits > 0) {
+        console.log(
+          `  Swarm Commits:                    ${store.summary.swarmCommits} (${store.summary.totalSwarmPosts} board posts, peak ${store.summary.maxSwarmWorkers} workers)`,
+        );
+      }
       console.log(
         `  Estimated Cost Savings:           ${store.summary.estimatedCostSavingsPct}%\n`,
       );
