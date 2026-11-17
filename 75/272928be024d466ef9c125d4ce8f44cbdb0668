@@ -1,0 +1,35 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-17T18:42:34.578Z",
+  "issue": {
+    "id": 65,
+    "title": "[lognexus/plan] Add swarm telemetry instrumentation, multi-manifest SemVer drift diagnostics & license attribution link fix",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Add backwards-compatible swarm board metrics to telemetry v2.0 schema and report",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/schema.ts",
+        "src/telemetry/report.ts",
+        "tests/telemetry.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        ".claude-plugin/plugin.json",
+        "commands/",
+        "skills/"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npx vitest run tests/telemetry.test.ts tests/telemetry-benchmark.test.ts && npm run lint && npm run build",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "subagent"
+    }
+  },
+  "tier": "tier-2"
+}
