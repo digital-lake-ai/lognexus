@@ -175,6 +175,54 @@ describe("Git Notes (Quiet Mode)", () => {
       attachCurrentStateToCommit("HEAD", { cwd: tempDir });
     }).not.toThrow();
   });
+
+  it("attaches swarm metadata from contract defaults and explicit overrides", () => {
+    saveState(
+      {
+        schemaVersion: "1.0.0",
+        activeIssue: {
+          id: 65,
+          title: "Swarm telemetry",
+          branch: "issue/65-swarm-telemetry-and-semver-guard",
+          phase: "commit",
+          tier: "tier-2",
+          readiness: "ready",
+        },
+        currentSubtask: {
+          id: "T1",
+          title: "Swarm note defaults",
+          status: "in-progress",
+          contract: {
+            allowedFiles: ["src/notes/attach.ts"],
+            forbiddenFiles: [],
+            decisionBudget: "none",
+            isolation: "swarm",
+          },
+        },
+        completedSubtasks: [],
+        lastSync: new Date().toISOString(),
+      },
+      tempDir,
+    );
+
+    const defaulted = attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    expect(defaulted.swarm).toEqual({ workers: 0, posts: 0 });
+
+    const overridden = attachCurrentStateToCommit("HEAD", {
+      cwd: tempDir,
+      swarmWorkers: 3,
+      swarmPosts: 14,
+    });
+    expect(overridden.swarm).toEqual({ workers: 3, posts: 14 });
+  });
+
+  it("omits swarm metadata when non-swarm and no swarm options are passed", () => {
+    const payload = attachCurrentStateToCommit("HEAD", { cwd: tempDir });
+    expect(payload.swarm).toBeUndefined();
+
+    const partial = attachCurrentStateToCommit("HEAD", { cwd: tempDir, swarmWorkers: 2 });
+    expect(partial.swarm).toEqual({ workers: 2 });
+  });
 });
 
 describe("Memory Recall (Git Notes search)", () => {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SubtaskIsolationSchema = z.enum(["shared", "worktree", "branch", "subagent"]);
+export const SubtaskIsolationSchema = z.enum(["shared", "worktree", "branch", "subagent", "swarm"]);
 
 export type SubtaskIsolation = z.infer<typeof SubtaskIsolationSchema>;
 
@@ -11,6 +11,8 @@ export const SubtaskContractSchema = z.object({
   verificationCmd: z.string().optional(),
   assignee: z.string().trim().min(1).optional(),
   isolation: SubtaskIsolationSchema.optional(),
+  swarmWorkers: z.number().int().nonnegative().optional(),
+  swarmPosts: z.number().int().nonnegative().optional(),
 });
 
 export type SubtaskContract = z.infer<typeof SubtaskContractSchema>;
@@ -22,6 +24,8 @@ const CONTRACT_KEYS = [
   "verificationCmd",
   "assignee",
   "isolation",
+  "swarmWorkers",
+  "swarmPosts",
 ] as const;
 
 function hoistContractFields(value: unknown): unknown {

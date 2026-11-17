@@ -368,6 +368,47 @@ describe("Commit Arguments Parser (parseCommitArgs & shell resilience)", () => {
     expect(withFlag.stageAllowed).toBe(true);
     expect(withoutFlag.stageAllowed).toBe(false);
   });
+
+  it("parses --swarm-workers and --swarm-posts and rejects invalid values", () => {
+    const parsed = parseCommitArgs([
+      "-m",
+      "feat(#65/T1): swarm commit",
+      "--swarm-workers",
+      "2",
+      "--swarm-posts",
+      "11",
+    ]);
+    expect(parsed.swarmWorkers).toBe(2);
+    expect(parsed.swarmPosts).toBe(11);
+
+    const zeroed = parseCommitArgs([
+      "-m",
+      "feat(#65/T1): zero swarm metrics",
+      "--swarm-workers",
+      "0",
+      "--swarm-posts",
+      "0",
+    ]);
+    expect(zeroed.swarmWorkers).toBe(0);
+    expect(zeroed.swarmPosts).toBe(0);
+
+    const omitted = parseCommitArgs(["-m", "feat(#65/T1): plain commit"]);
+    expect(omitted.swarmWorkers).toBeUndefined();
+    expect(omitted.swarmPosts).toBeUndefined();
+
+    expect(() => parseCommitArgs(["-m", "msg", "--swarm-workers"])).toThrow(
+      /Flag --swarm-workers requires a non-negative integer/,
+    );
+    expect(() => parseCommitArgs(["-m", "msg", "--swarm-posts", "--finish-task"])).toThrow(
+      /Flag --swarm-posts requires a non-negative integer/,
+    );
+    expect(() => parseCommitArgs(["-m", "msg", "--swarm-workers", "-2"])).toThrow(
+      /Invalid --swarm-workers value '-2'/,
+    );
+    expect(() => parseCommitArgs(["-m", "msg", "--swarm-posts", "abc"])).toThrow(
+      /Invalid --swarm-posts value 'abc'/,
+    );
+  });
 });
 
 describe("Commit tier routing (inference, escalation and audit trail)", () => {
@@ -629,5 +670,34 @@ describe("Commit tier routing (inference, escalation and audit trail)", () => {
         warnSpy.mockRestore();
       }
     });
+  });
+
+  it("forwards swarmWorkers and swarmPosts into the attached Git Note", () => {
+    setSubtask(
+      "T1",
+      "Swarm commit metrics",
+      {
+        allowedFiles: ["feature.ts"],
+        forbiddenFiles: [],
+        decisionBudget: "none",
+        isolation: "swarm",
+      },
+      tempDir,
+    );
+    writeFileSync(join(tempDir, "feature.ts"), "export const swarm = true;\n", "utf8");
+    execSync("git add feature.ts", { cwd: tempDir, stdio: "ignore" });
+
+    executeAtomicCommit({
+      message: "feat(#65/T1): attach swarm metrics",
+      author: "google/gemini-4-hydrogen-high (antigravity)",
+      swarmWorkers: 3,
+      swarmPosts: 18,
+      targetDir: tempDir,
+    });
+
+    const note = getNote("HEAD", { cwd: tempDir });
+    expect(note).not.toBeNull();
+    const parsed = JSON.parse(note as string) as { swarm?: { workers?: number; posts?: number } };
+    expect(parsed.swarm).toEqual({ workers: 3, posts: 18 });
   });
 });

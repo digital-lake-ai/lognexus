@@ -35,6 +35,10 @@ export interface CommitOptions {
   escalated?: boolean;
   /** Stages every modified file that matches the active contract before committing. */
   stageAllowed?: boolean;
+  /** Number of active swarm workers participating in this commit's subtask. */
+  swarmWorkers?: number;
+  /** Number of swarm board posts emitted during this commit's subtask. */
+  swarmPosts?: number;
   /** Internal test-only escape hatch for isolated unit tests. Never exposed via CLI or MCP. */
   _internalTestAllowMain?: boolean;
 }
@@ -48,6 +52,8 @@ export interface ParsedCommitArgs {
   tier?: AuthorTier;
   escalated: boolean;
   stageAllowed: boolean;
+  swarmWorkers?: number;
+  swarmPosts?: number;
 }
 
 export function parseCommitArgs(args: string[]): ParsedCommitArgs {
@@ -59,10 +65,28 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
   let tier: AuthorTier | undefined;
   let escalated = false;
   let stageAllowed = false;
+  let swarmWorkers: number | undefined;
+  let swarmPosts: number | undefined;
 
   const isFlag = (token: string | undefined): boolean => {
     if (!token) return false;
     return token.startsWith("--") || token === "-F" || token === "-m";
+  };
+
+  const parseSwarmCount = (index: number, flag: string): number => {
+    const raw = args[index + 1];
+    if (!raw || isFlag(raw)) {
+      throw new Error(`Flag ${flag} requires a non-negative integer.`);
+    }
+    const trimmed = raw.trim();
+    if (!/^\d+$/.test(trimmed)) {
+      throw new Error(`Invalid ${flag} value '${raw}'. Expected a non-negative integer.`);
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+      throw new Error(`Invalid ${flag} value '${raw}'. Expected a safe non-negative integer.`);
+    }
+    return parsed;
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -115,6 +139,12 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
       escalated = true;
     } else if (arg === "--stage-allowed") {
       stageAllowed = true;
+    } else if (arg === "--swarm-workers") {
+      swarmWorkers = parseSwarmCount(i, arg);
+      i += 1;
+    } else if (arg === "--swarm-posts") {
+      swarmPosts = parseSwarmCount(i, arg);
+      i += 1;
     }
   }
 
@@ -127,6 +157,8 @@ export function parseCommitArgs(args: string[]): ParsedCommitArgs {
     tier,
     escalated,
     stageAllowed,
+    swarmWorkers,
+    swarmPosts,
   };
 }
 
@@ -407,6 +439,8 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     cwd,
     tier: effectiveTier,
     escalated: Boolean(options.escalated),
+    swarmWorkers: options.swarmWorkers,
+    swarmPosts: options.swarmPosts,
   });
 
   // 9. Regenerate the context handoff so the next session starts from disk

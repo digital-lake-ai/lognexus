@@ -177,6 +177,34 @@ describe("State Manager & Schema", () => {
     expect((state.currentSubtask as Record<string, unknown>).assignee).toBeUndefined();
   });
 
+  it("hoists swarmWorkers and swarmPosts declared at the subtask root", () => {
+    mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+    writeFileSync(
+      join(tempDir, ".lognexus", "state.json"),
+      JSON.stringify({
+        schemaVersion: "1.0.0",
+        activeIssue: null,
+        currentSubtask: {
+          id: "T1",
+          title: "Swarm contract",
+          status: "in-progress",
+          allowedFiles: ["src/state/schema.ts"],
+          isolation: "swarm",
+          swarmWorkers: 2,
+          swarmPosts: 9,
+        },
+        completedSubtasks: [],
+      }),
+      "utf8",
+    );
+
+    const state = loadState(tempDir);
+    expect(state.currentSubtask?.contract?.isolation).toBe("swarm");
+    expect(state.currentSubtask?.contract?.swarmWorkers).toBe(2);
+    expect(state.currentSubtask?.contract?.swarmPosts).toBe(9);
+    expect((state.currentSubtask as Record<string, unknown>).swarmWorkers).toBeUndefined();
+  });
+
   it("loadState rescues valid blocks, warns on stderr and writes a backup on schema errors", () => {
     mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
     const badPayload = JSON.stringify({
@@ -393,6 +421,44 @@ describe("parseSetTaskArgs", () => {
     expect(() => parseSetTaskArgs(["T4", "--isolation", "docker"])).toThrow(
       /Invalid isolation mode/,
     );
+  });
+
+  it("parses --isolation swarm with --swarm-workers and --swarm-posts and rejects invalid counts", () => {
+    const parsed = parseSetTaskArgs([
+      "T1",
+      "Swarm",
+      "task",
+      "--isolation",
+      "swarm",
+      "--swarm-workers",
+      "3",
+      "--swarm-posts",
+      "12",
+    ]);
+    expect(parsed.contract?.isolation).toBe("swarm");
+    expect(parsed.contract?.swarmWorkers).toBe(3);
+    expect(parsed.contract?.swarmPosts).toBe(12);
+
+    const zeroParsed = parseSetTaskArgs([
+      "T2",
+      "--isolation",
+      "swarm",
+      "--swarm-workers",
+      "0",
+      "--swarm-posts",
+      "0",
+    ]);
+    expect(zeroParsed.contract?.swarmWorkers).toBe(0);
+    expect(zeroParsed.contract?.swarmPosts).toBe(0);
+
+    expect(() => parseSetTaskArgs(["T1", "--swarm-workers", "-1"])).toThrow(
+      /Invalid --swarm-workers/,
+    );
+    expect(() => parseSetTaskArgs(["T1", "--swarm-posts", "1.5"])).toThrow(/Invalid --swarm-posts/);
+    expect(() => parseSetTaskArgs(["T1", "--swarm-workers", "abc"])).toThrow(
+      /Invalid --swarm-workers/,
+    );
+    expect(() => parseSetTaskArgs(["T1", "--swarm-posts"])).toThrow(/Missing value/);
   });
 });
 
