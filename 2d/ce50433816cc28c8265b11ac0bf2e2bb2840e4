@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-17T18:32:33.532Z",
+  "issue": {
+    "id": 65,
+    "title": "[lognexus/plan] Add swarm telemetry instrumentation, multi-manifest SemVer drift diagnostics & license attribution link fix",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Support swarm isolation mode and board metrics in contracts, commits and Git Notes",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/state/schema.ts",
+        "src/state/manager.ts",
+        "src/commit.ts",
+        "src/notes/attach.ts",
+        "tests/state.test.ts",
+        "tests/commit.test.ts",
+        "tests/notes.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        ".claude-plugin/plugin.json",
+        "commands/",
+        "skills/"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npx vitest run tests/state.test.ts tests/commit.test.ts tests/notes.test.ts && npm run lint && npm run build",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "subagent"
+    }
+  },
+  "tier": "tier-2"
+}
