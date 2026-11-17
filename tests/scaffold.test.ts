@@ -47,6 +47,8 @@ describe("initProject", () => {
     for (const entry of LOGNEXUS_GITIGNORE_ENTRIES) {
       expect(content).toContain(entry);
     }
+    expect(content).toContain(".lognexus/snapshot-v2.json");
+    expect(content).toContain(".lognexus/telemetry*.md");
   });
 
   it("appends only the missing entries to a pre-existing .gitignore", () => {

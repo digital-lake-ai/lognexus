@@ -14,6 +14,8 @@ export const EPHEMERAL_LOGNEXUS_FILES = [
   ".lognexus/state.json.bak",
   ".lognexus/handoff.md",
   ".lognexus/telemetry.json",
+  ".lognexus/snapshot-v2.json",
+  ".lognexus/telemetry*.md",
   ".lognexus/update-check.json",
   ".lognexus/terms-consent.json",
 ] as const;

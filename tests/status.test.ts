@@ -7,6 +7,7 @@ import { extractIssueNumber } from "../src/branch.js";
 import {
   countPublishedReleases,
   detectHostProjectVersion,
+  detectProjectManifestVersions,
   getProjectStatus,
   getScopeDrift,
 } from "../src/status.js";
@@ -174,6 +175,63 @@ describe("host project SemVer visibility", () => {
     expect(status.isInsideGit).toBe(true);
     expect(status.projectVersion).toBe("0.1.0");
     expect(status.publishedReleases).toBe(0);
+  });
+
+  it("detects multi-manifest versions across Tauri, Cargo, Python and depth-2 plugin manifests", () => {
+    writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "0.4.0" }), "utf8");
+    mkdirSync(join(tempDir, "src-tauri"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "src-tauri", "tauri.conf.json"),
+      JSON.stringify({ package: { version: "0.4.0" } }),
+      "utf8",
+    );
+    writeFileSync(
+      join(tempDir, "src-tauri", "Cargo.toml"),
+      '[package]\nname = "app"\nversion = "0.4.0" # desktop crate\n[dependencies]\nserde = "1.0"\n',
+      "utf8",
+    );
+    mkdirSync(join(tempDir, "modules", "modA"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "modules", "modA", "plugin.manifest.json"),
+      JSON.stringify({ version: "0.5.0" }),
+      "utf8",
+    );
+    mkdirSync(join(tempDir, "node_modules", "ignored"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "node_modules", "ignored", "plugin.manifest.json"),
+      JSON.stringify({ version: "9.9.9" }),
+      "utf8",
+    );
+    mkdirSync(join(tempDir, "a", "b", "c"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "a", "b", "c", "plugin.manifest.json"),
+      JSON.stringify({ version: "8.8.8" }),
+      "utf8",
+    );
+
+    const manifests = detectProjectManifestVersions(tempDir);
+    expect(manifests).toEqual([
+      { path: "package.json", version: "0.4.0" },
+      { path: "src-tauri/tauri.conf.json", version: "0.4.0" },
+      { path: "src-tauri/Cargo.toml", version: "0.4.0" },
+      { path: "modules/modA/plugin.manifest.json", version: "0.5.0" },
+    ]);
+  });
+
+  it("falls back to src-tauri/tauri.conf.json and ignores non-package TOML sections", () => {
+    writeFileSync(
+      join(tempDir, "Cargo.toml"),
+      '[workspace]\nmembers = ["crates/a"]\n[dependencies]\nversion = "9.9.9"\n',
+      "utf8",
+    );
+    mkdirSync(join(tempDir, "src-tauri"), { recursive: true });
+    writeFileSync(
+      join(tempDir, "src-tauri", "tauri.conf.json"),
+      JSON.stringify({ version: "0.2.0" }),
+      "utf8",
+    );
+
+    expect(detectHostProjectVersion(tempDir)).toBe("0.2.0");
   });
 });
 

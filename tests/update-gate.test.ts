@@ -262,6 +262,8 @@ describe("Ephemeral .lognexus exclusion", () => {
     for (const entry of EPHEMERAL_LOGNEXUS_FILES) {
       expect(first).toContain(entry);
     }
+    expect(first).toContain(".lognexus/snapshot-v2.json");
+    expect(first).toContain(".lognexus/telemetry*.md");
 
     ensureLocalGitExclude(tempDir);
     const second = readExclude(tempDir);

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { extractIssueNumber } from "./branch.js";
 import {
@@ -113,39 +113,144 @@ export function getScopeDrift(targetDir: string = process.cwd()): ScopeDrift {
   };
 }
 
+export interface ManifestVersionEntry {
+  path: string;
+  version: string;
+}
+
+const MANIFEST_IGNORED_DIRS = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "dist-pypi",
+  "build",
+  "target",
+  "coverage",
+  ".lognexus",
+]);
+
+function readJsonManifestVersion(filePath: string): string | null {
+  if (!existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf8")) as {
+      version?: unknown;
+      package?: { version?: unknown } | null;
+    };
+    const raw =
+      typeof parsed.version === "string"
+        ? parsed.version
+        : typeof parsed.package?.version === "string"
+          ? parsed.package.version
+          : null;
+    const trimmed = raw?.trim() ?? "";
+    return trimmed !== "" ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Reads `version` inside `[project]` or `[package]` in linear O(n) time without polynomial regexes. */
+function readTomlPackageVersion(
+  content: string,
+  sectionName: "project" | "package",
+): string | null {
+  let inSection = false;
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    if (line.startsWith("[")) {
+      const end = line.indexOf("]");
+      inSection = (end === -1 ? line.slice(1) : line.slice(1, end)).trim() === sectionName;
+      continue;
+    }
+    if (!inSection) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0 || line.slice(0, eq).trim() !== "version") continue;
+    const val = line.slice(eq + 1).trim();
+    const quote = val[0] === '"' || val[0] === "'" ? val[0] : null;
+    const endIdx = quote !== null ? val.indexOf(quote, 1) : val.indexOf("#");
+    const raw =
+      quote !== null
+        ? val.slice(1, endIdx === -1 ? undefined : endIdx)
+        : endIdx === -1
+          ? val
+          : val.slice(0, endIdx);
+    const trimmed = raw.trim();
+    return trimmed !== "" ? trimmed : null;
+  }
+  return null;
+}
+
+function readTomlManifestVersion(filePath: string, section: "project" | "package"): string | null {
+  if (!existsSync(filePath)) return null;
+  try {
+    return readTomlPackageVersion(readFileSync(filePath, "utf8"), section);
+  } catch {
+    return null;
+  }
+}
+
+function scanPluginManifests(
+  dir: string,
+  relPrefix: string,
+  depth: number,
+  entries: ManifestVersionEntry[],
+): void {
+  let children: Dirent[];
+  try {
+    children = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  } catch {
+    return;
+  }
+  for (const child of children) {
+    if (child.isSymbolicLink()) continue;
+    const relPath = relPrefix === "" ? child.name : `${relPrefix}/${child.name}`;
+    const fullPath = join(dir, child.name);
+    if (child.isFile() && child.name === "plugin.manifest.json") {
+      const version = readJsonManifestVersion(fullPath);
+      if (version !== null) entries.push({ path: relPath, version });
+    } else if (child.isDirectory() && depth < 2 && !MANIFEST_IGNORED_DIRS.has(child.name)) {
+      scanPluginManifests(fullPath, relPath, depth + 1, entries);
+    }
+  }
+}
+
+/** Collects declared software versions across root manifests and up to 2-depth plugin manifests. */
+export function detectProjectManifestVersions(
+  targetDir: string = process.cwd(),
+): ManifestVersionEntry[] {
+  const entries: ManifestVersionEntry[] = [];
+  for (const relPath of ["package.json", "tauri.conf.json", "src-tauri/tauri.conf.json"]) {
+    const version = readJsonManifestVersion(join(targetDir, relPath));
+    if (version !== null) entries.push({ path: relPath, version });
+  }
+  for (const [relPath, section] of [
+    ["pyproject.toml", "project"],
+    ["Cargo.toml", "package"],
+    ["src-tauri/Cargo.toml", "package"],
+  ] as const) {
+    const version = readTomlManifestVersion(join(targetDir, relPath), section);
+    if (version !== null) entries.push({ path: relPath, version });
+  }
+  scanPluginManifests(targetDir, "", 0, entries);
+  return entries;
+}
+
 /**
  * Reads the host project version from the first manifest that declares one, so
  * `lognexus status` can show which release line the repository under governance is
  * on. Returns `null` when no manifest is present or it cannot be parsed.
  */
 export function detectHostProjectVersion(targetDir: string = process.cwd()): string | null {
-  const packageJsonPath = join(targetDir, "package.json");
-  if (existsSync(packageJsonPath)) {
-    try {
-      const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
-      if (typeof pkg.version === "string" && pkg.version.trim() !== "") {
-        return pkg.version.trim();
-      }
-    } catch {
-      // A malformed manifest falls through to the other manifest formats.
-    }
-  }
-
-  const tomlManifests = ["pyproject.toml", "Cargo.toml"];
-  for (const manifest of tomlManifests) {
-    const manifestPath = join(targetDir, manifest);
-    if (!existsSync(manifestPath)) continue;
-    try {
-      const match = readFileSync(manifestPath, "utf8").match(/^version\s*=\s*"([^"]+)"/m);
-      if (match?.[1] && match[1].trim() !== "") {
-        return match[1].trim();
-      }
-    } catch {
-      // An unreadable manifest is treated as absent.
-    }
-  }
-
-  return null;
+  return (
+    readJsonManifestVersion(join(targetDir, "package.json")) ??
+    readTomlManifestVersion(join(targetDir, "pyproject.toml"), "project") ??
+    readTomlManifestVersion(join(targetDir, "Cargo.toml"), "package") ??
+    readJsonManifestVersion(join(targetDir, "src-tauri/tauri.conf.json")) ??
+    readJsonManifestVersion(join(targetDir, "tauri.conf.json"))
+  );
 }
 
 /** Counts the Git tags published in the repository; `0` outside Git or on error. */
