@@ -1,0 +1,47 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-17T19:07:40.295Z",
+  "issue": {
+    "id": 65,
+    "title": "[lognexus/plan] Add swarm telemetry instrumentation, multi-manifest SemVer drift diagnostics & license attribution link fix",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T7",
+    "title": "Wire swarm CLI flags, codify swarm governance rules and fix HorchataHTML profile URL",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/cli.ts",
+        "LICENSE",
+        "NOTICE.md",
+        "README.md",
+        "AGENTS.md",
+        "GEMINI.md",
+        ".agents/rules.md",
+        "tests/packaging.test.ts",
+        "tests/e2e.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        ".claude-plugin/plugin.json",
+        "commands/",
+        "skills/"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue; npm run lint && npm test && npm run build",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2,
+      "swarmPosts": 49
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 2,
+    "posts": 50
+  }
+}
