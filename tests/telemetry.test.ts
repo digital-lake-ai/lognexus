@@ -792,6 +792,29 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("Gemini 4 Carbon (antigravity)")).toBe("gemini/carbon");
       expect(extractModelFamilyCategory("Gemini 4 Argon (antigravity)")).toBe("gemini/argon");
     });
+
+    it("classifies Orchestrator (Carbon/Argon), gemini-pro-orchestrator* and gemini-flash-worker-agy", () => {
+      expect(extractModelFamilyCategory("Orchestrator (Carbon)")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("Orchestrator (Argon)")).toBe("gemini/argon");
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator (antigravity)")).toBe(
+        "gemini/carbon",
+      );
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator-argon")).toBe("gemini/argon");
+      expect(extractModelFamilyCategory("gemini-flash-worker-agy")).toBe("gemini/flash");
+      expect(extractModelFamilyCategory("flash-worker-agy")).toBe("gemini/flash");
+      expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code, orchestrator)")).toBe(
+        "deepseek/v3",
+      );
+
+      expect(inferTierFromAuthor("Orchestrator (Carbon)")).toBe("tier-1");
+      expect(inferTierFromAuthor("Orchestrator (Argon)")).toBe("tier-1");
+      expect(inferTierFromAuthor("gemini-pro-orchestrator")).toBe("tier-1");
+      expect(inferTierFromAuthor("gemini-pro-orchestrator-argon")).toBe("tier-1");
+      expect(inferTierFromAuthor("gemini-flash-worker-agy")).toBe("tier-3");
+      expect(inferTierFromAuthor("flash-worker-agy")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek/VS Code (kimi-code, orchestrator)")).toBe("tier-3");
+    });
   });
 
   describe("Offline Guarantee", () => {
