@@ -5,6 +5,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/index.js";
+import { buildAnonymousDiagnosticPayload } from "../src/telemetry/collector.js";
 import {
   classifyFileCategory,
   inferTierFromAuthor,
@@ -1302,6 +1303,92 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(store.summary.tierCommits["tier-1"]).toBe(0);
       expect(store.summary.tierCommits["tier-2"]).toBe(2);
       expect(store.summary.tierCommits["tier-3"]).toBe(2);
+    });
+
+    it("reconciles swarmCommits, totalSwarmPosts and maxSwarmWorkers from Git Notes and propagates to diagnostic payload", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      // 1. Legacy non-swarm commit (no swarm metrics)
+      const legacySha = commitFile(
+        "src/legacy.ts",
+        "export const legacy = true;\n",
+        "feat(#65/T0): legacy commit",
+      );
+      note(legacySha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 65 },
+        subtask: { id: "T0", contract: { allowedFiles: ["src/legacy.ts"], isolation: "subagent" } },
+      });
+      recordCommitTelemetry({
+        sha: legacySha,
+        author: "gemini/hydrogen",
+        tier: "tier-2",
+        targetDir: tempDir,
+      });
+      expect(loadTelemetry(tempDir).summary.swarmCommits).toBe(0);
+
+      // 2. Explicit swarm payload on Git Note
+      const explicitSha = commitFile(
+        "src/swarm-a.ts",
+        "export const a = 1;\n",
+        "feat(#65/T1): explicit swarm note",
+      );
+      note(explicitSha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 65 },
+        subtask: { id: "T1", contract: { allowedFiles: ["src/swarm-a.ts"], isolation: "swarm" } },
+        swarm: { workers: 4, posts: 12 },
+      });
+      recordCommitTelemetry({
+        sha: explicitSha,
+        author: "gemini/hydrogen",
+        tier: "tier-2",
+        targetDir: tempDir,
+      });
+
+      const afterLive = loadTelemetry(tempDir);
+      expect(afterLive.summary.swarmCommits).toBe(1);
+      expect(afterLive.summary.totalSwarmPosts).toBe(12);
+      expect(afterLive.summary.maxSwarmWorkers).toBe(4);
+
+      // 3. Contract-level swarm metrics without explicit payload.swarm
+      const contractSha = commitFile(
+        "src/swarm-b.ts",
+        "export const b = 2;\n",
+        "feat(#65/T2): contract swarm note",
+      );
+      note(contractSha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 65 },
+        subtask: {
+          id: "T2",
+          contract: {
+            allowedFiles: ["src/swarm-b.ts"],
+            isolation: "swarm",
+            swarmWorkers: 2,
+            swarmPosts: 7,
+          },
+        },
+      });
+
+      // 4. Swarm worker author fallback without explicit swarm fields
+      commitFile(
+        "src/swarm-c.ts",
+        "export const c = 3;\n",
+        "feat(#65/T3): worker author fallback",
+        "gemini-flash-worker-agy <agy@example.com>",
+      );
+
+      const synced = syncTelemetryFromGitNotes(tempDir);
+      expect(synced.summary.swarmCommits).toBe(3);
+      expect(synced.summary.totalSwarmPosts).toBe(19);
+      expect(synced.summary.maxSwarmWorkers).toBe(4);
+
+      const diagnostic = buildAnonymousDiagnosticPayload(synced);
+      expect(diagnostic.schemaVersion).toBe("2.0.0");
+      expect(diagnostic.summary.swarmCommits).toBe(3);
+      expect(diagnostic.summary.totalSwarmPosts).toBe(19);
+      expect(diagnostic.summary.maxSwarmWorkers).toBe(4);
     });
   });
 });
