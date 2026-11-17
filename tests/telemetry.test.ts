@@ -669,6 +669,86 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(parsed.extensions[".ts"]?.category).toBe("source");
       expect(parsed.models["gemini/flash"]?.estimatedCostUsd).toBe(0);
       expect(parsed.models["gemini/flash"]?.sourceLinesAdded).toBe(0);
+      expect(parsed.summary.swarmCommits).toBe(0);
+      expect(parsed.summary.totalSwarmPosts).toBe(0);
+      expect(parsed.summary.maxSwarmWorkers).toBe(0);
+    });
+
+    it("parses legacy 2.0.0 stores and snapshots missing swarm metrics with zero defaults", () => {
+      const v2LegacyStore = {
+        schemaVersion: "2.0.0",
+        mode: "local",
+        anonymousProjectId: "22222222-3333-4444-5555-666666666666",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        detectedStacks: ["typescript"],
+        taskTimings: {},
+        extensions: {},
+        models: {},
+        summary: {
+          totalCommits: 5,
+          totalLinesAdded: 50,
+          totalLinesDeleted: 10,
+          totalSubtasksCompleted: 3,
+        },
+        lastUpdated: "2026-01-01T00:00:00.000Z",
+      };
+
+      const parsedStore = TelemetryStoreSchema.parse(v2LegacyStore);
+      expect(parsedStore.summary.swarmCommits).toBe(0);
+      expect(parsedStore.summary.totalSwarmPosts).toBe(0);
+      expect(parsedStore.summary.maxSwarmWorkers).toBe(0);
+
+      const v2LegacySnapshot = {
+        schemaVersion: "2.0.0",
+        anonymousProjectId: "22222222-3333-4444-5555-666666666666",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        environment: {
+          os: "win32",
+          nodeVersion: "v20.0.0",
+          lognexusVersion: "1.3.7",
+          detectedStacks: ["typescript"],
+        },
+        summary: {
+          totalCommits: 5,
+          totalLinesAdded: 50,
+          totalLinesDeleted: 10,
+          totalSubtasksCompleted: 3,
+        },
+        languageBreakdown: [],
+        modelBreakdown: [],
+      };
+
+      const parsedSnapshot = AnonymousDiagnosticPayloadSchema.parse(v2LegacySnapshot);
+      expect(parsedSnapshot.summary.swarmCommits).toBe(0);
+      expect(parsedSnapshot.summary.totalSwarmPosts).toBe(0);
+      expect(parsedSnapshot.summary.maxSwarmWorkers).toBe(0);
+    });
+
+    it("renders swarm coordination metrics in markdown report when swarmCommits > 0", () => {
+      const store = loadTelemetry(tempDir);
+      store.summary.totalCommits = 4;
+      store.summary.swarmCommits = 3;
+      store.summary.totalSwarmPosts = 12;
+      store.summary.maxSwarmWorkers = 2;
+
+      const report = formatTelemetryMarkdownReport(store);
+      expect(report).toContain("## 1. Executive Metrics Dashboard");
+      expect(report).toContain(
+        "| **Swarm Coordination** | **3 commit(s)** | 12 board post(s), peak 2 worker(s) |",
+      );
+      expect(report).toContain("## 3. Multi-Model Swarm Distribution");
+      expect(report).toContain(
+        "**Swarm Coordination:** 3 swarm-governed commit(s), 12 board post(s), peak 2 worker(s)",
+      );
+    });
+
+    it("omits swarm coordination metrics in markdown report when swarmCommits is 0", () => {
+      const store = loadTelemetry(tempDir);
+      expect(store.summary.swarmCommits).toBe(0);
+
+      const report = formatTelemetryMarkdownReport(store);
+      expect(report).not.toContain("**Swarm Coordination**");
+      expect(report).not.toContain("**Swarm Coordination:**");
     });
 
     it("defaults a fresh store schema version to 2.0.0", () => {
@@ -881,8 +961,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       expect(largeModel?.sourceLinesAdded).toBe(101);
       // `docsLinesAdded` folds documentation and configuration together. Here it is entirely
-      // configuration: the telemetry store the recorder itself writes (47 plus 43 lines).
-      expect(largeModel?.docsLinesAdded).toBe(90);
+      // configuration: the telemetry store the recorder itself writes (50 plus 43 lines).
+      expect(largeModel?.docsLinesAdded).toBe(93);
 
       const deltaCost = Number((largeCost - smallCost).toFixed(6));
       const deltaTokens = largeTokens - smallTokens;
@@ -904,9 +984,9 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(model?.sourceLinesAdded).toBe(10);
       // 20 guide lines plus the telemetry store the recorder writes during the commit (see
       // the bucket's total above); both land in the fold used for pricing.
-      expect(model?.docsLinesAdded).toBe(67);
-      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 67 doc/config lines at 0.000002.
-      expect(model?.estimatedCostUsd).toBeCloseTo(0.002214, 6);
+      expect(model?.docsLinesAdded).toBe(70);
+      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 70 doc/config lines at 0.000002.
+      expect(model?.estimatedCostUsd).toBeCloseTo(0.00222, 6);
     });
 
     it("scales the frontier baseline with the LOC actually shipped", () => {

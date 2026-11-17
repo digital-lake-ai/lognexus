@@ -78,6 +78,16 @@ export function formatTelemetryMarkdownReport(
   const tierCommits = sum.tierCommits;
   const tierLine = `\`tier-1\`: ${tierCommits["tier-1"]} · \`tier-2\`: ${tierCommits["tier-2"]} · \`tier-3\`: ${tierCommits["tier-3"]}`;
 
+  const swarmDashboardRow =
+    sum.swarmCommits > 0
+      ? `\n| **Swarm Coordination** | **${sum.swarmCommits} commit(s)** | ${sum.totalSwarmPosts} board post(s), peak ${sum.maxSwarmWorkers} worker(s) |`
+      : "";
+
+  const swarmCoordLine =
+    sum.swarmCommits > 0
+      ? `\n**Swarm Coordination:** ${sum.swarmCommits} swarm-governed commit(s), ${sum.totalSwarmPosts} board post(s), peak ${sum.maxSwarmWorkers} worker(s)`
+      : "";
+
   return `<!-- lognexus:
 kind: telemetry-report
 schema_version: ${store.schemaVersion}
@@ -114,7 +124,7 @@ ${scopeLine === null ? "" : `**Report Scope:** ${scopeLine} *(in-memory projecti
 | **Contract Compliance** | **${sum.contractCompliancePct}%** | ${sum.contractedCommits} contracted commit(s) checked against \`allowedFiles\` (excluding ephemeral paths) |
 | **Tier Escalations** | **${sum.escalatedCommits}** | Commits explicitly escalated above their subtask tier |
 | **Rework Ratio** | **${sum.reworkRatioPct}%** | ${sum.reworkCommits} \`fix(...)\` / \`revert(...)\` commit(s) |
-| **Estimated Cost Savings** | **${sum.estimatedCostSavingsPct}%** (~$${sum.estimatedCostSavingsUsd.toFixed(2)} USD) | Compared to Monolithic Tier-1 frontier execution |
+| **Estimated Cost Savings** | **${sum.estimatedCostSavingsPct}%** (~$${sum.estimatedCostSavingsUsd.toFixed(2)} USD) | Compared to Monolithic Tier-1 frontier execution |${swarmDashboardRow}
 
 ---
 
@@ -126,7 +136,7 @@ ${langTable}
 
 ## 3. Multi-Model Swarm Distribution
 
-**Tier Commits:** ${tierLine}
+**Tier Commits:** ${tierLine}${swarmCoordLine}
 
 ${modelTable}
 
