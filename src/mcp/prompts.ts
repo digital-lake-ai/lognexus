@@ -119,6 +119,7 @@ ${contextBlock}
 5. Each subtask must end in a state where the verification command passes.
 6. Prefer the lowest tier that can safely complete the subtask. Escalate to tier-1 only for decisions the executor must not make.
 7. Do not invent dependencies or APIs. If a capability is missing, the subtask must say "stop and ask".
+8. Swarm Token-Hygiene: cap active swarm workers at \`<= 4\`, prohibit \`tier-1\` models on read-only probes when \`tier-2\`/\`tier-3\` suffice, enforce selective \`@name\` mentions (avoiding \`@all\` broadcast bloat), and pass \`--isolation swarm --swarm-workers <n> --swarm-posts <count>\` on subtask completion.
 
 ## Tier taxonomy
 
@@ -134,7 +135,7 @@ For each subtask emit exactly:
 
 ### [tier-X] <short imperative title>
 - **Branch / commit:** \`feat(#<issue>/T<n>)\` or \`fix(#<issue>/T<n>)\`
-- **Assigned agent / isolation:** \`<tier-model or auto>\` (\`subagent\` | \`worktree\` | \`shared\`)
+- **Assigned agent / isolation:** \`<tier-model or auto>\` (\`subagent\` | \`swarm\` | \`worktree\` | \`shared\`)
 - **Scope:** one or two sentences describing the exact change.
 
 ${CONTRACT_FORMAT}

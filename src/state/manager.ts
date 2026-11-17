@@ -176,7 +176,13 @@ export const SUBTASK_ID_PATTERN = /^T\d+(?:-[a-zA-Z0-9]+)?$/;
 
 const TIERS: ActiveIssueState["tier"][] = ["tier-1", "tier-2", "tier-3"];
 const DECISION_BUDGETS: SubtaskContract["decisionBudget"][] = ["none", "narrow", "full"];
-const ISOLATION_MODES: readonly SubtaskIsolation[] = ["shared", "worktree", "branch", "subagent"];
+const ISOLATION_MODES: readonly SubtaskIsolation[] = [
+  "shared",
+  "worktree",
+  "branch",
+  "subagent",
+  "swarm",
+];
 const ASSIGNEE_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_. -]+(?:\s*\([^()\r\n]+\))?$/;
 
 export interface ParsedSetTaskArgs {
@@ -201,6 +207,18 @@ function parseCsv(value: string): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function parseNonNegativeInt(raw: string, flag: string): number {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error(`Invalid ${flag} value '${raw}'. Expected a non-negative integer.`);
+  }
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Invalid ${flag} value '${raw}'. Expected a safe non-negative integer.`);
+  }
+  return value;
+}
+
 export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
   const positional: string[] = [];
   let tier: ActiveIssueState["tier"] | undefined;
@@ -210,6 +228,8 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
   let verificationCmd: string | undefined;
   let assignee: string | undefined;
   let isolation: SubtaskIsolation | undefined;
+  let swarmWorkers: number | undefined;
+  let swarmPosts: number | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -277,6 +297,16 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
         index += 1;
         break;
       }
+      case "--swarm-workers": {
+        swarmWorkers = parseNonNegativeInt(readFlagValue(args, index, arg), arg);
+        index += 1;
+        break;
+      }
+      case "--swarm-posts": {
+        swarmPosts = parseNonNegativeInt(readFlagValue(args, index, arg), arg);
+        index += 1;
+        break;
+      }
       default:
         throw new Error(`Unknown flag '${arg}'.`);
     }
@@ -296,7 +326,9 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
     decisionBudget !== undefined ||
     verificationCmd !== undefined ||
     assignee !== undefined ||
-    isolation !== undefined
+    isolation !== undefined ||
+    swarmWorkers !== undefined ||
+    swarmPosts !== undefined
       ? {
           allowedFiles: allowedFiles ?? [],
           forbiddenFiles: forbiddenFiles ?? [],
@@ -304,6 +336,8 @@ export function parseSetTaskArgs(args: string[]): ParsedSetTaskArgs {
           verificationCmd,
           ...(assignee !== undefined ? { assignee } : {}),
           ...(isolation !== undefined ? { isolation } : {}),
+          ...(swarmWorkers !== undefined ? { swarmWorkers } : {}),
+          ...(swarmPosts !== undefined ? { swarmPosts } : {}),
         }
       : undefined;
 

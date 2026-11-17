@@ -36,7 +36,7 @@ As AI coding agents take on complex engineering tasks across different IDEs, the
 
 **LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
 - **Clients:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code, VS Code, Zed.
-- **Models:** Google Gemini (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
+- **Models:** Google Gemini (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash High`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
 - **Supported Platforms:** **Linux**, **macOS**, and **Windows** (`linux`, `darwin`, `win32` — 100% cross-platform Node.js >= 20 & Git >= 2.28, zero native binary dependencies).
 
 ```
@@ -51,7 +51,7 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 
 ## Key Features
 
-- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
+- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
 - **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **Google Antigravity**, and **Kimi Code / VS Code**.
 - **Atomic Commit Engine (`lognexus commit` & MCP `lognexus_commit`):** Validates subtask file contracts, verifies reviewer separation, injects authorship trailers, commits changes, marks subtasks completed, and attaches Git Notes in a single ~0.15s execution.
 - **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. No model merges its own code without independent verification from another model family.
@@ -83,7 +83,7 @@ LogNexus organizes development phases into three cognitive tiers. You can assign
 | Tier | Cognitive Role | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Activities |
 |---|---|---|---|---|---|---|
 | **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x | o3, o1, GPT-5 | Gemini 4 Carbon / Argon, 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model review sign-offs. |
-| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, knowledge retrieval. |
+| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 4 Hydrogen, Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, knowledge retrieval. |
 | **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
 
 ### Example Deployment Setups
@@ -372,9 +372,9 @@ The `Planned-by:` trailer documents where an externally authored plan came from.
 
 ## Provenance & Acknowledgments
 
-**LogNexus** is engineered and maintained by **[HorchataHTML](https://github.com/digital-lake-ai/lognexus)** and **[Digital Lake](https://github.com/digital-lake-ai)**, encompassing:
+**LogNexus** is engineered and maintained by **[HorchataHTML](https://github.com/HorchataHTML)** and **[Digital Lake](https://github.com/digital-lake-ai)**, encompassing:
 - The full TypeScript runtime, repository scaffolding & diagnostic CLI, Persistent Agent State Engine, Atomic Commit Engine, Git Notes memory layer (`refs/notes/lognexus`), local-first FinOps telemetry, Multi-Model Token Shield, and native JSON-RPC 2.0 stdio MCP server (`@digital-lake/lognexus` / `lognexus-mcp`).
-- First-class multi-model tier routing and closed delegation contracts across **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
+- First-class multi-model tier routing and closed delegation contracts across **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
 - The cross-reference CI validation workflow (`.github/workflows/cross-ref-check.yml`), single-source-of-truth review/signing block architecture, and sub-skill anchor normalization authored by **HorchataHTML** (`2026-08-04`, commit `cd0582c1`).
 
 The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Argon`** and **`Gemini 4 Carbon`** (*Master Architecture & Security Orchestrators*).
@@ -404,6 +404,6 @@ If **LogNexus** saved you time, prevented context amnesia in your workflows, and
 ## License
 
 LogNexus is released under the [MIT License](LICENSE).  
-Copyright (c) 2026 HorchataHTML (https://github.com/digital-lake-ai/lognexus)  
-Copyright (c) 2026 Digital Lake and LogNexus contributors.  
+Copyright (c) 2026 HorchataHTML (https://github.com/HorchataHTML)  
+Copyright (c) 2026 Digital Lake (https://github.com/digital-lake-ai) and LogNexus contributors.  
 Copyright (c) 2026 devallibus

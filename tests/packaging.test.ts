@@ -92,6 +92,8 @@ describe("CLI --help & Biome schema parity", () => {
     expect(usage).toContain("--protect-tokens");
     expect(usage).toContain("--assignee");
     expect(usage).toContain("--isolation");
+    expect(usage).toContain("--swarm-workers");
+    expect(usage).toContain("--swarm-posts");
   });
 
   it("documents the scoped telemetry subcommands in printUsage()", () => {

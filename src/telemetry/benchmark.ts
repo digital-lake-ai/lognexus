@@ -460,6 +460,9 @@ export function aggregateBenchmarkCohort(
     totals.tokensSaved += summary.estimatedTokensSaved;
     totals.escalatedCommits += summary.escalatedCommits;
     totals.reworkCommits += summary.reworkCommits;
+    totals.swarmCommits += summary.swarmCommits ?? 0;
+    totals.totalSwarmPosts += summary.totalSwarmPosts ?? 0;
+    totals.maxSwarmWorkers = Math.max(totals.maxSwarmWorkers ?? 0, summary.maxSwarmWorkers ?? 0);
   }
 
   totals.weightedCostSavingsPct =
@@ -553,6 +556,13 @@ export function formatCohortMarkdownReport(cohort: CohortBenchmark): string {
     `| Actual cost | ${formatUsd(cohort.totals.actualCostUsd)} |`,
     `| Cost savings | ${formatUsd(cohort.totals.costSavingsUsd)} (${cohort.totals.weightedCostSavingsPct}% weighted) |`,
     `| Tokens saved | ${cohort.totals.tokensSaved} |`,
+    ...(cohort.totals.swarmCommits > 0
+      ? [
+          `| Swarm commits | ${cohort.totals.swarmCommits} |`,
+          `| Swarm board posts | ${cohort.totals.totalSwarmPosts} |`,
+          `| Peak swarm workers | ${cohort.totals.maxSwarmWorkers} |`,
+        ]
+      : []),
     "",
     "## Statistical Medians",
     "",

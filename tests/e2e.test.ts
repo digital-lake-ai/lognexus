@@ -201,4 +201,37 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
       logSpy.mockRestore();
     }
   });
+
+  it("wires --isolation swarm, --swarm-workers and --swarm-posts into state set-task and prints Swarm Metrics in state show", async () => {
+    initProject(tempDir);
+
+    await handleState(
+      [
+        "set-task",
+        "T7",
+        "Swarm coordination test",
+        "--isolation",
+        "swarm",
+        "--swarm-workers",
+        "3",
+        "--swarm-posts",
+        "12",
+      ],
+      tempDir,
+    );
+
+    const logs: string[] = [];
+    const logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+
+    try {
+      await handleState(["show"], tempDir);
+      const showOutput = logs.join("\n");
+      expect(showOutput).toContain("Isolation Mode:  swarm");
+      expect(showOutput).toContain("Swarm Metrics:   3 worker(s), 12 post(s)");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
 });

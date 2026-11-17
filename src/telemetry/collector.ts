@@ -523,6 +523,16 @@ export function recordCommitTelemetry(options: {
   }
   store.summary.tierCommits[pricingTier] += 1;
 
+  const swarmMetrics = extractNoteSwarmMetrics(readParsedNote(options.sha, cwd));
+  if (swarmMetrics.isSwarm) {
+    store.summary.swarmCommits = (store.summary.swarmCommits ?? 0) + 1;
+    store.summary.totalSwarmPosts = (store.summary.totalSwarmPosts ?? 0) + swarmMetrics.posts;
+    store.summary.maxSwarmWorkers = Math.max(
+      store.summary.maxSwarmWorkers ?? 0,
+      swarmMetrics.workers,
+    );
+  }
+
   updateCostSavingsEstimate(store);
   saveTelemetry(store, cwd);
 }
@@ -661,9 +671,59 @@ function isCommitContracted(sha: string, allowedFiles: string[], targetDir: stri
 interface ParsedNote {
   $schema?: unknown;
   issue?: { id?: unknown } | null;
-  subtask?: { id?: unknown; contract?: { allowedFiles?: unknown } | null } | null;
+  subtask?: {
+    id?: unknown;
+    contract?: {
+      allowedFiles?: unknown;
+      isolation?: unknown;
+      swarmWorkers?: unknown;
+      swarmPosts?: unknown;
+    } | null;
+  } | null;
   tier?: unknown;
   escalated?: unknown;
+  swarm?: { workers?: unknown; posts?: unknown } | null;
+}
+
+function parseNonNegativeInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+    return null;
+  }
+  return value;
+}
+
+function readParsedNote(sha: string, targetDir: string): ParsedNote | null {
+  const rawNote = getNote(sha, { cwd: targetDir });
+  if (rawNote === null || rawNote === "") return null;
+  try {
+    return JSON.parse(rawNote) as ParsedNote;
+  } catch {
+    return null;
+  }
+}
+
+export function extractNoteSwarmMetrics(parsedNote: ParsedNote | null): {
+  isSwarm: boolean;
+  workers: number;
+  posts: number;
+} {
+  const workers =
+    parseNonNegativeInt(parsedNote?.swarm?.workers) ??
+    parseNonNegativeInt(parsedNote?.subtask?.contract?.swarmWorkers);
+  const posts =
+    parseNonNegativeInt(parsedNote?.swarm?.posts) ??
+    parseNonNegativeInt(parsedNote?.subtask?.contract?.swarmPosts);
+  const isSwarm =
+    parsedNote?.subtask?.contract?.isolation === "swarm" ||
+    workers !== null ||
+    posts !== null ||
+    (parsedNote?.swarm !== null && typeof parsedNote?.swarm === "object");
+
+  return {
+    isSwarm,
+    workers: workers ?? 0,
+    posts: posts ?? 0,
+  };
 }
 
 /**
@@ -756,6 +816,9 @@ export function syncTelemetryFromGitNotes(
   summary.docsLinesAdded = 0;
   summary.configLinesAdded = 0;
   summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
+  summary.swarmCommits = 0;
+  summary.totalSwarmPosts = 0;
+  summary.maxSwarmWorkers = 0;
 
   let totalLinesAdded = 0;
   let totalLinesDeleted = 0;
@@ -765,6 +828,9 @@ export function syncTelemetryFromGitNotes(
   let compliantCommits = 0;
   let escalatedCommits = 0;
   let reworkCommits = 0;
+  let swarmCommits = 0;
+  let totalSwarmPosts = 0;
+  let maxSwarmWorkers = 0;
   const timestamps: number[] = [];
 
   for (const commit of commits) {
@@ -775,15 +841,7 @@ export function syncTelemetryFromGitNotes(
       continue;
     }
 
-    let parsedNote: ParsedNote | null = null;
-    const rawNote = getNote(safeSha, { cwd: targetDir });
-    if (rawNote !== null && rawNote !== "") {
-      try {
-        parsedNote = JSON.parse(rawNote) as ParsedNote;
-      } catch {
-        parsedNote = null;
-      }
-    }
+    const parsedNote = readParsedNote(safeSha, targetDir);
 
     if (issueFilter !== null && !matchesIssueFilter(issueFilter, commit, parsedNote?.issue?.id)) {
       continue;
@@ -846,6 +904,19 @@ export function syncTelemetryFromGitNotes(
     models[modelKey] = existingModel;
 
     summary.tierCommits[resolvePricingTier(tier)] += 1;
+
+    const swarmMetrics = extractNoteSwarmMetrics(parsedNote);
+    const loweredAuthor = author.toLowerCase();
+    const isSwarmCommit =
+      swarmMetrics.isSwarm ||
+      loweredAuthor.includes("gemini-flash-worker-agy") ||
+      loweredAuthor.includes("orchestrator (carbon)") ||
+      loweredAuthor.includes("orchestrator (argon)");
+    if (isSwarmCommit) {
+      swarmCommits += 1;
+      totalSwarmPosts += swarmMetrics.posts;
+      maxSwarmWorkers = Math.max(maxSwarmWorkers, swarmMetrics.workers);
+    }
   }
 
   store.extensions = extensions;
@@ -860,6 +931,9 @@ export function syncTelemetryFromGitNotes(
   summary.escalatedCommits = escalatedCommits;
   summary.reworkCommits = reworkCommits;
   summary.reworkRatioPct = percentage(reworkCommits, commitsInScope, 0);
+  summary.swarmCommits = swarmCommits;
+  summary.totalSwarmPosts = totalSwarmPosts;
+  summary.maxSwarmWorkers = maxSwarmWorkers;
 
   const ordered = [...timestamps].sort((a, b) => a - b);
   summary.activeDevelopmentSpanSec =

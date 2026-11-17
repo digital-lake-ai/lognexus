@@ -263,6 +263,25 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   if (trimmed.includes("antigravity") && trimmed.includes("argon")) return "gemini/argon";
   if (trimmed.includes("antigravity") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
 
+  // Antigravity Orchestrator (Carbon/Argon) display & slug forms and Flash worker-agy forms.
+  if (
+    trimmed === "orchestrator (carbon)" ||
+    (trimmed.includes("orchestrator") && trimmed.includes("carbon")) ||
+    (trimmed.includes("gemini-pro-orchestrator") && !trimmed.includes("argon"))
+  ) {
+    return "gemini/carbon";
+  }
+  if (
+    trimmed === "orchestrator (argon)" ||
+    (trimmed.includes("orchestrator") && trimmed.includes("argon")) ||
+    trimmed.includes("gemini-pro-orchestrator-argon")
+  ) {
+    return "gemini/argon";
+  }
+  if (trimmed.includes("gemini-flash-worker-agy") || trimmed.includes("flash-worker-agy")) {
+    return "gemini/flash";
+  }
+
   // The Antigravity orchestrator drives the plan from an isolated window; classify unnamed
   // Antigravity orchestrators as the architecture family before generic Gemini checks claim them.
   if (
@@ -380,6 +399,9 @@ export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | n
     head = head.slice(0, -suffix.length);
   }
 
+  if (head.includes("flash-worker-agy") || head.includes("worker-agy")) {
+    return "tier-3";
+  }
   if (/(?:^|[/_-])(?:gpt-4o-mini|flash-lite)(?:$|[/_-])/.test(head)) {
     return "tier-3";
   }

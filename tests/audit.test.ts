@@ -574,6 +574,41 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
     });
   });
 
+  describe("Antigravity Orchestrator (Carbon/Argon) & Flash Worker normalization", () => {
+    it.each([
+      ["Orchestrator (Carbon)", "gemini/carbon"],
+      ["Orchestrator (Argon)", "gemini/argon"],
+      ["gemini-pro-orchestrator", "gemini/carbon"],
+      ["google/gemini-pro-orchestrator (antigravity)", "gemini/carbon"],
+      ["gemini-pro-orchestrator-argon", "gemini/argon"],
+      ["google/gemini-pro-orchestrator-argon (antigravity)", "gemini/argon"],
+      ["gemini-flash-worker-agy", "gemini/flash-worker-agy"],
+      ["flash-worker-agy", "gemini/flash-worker-agy"],
+      ["google/gemini-flash-worker-agy (antigravity)", "gemini/flash-worker-agy"],
+    ])("normalizes %s to %s", (input, expected) => {
+      expect(parseIdentity(input)?.family).toBe(expected);
+    });
+
+    it("separates Orchestrator (Carbon) from Orchestrator (Argon) and blocks alias self-approval", () => {
+      expect(
+        checkSelfApproval("Orchestrator (Carbon)", "Orchestrator (Argon)").isSelfApproval,
+      ).toBe(false);
+      expect(checkSelfApproval("Orchestrator (Carbon)", "Gemini 4 Carbon").isSelfApproval).toBe(
+        true,
+      );
+      expect(
+        checkSelfApproval("Orchestrator (Argon)", "gemini-pro-orchestrator-argon").isSelfApproval,
+      ).toBe(true);
+      expect(
+        checkSelfApproval("gemini-flash-worker-agy", "Orchestrator (Carbon)").isSelfApproval,
+      ).toBe(false);
+      expect(
+        checkSelfApproval("gemini-flash-worker-agy", "google/gemini-flash-worker-agy")
+          .isSelfApproval,
+      ).toBe(true);
+    });
+  });
+
   describe("Universal effort-suffix, provider alias, and vendor normalization", () => {
     it.each([
       ["openai/o3-xhigh", "openai/o3"],

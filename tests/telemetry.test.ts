@@ -5,6 +5,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/index.js";
+import { buildAnonymousDiagnosticPayload } from "../src/telemetry/collector.js";
 import {
   classifyFileCategory,
   inferTierFromAuthor,
@@ -669,6 +670,86 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(parsed.extensions[".ts"]?.category).toBe("source");
       expect(parsed.models["gemini/flash"]?.estimatedCostUsd).toBe(0);
       expect(parsed.models["gemini/flash"]?.sourceLinesAdded).toBe(0);
+      expect(parsed.summary.swarmCommits).toBe(0);
+      expect(parsed.summary.totalSwarmPosts).toBe(0);
+      expect(parsed.summary.maxSwarmWorkers).toBe(0);
+    });
+
+    it("parses legacy 2.0.0 stores and snapshots missing swarm metrics with zero defaults", () => {
+      const v2LegacyStore = {
+        schemaVersion: "2.0.0",
+        mode: "local",
+        anonymousProjectId: "22222222-3333-4444-5555-666666666666",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        detectedStacks: ["typescript"],
+        taskTimings: {},
+        extensions: {},
+        models: {},
+        summary: {
+          totalCommits: 5,
+          totalLinesAdded: 50,
+          totalLinesDeleted: 10,
+          totalSubtasksCompleted: 3,
+        },
+        lastUpdated: "2026-01-01T00:00:00.000Z",
+      };
+
+      const parsedStore = TelemetryStoreSchema.parse(v2LegacyStore);
+      expect(parsedStore.summary.swarmCommits).toBe(0);
+      expect(parsedStore.summary.totalSwarmPosts).toBe(0);
+      expect(parsedStore.summary.maxSwarmWorkers).toBe(0);
+
+      const v2LegacySnapshot = {
+        schemaVersion: "2.0.0",
+        anonymousProjectId: "22222222-3333-4444-5555-666666666666",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        environment: {
+          os: "win32",
+          nodeVersion: "v20.0.0",
+          lognexusVersion: "1.3.7",
+          detectedStacks: ["typescript"],
+        },
+        summary: {
+          totalCommits: 5,
+          totalLinesAdded: 50,
+          totalLinesDeleted: 10,
+          totalSubtasksCompleted: 3,
+        },
+        languageBreakdown: [],
+        modelBreakdown: [],
+      };
+
+      const parsedSnapshot = AnonymousDiagnosticPayloadSchema.parse(v2LegacySnapshot);
+      expect(parsedSnapshot.summary.swarmCommits).toBe(0);
+      expect(parsedSnapshot.summary.totalSwarmPosts).toBe(0);
+      expect(parsedSnapshot.summary.maxSwarmWorkers).toBe(0);
+    });
+
+    it("renders swarm coordination metrics in markdown report when swarmCommits > 0", () => {
+      const store = loadTelemetry(tempDir);
+      store.summary.totalCommits = 4;
+      store.summary.swarmCommits = 3;
+      store.summary.totalSwarmPosts = 12;
+      store.summary.maxSwarmWorkers = 2;
+
+      const report = formatTelemetryMarkdownReport(store);
+      expect(report).toContain("## 1. Executive Metrics Dashboard");
+      expect(report).toContain(
+        "| **Swarm Coordination** | **3 commit(s)** | 12 board post(s), peak 2 worker(s) |",
+      );
+      expect(report).toContain("## 3. Multi-Model Swarm Distribution");
+      expect(report).toContain(
+        "**Swarm Coordination:** 3 swarm-governed commit(s), 12 board post(s), peak 2 worker(s)",
+      );
+    });
+
+    it("omits swarm coordination metrics in markdown report when swarmCommits is 0", () => {
+      const store = loadTelemetry(tempDir);
+      expect(store.summary.swarmCommits).toBe(0);
+
+      const report = formatTelemetryMarkdownReport(store);
+      expect(report).not.toContain("**Swarm Coordination**");
+      expect(report).not.toContain("**Swarm Coordination:**");
     });
 
     it("defaults a fresh store schema version to 2.0.0", () => {
@@ -792,6 +873,29 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("Gemini 4 Carbon (antigravity)")).toBe("gemini/carbon");
       expect(extractModelFamilyCategory("Gemini 4 Argon (antigravity)")).toBe("gemini/argon");
     });
+
+    it("classifies Orchestrator (Carbon/Argon), gemini-pro-orchestrator* and gemini-flash-worker-agy", () => {
+      expect(extractModelFamilyCategory("Orchestrator (Carbon)")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("Orchestrator (Argon)")).toBe("gemini/argon");
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator (antigravity)")).toBe(
+        "gemini/carbon",
+      );
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator-argon")).toBe("gemini/argon");
+      expect(extractModelFamilyCategory("gemini-flash-worker-agy")).toBe("gemini/flash");
+      expect(extractModelFamilyCategory("flash-worker-agy")).toBe("gemini/flash");
+      expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code, orchestrator)")).toBe(
+        "deepseek/v3",
+      );
+
+      expect(inferTierFromAuthor("Orchestrator (Carbon)")).toBe("tier-1");
+      expect(inferTierFromAuthor("Orchestrator (Argon)")).toBe("tier-1");
+      expect(inferTierFromAuthor("gemini-pro-orchestrator")).toBe("tier-1");
+      expect(inferTierFromAuthor("gemini-pro-orchestrator-argon")).toBe("tier-1");
+      expect(inferTierFromAuthor("gemini-flash-worker-agy")).toBe("tier-3");
+      expect(inferTierFromAuthor("flash-worker-agy")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek/VS Code (kimi-code, orchestrator)")).toBe("tier-3");
+    });
   });
 
   describe("Offline Guarantee", () => {
@@ -858,8 +962,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       expect(largeModel?.sourceLinesAdded).toBe(101);
       // `docsLinesAdded` folds documentation and configuration together. Here it is entirely
-      // configuration: the telemetry store the recorder itself writes (47 plus 43 lines).
-      expect(largeModel?.docsLinesAdded).toBe(90);
+      // configuration: the telemetry store the recorder itself writes (50 plus 43 lines).
+      expect(largeModel?.docsLinesAdded).toBe(93);
 
       const deltaCost = Number((largeCost - smallCost).toFixed(6));
       const deltaTokens = largeTokens - smallTokens;
@@ -881,9 +985,9 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(model?.sourceLinesAdded).toBe(10);
       // 20 guide lines plus the telemetry store the recorder writes during the commit (see
       // the bucket's total above); both land in the fold used for pricing.
-      expect(model?.docsLinesAdded).toBe(67);
-      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 67 doc/config lines at 0.000002.
-      expect(model?.estimatedCostUsd).toBeCloseTo(0.002214, 6);
+      expect(model?.docsLinesAdded).toBe(70);
+      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 70 doc/config lines at 0.000002.
+      expect(model?.estimatedCostUsd).toBeCloseTo(0.00222, 6);
     });
 
     it("scales the frontier baseline with the LOC actually shipped", () => {
@@ -1199,6 +1303,92 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(store.summary.tierCommits["tier-1"]).toBe(0);
       expect(store.summary.tierCommits["tier-2"]).toBe(2);
       expect(store.summary.tierCommits["tier-3"]).toBe(2);
+    });
+
+    it("reconciles swarmCommits, totalSwarmPosts and maxSwarmWorkers from Git Notes and propagates to diagnostic payload", () => {
+      enableTelemetry({ cwd: tempDir });
+
+      // 1. Legacy non-swarm commit (no swarm metrics)
+      const legacySha = commitFile(
+        "src/legacy.ts",
+        "export const legacy = true;\n",
+        "feat(#65/T0): legacy commit",
+      );
+      note(legacySha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 65 },
+        subtask: { id: "T0", contract: { allowedFiles: ["src/legacy.ts"], isolation: "subagent" } },
+      });
+      recordCommitTelemetry({
+        sha: legacySha,
+        author: "gemini/hydrogen",
+        tier: "tier-2",
+        targetDir: tempDir,
+      });
+      expect(loadTelemetry(tempDir).summary.swarmCommits).toBe(0);
+
+      // 2. Explicit swarm payload on Git Note
+      const explicitSha = commitFile(
+        "src/swarm-a.ts",
+        "export const a = 1;\n",
+        "feat(#65/T1): explicit swarm note",
+      );
+      note(explicitSha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 65 },
+        subtask: { id: "T1", contract: { allowedFiles: ["src/swarm-a.ts"], isolation: "swarm" } },
+        swarm: { workers: 4, posts: 12 },
+      });
+      recordCommitTelemetry({
+        sha: explicitSha,
+        author: "gemini/hydrogen",
+        tier: "tier-2",
+        targetDir: tempDir,
+      });
+
+      const afterLive = loadTelemetry(tempDir);
+      expect(afterLive.summary.swarmCommits).toBe(1);
+      expect(afterLive.summary.totalSwarmPosts).toBe(12);
+      expect(afterLive.summary.maxSwarmWorkers).toBe(4);
+
+      // 3. Contract-level swarm metrics without explicit payload.swarm
+      const contractSha = commitFile(
+        "src/swarm-b.ts",
+        "export const b = 2;\n",
+        "feat(#65/T2): contract swarm note",
+      );
+      note(contractSha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 65 },
+        subtask: {
+          id: "T2",
+          contract: {
+            allowedFiles: ["src/swarm-b.ts"],
+            isolation: "swarm",
+            swarmWorkers: 2,
+            swarmPosts: 7,
+          },
+        },
+      });
+
+      // 4. Swarm worker author fallback without explicit swarm fields
+      commitFile(
+        "src/swarm-c.ts",
+        "export const c = 3;\n",
+        "feat(#65/T3): worker author fallback",
+        "gemini-flash-worker-agy <agy@example.com>",
+      );
+
+      const synced = syncTelemetryFromGitNotes(tempDir);
+      expect(synced.summary.swarmCommits).toBe(3);
+      expect(synced.summary.totalSwarmPosts).toBe(19);
+      expect(synced.summary.maxSwarmWorkers).toBe(4);
+
+      const diagnostic = buildAnonymousDiagnosticPayload(synced);
+      expect(diagnostic.schemaVersion).toBe("2.0.0");
+      expect(diagnostic.summary.swarmCommits).toBe(3);
+      expect(diagnostic.summary.totalSwarmPosts).toBe(19);
+      expect(diagnostic.summary.maxSwarmWorkers).toBe(4);
     });
   });
 });

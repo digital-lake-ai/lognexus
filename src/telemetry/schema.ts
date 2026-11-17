@@ -74,6 +74,9 @@ export const TelemetrySummarySchema = z.object({
   estimatedBaselineTokens: z.number().default(0),
   estimatedActualTokens: z.number().default(0),
   estimatedTokensSaved: z.number().default(0),
+  swarmCommits: z.number().default(0),
+  totalSwarmPosts: z.number().default(0),
+  maxSwarmWorkers: z.number().default(0),
 });
 export type TelemetrySummary = z.infer<typeof TelemetrySummarySchema>;
 
@@ -104,6 +107,9 @@ export const DEFAULT_TELEMETRY_SUMMARY: TelemetrySummary = {
   estimatedBaselineTokens: 0,
   estimatedActualTokens: 0,
   estimatedTokensSaved: 0,
+  swarmCommits: 0,
+  totalSwarmPosts: 0,
+  maxSwarmWorkers: 0,
 };
 
 export const TaskTimingEntrySchema = z.object({
@@ -157,7 +163,7 @@ export type AnonymousDiagnosticPayload = z.infer<typeof AnonymousDiagnosticPaylo
 export const AnonymousCommunityPayloadSchema = AnonymousDiagnosticPayloadSchema;
 export type AnonymousCommunityPayload = AnonymousDiagnosticPayload;
 
-const CohortTotalsSchema = z.object({
+export const CohortTotalsSchema = z.object({
   commits: z.number().default(0),
   sourceLinesAdded: z.number().default(0),
   testLinesAdded: z.number().default(0),
@@ -174,6 +180,9 @@ const CohortTotalsSchema = z.object({
   tokensSaved: z.number().default(0),
   escalatedCommits: z.number().default(0),
   reworkCommits: z.number().default(0),
+  swarmCommits: z.number().default(0),
+  totalSwarmPosts: z.number().default(0),
+  maxSwarmWorkers: z.number().default(0),
 });
 export type CohortTotals = z.infer<typeof CohortTotalsSchema>;
 
@@ -212,6 +221,9 @@ export const COHORT_TOTALS_DEFAULT: CohortTotals = {
   tokensSaved: 0,
   escalatedCommits: 0,
   reworkCommits: 0,
+  swarmCommits: 0,
+  totalSwarmPosts: 0,
+  maxSwarmWorkers: 0,
 };
 
 export const COHORT_MEDIANS_DEFAULT: CohortMedians = {

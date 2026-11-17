@@ -20,6 +20,7 @@ export interface GitNotePayload {
   } | null;
   tier: string;
   escalated?: boolean;
+  swarm?: { workers?: number; posts?: number };
 }
 
 export interface NoteAttachOptions extends NoteOptions {
@@ -27,6 +28,10 @@ export interface NoteAttachOptions extends NoteOptions {
   tier?: string;
   /** Marks the commit as an explicit tier escalation (e.g. tier-1 author on a tier-3 subtask). */
   escalated?: boolean;
+  /** Number of active swarm workers participating in this subtask. */
+  swarmWorkers?: number;
+  /** Number of swarm board posts emitted during this subtask. */
+  swarmPosts?: number;
 }
 
 interface InferredSubjectMeta {
@@ -75,7 +80,13 @@ function inferCommitSubjectMeta(commitSha: string, cwd: string): InferredSubject
 
 export function buildStateNotePayload(
   targetDir: string = process.cwd(),
-  options: { tier?: string; escalated?: boolean; commitSha?: string } = {},
+  options: {
+    tier?: string;
+    escalated?: boolean;
+    commitSha?: string;
+    swarmWorkers?: number;
+    swarmPosts?: number;
+  } = {},
 ): GitNotePayload {
   const state = loadState(targetDir);
   const meta =
@@ -117,6 +128,17 @@ export function buildStateNotePayload(
 
   if (options.escalated) {
     payload.escalated = true;
+  }
+
+  const contract = state.currentSubtask?.contract;
+  const isSwarm = contract?.isolation === "swarm";
+  const workers = options.swarmWorkers ?? contract?.swarmWorkers;
+  const posts = options.swarmPosts ?? contract?.swarmPosts;
+  if (isSwarm || workers !== undefined || posts !== undefined) {
+    payload.swarm = {
+      ...(workers !== undefined ? { workers } : isSwarm ? { workers: 0 } : {}),
+      ...(posts !== undefined ? { posts } : isSwarm ? { posts: 0 } : {}),
+    };
   }
 
   return payload;
@@ -163,6 +185,8 @@ export function attachCurrentStateToCommit(
     tier: options.tier,
     escalated: options.escalated,
     commitSha: safeSha,
+    swarmWorkers: options.swarmWorkers,
+    swarmPosts: options.swarmPosts,
   });
   const serialized = JSON.stringify(payload, null, 2);
   attachNote(serialized, safeSha, options);

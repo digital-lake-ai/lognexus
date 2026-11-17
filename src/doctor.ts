@@ -2,7 +2,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { resolveRoutingProfile } from "./routing/profile.js";
-import { countPublishedReleases, detectHostProjectVersion, getScopeDrift } from "./status.js";
+import {
+  countPublishedReleases,
+  detectHostProjectVersion,
+  detectProjectManifestVersions,
+  getScopeDrift,
+} from "./status.js";
 
 export interface DiagnosticCheck {
   name: string;
@@ -174,6 +179,16 @@ function countCommits(targetDir: string): number {
  */
 export function checkVersionMaturity(targetDir: string = process.cwd()): DiagnosticCheck {
   const version = detectHostProjectVersion(targetDir);
+  const manifests = detectProjectManifestVersions(targetDir);
+  const distinct = new Set(manifests.map((entry) => entry.version));
+
+  if (distinct.size > 1) {
+    return {
+      name: "Version Maturity",
+      status: "warn",
+      message: `Software version drift across manifests (${manifests.map((m) => `${m.path}=${m.version}`).join(", ")}) — keep manifests synchronized and separate Software Version (e.g. 0.1.0) from Document Revision (e.g. rev. 1.3)`,
+    };
+  }
 
   if (version === null) {
     return {

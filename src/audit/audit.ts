@@ -155,32 +155,55 @@ function normalizeCanonicalFamily(raw: string): string {
 const CANONICAL_FLAGSHIP_BASENAMES = new Map<string, string>([
   ["4-carbon", "gemini/carbon"],
   ["carbon", "gemini/carbon"],
+  ["pro-orchestrator", "gemini/carbon"],
   ["4-argon", "gemini/argon"],
   ["argon", "gemini/argon"],
+  ["pro-orchestrator-argon", "gemini/argon"],
   ["4-hydrogen", "gemini/hydrogen"],
   ["hydrogen", "gemini/hydrogen"],
+  ["flash-worker-agy", "gemini/flash-worker-agy"],
 ]);
 
 export function parseIdentity(value: string | null): Identity | null {
   if (value === null) return null;
 
-  const head = value.split("(")[0].trim();
+  const trimmedValue = value.trim();
+  if (trimmedValue === "") return null;
+
+  const parenIdx = trimmedValue.indexOf("(");
+  const head = (parenIdx === -1 ? trimmedValue : trimmedValue.slice(0, parenIdx)).trim();
+  const collapsedHead = head.toLowerCase().replace(/[\s_]+/g, "-");
+  if (collapsedHead === "orchestrator" && parenIdx !== -1) {
+    const closeIdx = trimmedValue.indexOf(")", parenIdx);
+    const qualifier = (
+      closeIdx === -1
+        ? trimmedValue.slice(parenIdx + 1)
+        : trimmedValue.slice(parenIdx + 1, closeIdx)
+    )
+      .trim()
+      .toLowerCase();
+    if (qualifier.includes("carbon")) {
+      return { full: trimmedValue.toLowerCase(), family: "gemini/carbon" };
+    }
+    if (qualifier.includes("argon")) {
+      return { full: trimmedValue.toLowerCase(), family: "gemini/argon" };
+    }
+  }
+
   const family = extractFamily(value);
   if (family === null) {
     const trimmed = head.toLowerCase();
     if (trimmed === "") {
-      const fullOnly = value.trim().toLowerCase();
-      return fullOnly === ""
-        ? null
-        : { full: fullOnly, family: normalizeCanonicalFamily(fullOnly) };
+      const fullOnly = trimmedValue.toLowerCase();
+      return { full: fullOnly, family: normalizeCanonicalFamily(fullOnly) };
     }
     return {
-      full: value.trim().toLowerCase(),
+      full: trimmedValue.toLowerCase(),
       family: normalizeCanonicalFamily(trimmed),
     };
   }
 
-  return { full: value.trim().toLowerCase(), family: normalizeCanonicalFamily(family) };
+  return { full: trimmedValue.toLowerCase(), family: normalizeCanonicalFamily(family) };
 }
 
 export function extractTrailers(commitBody: string): {

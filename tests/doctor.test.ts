@@ -174,6 +174,53 @@ describe("doctor diagnostics", () => {
       expect(results[4]?.name).toBe("Version Maturity");
       expect(results[5]?.name).toBe("Agent Ecosystem");
     });
+
+    it("passes when multiple manifests share the exact same version", () => {
+      initRepo();
+      writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "0.1.0" }), "utf8");
+      mkdirSync(join(tempDir, "src-tauri"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "src-tauri", "Cargo.toml"),
+        '[package]\nname = "app"\nversion = "0.1.0"\n',
+        "utf8",
+      );
+      mkdirSync(join(tempDir, "modules", "modA"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "modules", "modA", "plugin.manifest.json"),
+        JSON.stringify({ version: "0.1.0" }),
+        "utf8",
+      );
+
+      const check = checkVersionMaturity(tempDir);
+      expect(check.status).toBe("pass");
+      expect(check.message).toContain("Manifest version 0.1.0");
+    });
+
+    it("warns when software versions drift across manifests", () => {
+      initRepo();
+      writeFileSync(join(tempDir, "package.json"), JSON.stringify({ version: "0.1.0" }), "utf8");
+      mkdirSync(join(tempDir, "src-tauri"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "src-tauri", "Cargo.toml"),
+        '[package]\nname = "app"\nversion = "0.2.0"\n',
+        "utf8",
+      );
+      mkdirSync(join(tempDir, "modules", "modA"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "modules", "modA", "plugin.manifest.json"),
+        JSON.stringify({ version: "0.3.0" }),
+        "utf8",
+      );
+
+      const check = checkVersionMaturity(tempDir);
+      expect(check.name).toBe("Version Maturity");
+      expect(check.status).toBe("warn");
+      expect(check.message).toContain("Software version drift across manifests");
+      expect(check.message).toContain("package.json=0.1.0");
+      expect(check.message).toContain("src-tauri/Cargo.toml=0.2.0");
+      expect(check.message).toContain("modules/modA/plugin.manifest.json=0.3.0");
+      expect(check.message).toContain("Document Revision");
+    });
   });
 
   it("ignores commented routing directives and warns on unknown keys in routing.md", () => {
