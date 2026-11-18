@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-18T23:33:52.866Z",
+  "issue": {
+    "id": 69,
+    "title": "feat: add Gemini 4 Neon & Orchestrator (Neon) support and linearize paren unwrapping",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Add Gemini 4 Neon telemetry detection, swarm attribution, and SIGINT prompt polish",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/detector.ts",
+        "src/telemetry/collector.ts",
+        "src/telemetry/consent-prompt.ts",
+        "tests/telemetry.test.ts",
+        "tests/consent-prompt.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 86
+  }
+}
