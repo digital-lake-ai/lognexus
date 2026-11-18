@@ -1,0 +1,41 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-18T20:53:17.268Z",
+  "issue": {
+    "id": 67,
+    "title": "feat: native auto-swarm orchestration, Turn-1 probe gate, and sealed GDPR telemetry consent v2.0",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Interactive human-TTY [y/N] consent gate and privacy policy v2.0.0",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/consent-prompt.ts",
+        "src/cli.ts",
+        "docs/TELEMETRY_PRIVACY.md",
+        "tests/consent-prompt.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 65
+  }
+}
