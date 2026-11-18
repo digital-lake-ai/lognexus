@@ -277,7 +277,7 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
   Record<AgentEcosystemId, { readonly base: string; readonly issue: string }>
 > = {
   antigravity: {
-    base: "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon)",
+    base: "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon)",
     issue: "tier-3 (Scoped Execution: Gemini 3.8 Flash / Gemini 4 Hydrogen)",
   },
   "claude-code": {
@@ -356,7 +356,7 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     ? (singleLabels?.issue ??
       "tier-3 (Scoped Execution: Claude Haiku, GPT-4o-mini, DeepSeek Chat, Gemini Flash)")
     : (singleLabels?.base ??
-      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon, Claude Opus, OpenAI o3, DeepSeek R1)");
+      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Opus, OpenAI o3, DeepSeek R1)");
 
   return {
     branch,

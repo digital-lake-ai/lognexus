@@ -82,7 +82,7 @@ const CONTRACT_FORMAT = `### Contract
 
 const TIER_TABLE = `| Tier | Role | Example models | Typical work |
 | --- | --- | --- | --- |
-| tier-1 | Reasoning, architecture, review | Claude Opus, OpenAI o3, Gemini Pro, DeepSeek R1 | Issue decomposition, architectural decisions, review gate |
+| tier-1 | Reasoning, architecture, review | Claude Opus, OpenAI o3, Gemini 4 Carbon / Argon / Neon (Gemini Pro), DeepSeek R1 | Issue decomposition, architectural decisions, review gate |
 | tier-2 | Large-context discovery and triage | Claude Sonnet, GPT-4.1, Gemini Pro (1M), DeepSeek V3 | Repository exploration, discovery triage |
 | tier-3 | Scoped execution | Claude Haiku, GPT-4o-mini, Gemini Flash, DeepSeek Chat | Single-contract subtasks, atomic commits |`;
 
@@ -112,7 +112,7 @@ ${issueLine}
 ${contextBlock}
 ## Rules
 
-1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files, with or without an active issue), NEVER read \`> 3\` codebase files directly in the orchestrator; immediately auto-dispatch read-only discovery probes (zero writes) to \`tier-2\`/\`tier-3\` subagents without asking first — pin a fast \`tier-2\`/\`tier-3\` model (e.g. \`flash\`) whenever the orchestrator is \`tier-1\` (\`Carbon\`/\`Argon\`/\`Opus\`), and omit \`model\` only when the coordinator itself is \`tier-2\`/\`tier-3\`.
+1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files, with or without an active issue), NEVER read \`> 3\` codebase files directly in the orchestrator; immediately auto-dispatch read-only discovery probes (zero writes) to \`tier-2\`/\`tier-3\` subagents without asking first — pin a fast \`tier-2\`/\`tier-3\` model (e.g. \`flash\`) whenever the orchestrator is \`tier-1\` (\`Neon\`/\`Carbon\`/\`Argon\`/\`Opus\`), and omit \`model\` only when the coordinator itself is \`tier-2\`/\`tier-3\`.
 2. Decompose the work into ordered subtasks, each named \`[tier-X]\` according to the model tier suited to it, with pre-delimited subagent/isolation assignments awaiting developer confirmation before executing writes. Once the developer confirms the plan, when \`orchestration: auto\` and Antigravity \`Orchestrator\` (\`swarm\` tool) are active, launch native \`swarm\` execution automatically without asking again, omitting \`model\` (\`"auto"\`) on implementation workers unless a specific model is requested.
 3. Every subtask must carry a closed delegation contract. Never leave a subtask open-ended.
 4. Subtasks must not overlap in the files they touch. If they would, split further or sequence them.

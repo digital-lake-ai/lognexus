@@ -64,20 +64,40 @@ export interface Identity {
   family: string;
 }
 
-function isWrappedInSingleParenPair(value: string): boolean {
-  if (!value.startsWith("(") || !value.endsWith(")")) return false;
-  let depth = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    if (value[i] === "(") {
-      depth += 1;
-    } else if (value[i] === ")") {
-      depth -= 1;
-      if (depth === 0 && i < value.length - 1) {
-        return false;
+/**
+ * Strips matched outer parenthesis pairs (`((...))` -> `...`) in a single linear pass
+ * without removing sibling groups such as `(a) (b)`.
+ */
+export function unwrapOuterBalancedParens(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed.length < 2 || trimmed[0] !== "(" || trimmed[trimmed.length - 1] !== ")") {
+    return trimmed;
+  }
+
+  const matchClose = new Int32Array(trimmed.length).fill(-1);
+  const stack: number[] = [];
+  for (let i = 0; i < trimmed.length; i += 1) {
+    const ch = trimmed.charCodeAt(i);
+    if (ch === 40) {
+      stack.push(i);
+    } else if (ch === 41) {
+      const openIdx = stack.pop();
+      if (openIdx !== undefined) {
+        matchClose[openIdx] = i;
       }
     }
   }
-  return depth === 0;
+
+  let left = 0;
+  let right = trimmed.length - 1;
+  while (left < right && matchClose[left] === right) {
+    left += 1;
+    right -= 1;
+    while (left <= right && trimmed.charCodeAt(left) <= 32) left += 1;
+    while (right >= left && trimmed.charCodeAt(right) <= 32) right -= 1;
+  }
+
+  return left > right ? "" : trimmed.slice(left, right + 1);
 }
 
 function stripStrayOuterParens(value: string): string {
@@ -170,6 +190,7 @@ const EFFORT_VARIANT_SUFFIXES = [
   "-extra-high",
   "-xtrahigh",
   "-xhigh",
+  "-extra",
   "-minimal",
   "-medium",
   "-high",
@@ -270,6 +291,9 @@ const CANONICAL_FLAGSHIP_BASENAMES = new Map<string, string>([
   ["4-argon", "gemini/argon"],
   ["argon", "gemini/argon"],
   ["pro-orchestrator-argon", "gemini/argon"],
+  ["4-neon", "gemini/neon"],
+  ["neon", "gemini/neon"],
+  ["pro-orchestrator-neon", "gemini/neon"],
   ["4-hydrogen", "gemini/hydrogen"],
   ["hydrogen", "gemini/hydrogen"],
   ["flash-worker-agy", "gemini/flash-worker-agy"],
@@ -281,10 +305,7 @@ function parseIdentityInternal(value: string | null, depth: number): Identity | 
   const trimmedValue = value.trim();
   if (trimmedValue === "") return null;
 
-  let cleaned = trimmedValue;
-  while (isWrappedInSingleParenPair(cleaned)) {
-    cleaned = cleaned.slice(1, -1).trim();
-  }
+  const cleaned = unwrapOuterBalancedParens(trimmedValue);
   if (cleaned === "") return null;
 
   const parenIdx = cleaned.indexOf("(");
@@ -299,6 +320,9 @@ function parseIdentityInternal(value: string | null, depth: number): Identity | 
     }
     if (lowerQualifier.includes("argon")) {
       return { full: trimmedValue.toLowerCase(), family: "gemini/argon" };
+    }
+    if (lowerQualifier.includes("neon")) {
+      return { full: trimmedValue.toLowerCase(), family: "gemini/neon" };
     }
     if (qualifier !== "") {
       const inner = parseIdentityInternal(qualifier, depth + 1);
@@ -487,11 +511,23 @@ export function matchesPath(file: string, rule: string): boolean {
   const normFile = normalizePath(file);
   const normRule = normalizePath(rule);
   if (normFile === "" || normRule === "") return false;
-  if (normRule.endsWith("/")) return normFile.startsWith(normRule);
+  if (normRule.endsWith("/") && !normRule.includes("*")) {
+    return normFile.startsWith(normRule);
+  }
   if (!normRule.includes("*")) return normFile === normRule;
 
   const fileSegments = normFile.split("/");
-  const ruleSegments = normRule.split("/");
+  let ruleSegments: string[];
+  if (normRule.endsWith("/")) {
+    let dirPrefix = normRule;
+    while (dirPrefix.endsWith("/")) {
+      dirPrefix = dirPrefix.slice(0, -1);
+    }
+    if (dirPrefix === "") return false;
+    ruleSegments = [...dirPrefix.split("/"), "*", "**"];
+  } else {
+    ruleSegments = normRule.split("/");
+  }
   let fi = 0;
   let ri = 0;
   let starRi = -1;
