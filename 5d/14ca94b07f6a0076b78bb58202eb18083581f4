@@ -1,0 +1,45 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-18T23:41:26.424Z",
+  "issue": {
+    "id": 69,
+    "title": "feat: add Gemini 4 Neon & Orchestrator (Neon) support and linearize paren unwrapping",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Add Gemini 4 Neon audit normalization, O(n) paren unwrapping, and tier-1 taxonomy",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/audit/audit.ts",
+        "src/status.ts",
+        "src/scaffold.ts",
+        "src/state/handoff.ts",
+        "src/mcp/prompts.ts",
+        "tests/audit.test.ts",
+        "tests/scaffold.test.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 88
+  }
+}
