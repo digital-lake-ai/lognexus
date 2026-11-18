@@ -7,10 +7,13 @@ export const TelemetryModeSchema = z
   .transform((mode): "off" | "local" => (mode === "off" ? "off" : "local"));
 export type TelemetryMode = z.infer<typeof TelemetryModeSchema>;
 
+export const TELEMETRY_POLICY_VERSION = "2.0.0";
+
 export const TelemetryConsentSchema = z.object({
   accepted: z.boolean().default(false),
   policyVersion: z.string().default("1.0.0"),
   acceptedAt: z.string().nullable().default(null),
+  declinedAt: z.string().nullable().default(null),
 });
 export type TelemetryConsent = z.infer<typeof TelemetryConsentSchema>;
 

@@ -52,6 +52,7 @@ const TRUSTED_LEAF_PATHS = new Set([
   "schemaVersion",
   "consent.policyVersion",
   "consent.acceptedAt",
+  "consent.declinedAt",
   "environment.os",
   "environment.nodeVersion",
   "environment.lognexusVersion",
