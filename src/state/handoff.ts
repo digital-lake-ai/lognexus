@@ -4,7 +4,11 @@ import { basename, join, relative, resolve } from "node:path";
 import { extractTrailers } from "../audit/audit.js";
 import { getCliVersion } from "../cli.js";
 import { getNote } from "../notes/notes.js";
-import { type EffectiveReviewGateMode, resolveRoutingProfile } from "../routing/profile.js";
+import {
+  type EffectiveReviewGateMode,
+  type OrchestrationMode,
+  resolveRoutingProfile,
+} from "../routing/profile.js";
 import { ensureLocalGitExclude } from "../update/gate.js";
 import { loadState } from "./manager.js";
 import type { SubtaskIsolation } from "./schema.js";
@@ -65,6 +69,7 @@ export interface ContextHandoff {
     isolation?: SubtaskIsolation;
   } | null;
   routing?: {
+    orchestration: OrchestrationMode;
     implementer: string | null;
     reviewer: string | null;
     reviewGate: EffectiveReviewGateMode;
@@ -396,6 +401,7 @@ export function generateContextHandoff(targetDir: string = process.cwd()): Conte
         }
       : null,
     routing: {
+      orchestration: profile.orchestrationMode,
       implementer: profile.implementer,
       reviewer: profile.reviewer,
       reviewGate: profile.effectiveReviewGate,
@@ -427,6 +433,24 @@ export function renderContextHandoff(handoff: ContextHandoff): string {
   lines.push(`- **Version:** ${handoff.version ?? "unknown"}`);
   if (handoff.planFile) {
     lines.push(`- **Plan file:** \`${handoff.planFile}\``);
+  }
+  if (handoff.routing) {
+    lines.push("");
+    lines.push("## Routing");
+    lines.push("");
+    lines.push(`- Orchestration Mode: \`${handoff.routing.orchestration}\``);
+    lines.push(`- Review Gate: \`${handoff.routing.reviewGate}\``);
+    lines.push(`- Ecosystem Profile: ${handoff.routing.profileLabel}`);
+    if (handoff.routing.implementer === null) {
+      lines.push(
+        "- Implementer Identity: `auto` — Substitute your real runtime model identity in `--author` (never pass literal `auto` or `<provider>/<model>`).",
+      );
+    } else {
+      lines.push(`- Implementer Identity: \`${handoff.routing.implementer}\``);
+    }
+    if (handoff.routing.reviewer !== null) {
+      lines.push(`- Reviewer Identity: \`${handoff.routing.reviewer}\``);
+    }
   }
   lines.push("");
   lines.push("## Active Subtask Contract");
@@ -508,13 +532,17 @@ export function renderCompactDispatchPrompt(handoff: ContextHandoff): string {
   const taskRef = handoff.contract ? `subtask ${handoff.contract.id}` : "all planned subtasks";
   const author =
     handoff.contract?.assignee ?? handoff.routing?.implementer ?? "<provider>/<model> (<client>)";
+  const authorHint =
+    author === "<provider>/<model> (<client>)"
+      ? " (substitute your real runtime identity; never pass literal `auto`)"
+      : "";
   const forbidden = handoff.contract?.forbiddenFiles ?? [];
   const forbiddenGuard =
     forbidden.length > 0 ? `0 changes in ${forbidden.map((f) => `\`${f}\``).join(", ")}, ` : "";
   return [
     `Execute ${issueTag} (${taskRef}) on branch \`${branch}\`.`,
     `1. Read \`${planRef}\`, \`.lognexus/handoff.md\`, and \`.lognexus/state.json\` first (do not inline specs in chat).`,
-    `2. Sign every commit with \`--author "${author}"\` and \`--finish-task\`.`,
+    `2. Sign every commit with \`--author "${author}"\`${authorHint} and \`--finish-task\`.`,
     `3. Governance guards: ${forbiddenGuard}0 \`fetch()\` calls, and strict \`{ shell: false }\`.`,
     `4. Assistant vs. Contract boundary: operate freely with your native IDE/assistant capabilities during conversation and exploration, but once executing the active subtask contract, strictly obey LogNexus contract governance (\`allowedFiles\`, \`forbiddenFiles\`, \`decisionBudget\`, and verification).`,
     `5. Do NOT write \`Reviewed-by:\` trailers, do NOT run \`git push\`, and do NOT open a PR. Run \`npm test && npm run build && npx lognexus audit main\` when done.`,

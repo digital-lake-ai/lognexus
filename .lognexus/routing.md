@@ -2,8 +2,9 @@
 
 routing: confirm
 review_gate: intra-fleet
-implementer: google/gemini-4-hydrogen-high (antigravity)
-reviewer: Gemini 4 Argon
+orchestration: auto
+implementer: auto
+reviewer: auto
 
 # Operational Tier Taxonomy
 # tier-1 (Architecture / Orchestration / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Claude Opus, OpenAI o3/GPT-5, DeepSeek R1

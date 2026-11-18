@@ -12,10 +12,13 @@ export const DEFAULT_ROUTING_TEMPLATE = `# Model-Tier Routing Configuration
 # Modes: confirm (pause and prompt) | warn (banner only) | off (silent)
 routing: confirm
 
+# Orchestration: auto (native swarm/subagent) | swarm | subagent | off
+orchestration: auto
+
 # Review Gate: auto | cross-vendor | intra-fleet | advisory | off
 review_gate: auto
-# implementer: auto
-# reviewer: auto
+implementer: auto
+reviewer: auto
 
 # Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Opus -> Sonnet, Argon/Carbon -> Hydrogen/Flash) works out of the box for single-provider teams.
 

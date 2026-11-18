@@ -2,11 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { checkRulesConfig } from "../src/doctor.js";
 import {
   detectAgentEcosystems,
   parseRoutingConfigContent,
   resolveRoutingProfile,
 } from "../src/routing/profile.js";
+import { getProjectStatus } from "../src/status.js";
 
 describe("detectAgentEcosystems", () => {
   let tempDir: string;
@@ -97,10 +99,24 @@ describe("parseRoutingConfigContent", () => {
 
     const parsed = parseRoutingConfigContent(content);
     expect(parsed.routingMode).toBe("warn");
+    expect(parsed.orchestrationMode).toBe("auto");
     expect(parsed.configuredReviewGate).toBe("cross-vendor");
     expect(parsed.implementer).toBeNull();
     expect(parsed.reviewer).toBe("Claude Opus");
     expect(parsed.warnings).toEqual([]);
+  });
+
+  it("parses valid orchestration modes and warns on invalid orchestration values", () => {
+    for (const mode of ["auto", "swarm", "subagent", "off"] as const) {
+      const parsed = parseRoutingConfigContent(`orchestration: ${mode.toUpperCase()}\n`);
+      expect(parsed.orchestrationMode).toBe(mode);
+      expect(parsed.warnings).toEqual([]);
+    }
+
+    const invalid = parseRoutingConfigContent("orchestration: bogus\n");
+    expect(invalid.orchestrationMode).toBe("auto");
+    expect(invalid.warnings).toHaveLength(1);
+    expect(invalid.warnings[0]).toContain("Invalid orchestration value");
   });
 
   it("warns without throwing on unknown keys and invalid values", () => {
@@ -162,6 +178,7 @@ describe("resolveRoutingProfile", () => {
     const profile = resolveRoutingProfile(tempDir);
     expect(profile.hasRoutingFile).toBe(false);
     expect(profile.routingMode).toBe("confirm");
+    expect(profile.orchestrationMode).toBe("auto");
     expect(profile.configuredReviewGate).toBe("auto");
     expect(profile.effectiveReviewGate).toBe("intra-fleet");
     expect(profile.warnings).toEqual([]);
@@ -187,14 +204,24 @@ describe("resolveRoutingProfile", () => {
     mkdirSync(join(tempDir, ".lognexus"));
     writeFileSync(
       join(tempDir, ".lognexus", "routing.md"),
-      "routing: warn\nreview_gate: advisory\nimplementer: claude/sonnet\nreviewer: claude/opus\n",
+      "routing: warn\norchestration: swarm\nreview_gate: advisory\nimplementer: claude/sonnet\nreviewer: claude/opus\n",
     );
 
     const profile = resolveRoutingProfile(tempDir);
     expect(profile.hasRoutingFile).toBe(true);
     expect(profile.routingMode).toBe("warn");
+    expect(profile.orchestrationMode).toBe("swarm");
     expect(profile.effectiveReviewGate).toBe("advisory");
     expect(profile.implementer).toBe("claude/sonnet");
     expect(profile.reviewer).toBe("claude/opus");
+
+    const status = getProjectStatus(tempDir);
+    expect(status.orchestrationMode).toBe("swarm");
+
+    const rulesCheck = checkRulesConfig(tempDir);
+    expect(rulesCheck.status).toBe("pass");
+    expect(rulesCheck.message).toContain("routing mode: warn");
+    expect(rulesCheck.message).toContain("orchestration: swarm");
+    expect(rulesCheck.message).toContain("review_gate: advisory");
   });
 });

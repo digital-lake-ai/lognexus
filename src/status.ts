@@ -5,6 +5,7 @@ import { extractIssueNumber } from "./branch.js";
 import {
   type AgentEcosystemId,
   type EffectiveReviewGateMode,
+  type OrchestrationMode,
   resolveRoutingProfile,
 } from "./routing/profile.js";
 
@@ -13,6 +14,7 @@ export interface ProjectStatus {
   isInsideGit: boolean;
   activeIssue: string | null;
   routingMode: string;
+  orchestrationMode: OrchestrationMode;
   recommendedTier: string;
   ecosystemProfile: string;
   reviewGateMode: EffectiveReviewGateMode;
@@ -361,6 +363,7 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
     isInsideGit,
     activeIssue,
     routingMode,
+    orchestrationMode: profile.orchestrationMode,
     recommendedTier,
     ecosystemProfile: profile.ecosystems.profileLabel,
     reviewGateMode: profile.effectiveReviewGate,

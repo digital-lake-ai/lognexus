@@ -104,13 +104,13 @@ export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticC
         return {
           name: "LogNexus Rules",
           status: "warn",
-          message: `Found .lognexus/routing.md (routing mode: ${profile.routingMode}, review_gate: ${profile.effectiveReviewGate}) — warning(s): ${profile.warnings.join("; ")}`,
+          message: `Found .lognexus/routing.md (routing mode: ${profile.routingMode}, orchestration: ${profile.orchestrationMode}, review_gate: ${profile.effectiveReviewGate}) — warning(s): ${profile.warnings.join("; ")}`,
         };
       }
       return {
         name: "LogNexus Rules",
         status: "pass",
-        message: `Found .lognexus/ (routing mode: ${profile.routingMode}, review_gate: ${profile.effectiveReviewGate})`,
+        message: `Found .lognexus/ (routing mode: ${profile.routingMode}, orchestration: ${profile.orchestrationMode}, review_gate: ${profile.effectiveReviewGate})`,
       };
     }
     return {

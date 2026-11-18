@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkReviewGate } from "./audit/audit.js";
+import { checkReviewGate, isInvalidPlaceholderIdentity, matchesPath } from "./audit/audit.js";
 import { SCOPED_BRANCH_TEMPLATE } from "./branch.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
 import { resolveRoutingProfile } from "./routing/profile.js";
@@ -185,21 +185,6 @@ function normalizePath(value: string): string {
   return value.replace(/\\/g, "/").replace(/^\.\//, "").trim();
 }
 
-function matchesPath(file: string, rule: string): boolean {
-  if (rule === "") return false;
-  if (rule.endsWith("/")) return file.startsWith(rule);
-  if (rule.includes("*")) {
-    const pattern = new RegExp(
-      `^${rule
-        .split("*")
-        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-        .join(".*")}$`,
-    );
-    return pattern.test(file);
-  }
-  return file === rule;
-}
-
 /**
  * Lists the working-tree files that belong to the active contract, so `--stage-allowed`
  * can stage exactly the sanctioned edits and never sweep unrelated changes into a commit.
@@ -291,7 +276,15 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
   }
 
   // 2. Resolve author and reviewer
-  let author = options.author?.trim();
+  const explicitAuthor = options.author?.trim();
+  if (explicitAuthor && isInvalidPlaceholderIdentity(explicitAuthor)) {
+    recordReviewGateBlock(cwd);
+    throw new Error(
+      `Invalid placeholder identity for author: '${explicitAuthor}'. Specify your exact runtime model identity (e.g. 'google/gemini-3.8-flash-high (antigravity)').`,
+    );
+  }
+
+  let author = explicitAuthor;
   if (!author) {
     author = process.env.LOGNEXUS_AUTHOR?.trim();
   }
@@ -305,7 +298,20 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     }
   }
 
+  if (isInvalidPlaceholderIdentity(author)) {
+    recordReviewGateBlock(cwd);
+    throw new Error(
+      `Invalid placeholder identity for author: '${author}'. Specify your exact runtime model identity (e.g. 'google/gemini-3.8-flash-high (antigravity)').`,
+    );
+  }
+
   const reviewer = options.reviewer?.trim() || null;
+  if (reviewer && isInvalidPlaceholderIdentity(reviewer)) {
+    recordReviewGateBlock(cwd);
+    throw new Error(
+      `Invalid placeholder identity for reviewer: '${reviewer}'. Specify your exact runtime model identity (e.g. 'claude/opus-4.6 (claude-code)').`,
+    );
+  }
 
   // 2. Pre-flight check: review gate separation
   if (author && reviewer) {

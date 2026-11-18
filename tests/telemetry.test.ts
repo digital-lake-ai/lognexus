@@ -5,7 +5,12 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/index.js";
-import { buildAnonymousDiagnosticPayload } from "../src/telemetry/collector.js";
+import {
+  buildAnonymousDiagnosticPayload,
+  declineTelemetry,
+  getTelemetryConsentState,
+  resolveCommitTier,
+} from "../src/telemetry/collector.js";
 import {
   classifyFileCategory,
   inferTierFromAuthor,
@@ -35,7 +40,10 @@ import {
   syncTelemetryFromGitNotes,
   TelemetryStoreSchema,
 } from "../src/telemetry/index.js";
-import { AnonymousDiagnosticPayloadSchema } from "../src/telemetry/schema.js";
+import {
+  AnonymousDiagnosticPayloadSchema,
+  TELEMETRY_POLICY_VERSION,
+} from "../src/telemetry/schema.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -85,14 +93,49 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
   });
 
   describe("Consent Gate & Modes", () => {
-    it("enables local telemetry without requiring network consent", () => {
-      const res = enableTelemetry({ cwd: tempDir });
+    it("enables active local telemetry when acceptTerms is true", () => {
+      const res = enableTelemetry({ cwd: tempDir, acceptTerms: true });
       expect(res.mode).toBe("local");
       expect(isTelemetryActive(tempDir)).toBe(true);
+      expect(getTelemetryConsentState(tempDir)).toBe("accepted");
+
+      const store = loadTelemetry(tempDir);
+      expect(store.mode).toBe("local");
+      expect(store.consent.accepted).toBe(true);
+      expect(store.consent.policyVersion).toBe(TELEMETRY_POLICY_VERSION);
+      expect(store.consent.acceptedAt).not.toBeNull();
+      expect(store.consent.declinedAt).toBeNull();
+    });
+
+    it("guards MCP enableTelemetry calls without acceptTerms from sealing GDPR consent", () => {
+      const res = enableTelemetry({ cwd: tempDir });
+      expect(res.mode).toBe("local");
+      expect(isTelemetryActive(tempDir)).toBe(false);
+      expect(getTelemetryConsentState(tempDir)).toBe("unanswered");
 
       const store = loadTelemetry(tempDir);
       expect(store.mode).toBe("local");
       expect(store.consent.accepted).toBe(false);
+      expect(store.consent.acceptedAt).toBeNull();
+    });
+
+    it("tracks unanswered, accepted, declined, and outdated consent states read-only", () => {
+      expect(getTelemetryConsentState(tempDir)).toBe("unanswered");
+      expect(existsSync(getTelemetryPath(tempDir))).toBe(false);
+
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+      expect(getTelemetryConsentState(tempDir)).toBe("accepted");
+
+      declineTelemetry(tempDir);
+      expect(getTelemetryConsentState(tempDir)).toBe("declined");
+      expect(isTelemetryActive(tempDir)).toBe(false);
+      expect(loadTelemetry(tempDir).consent.declinedAt).not.toBeNull();
+
+      const store = loadTelemetry(tempDir);
+      store.consent.policyVersion = "1.0.0";
+      writeFileSync(getTelemetryPath(tempDir), JSON.stringify(store, null, 2), "utf8");
+      expect(getTelemetryConsentState(tempDir)).toBe("outdated");
+      expect(isTelemetryActive(tempDir)).toBe(false);
     });
 
     it("rejects retired community telemetry dispatch with a descriptive error", () => {
@@ -103,28 +146,61 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(isTelemetryActive(tempDir)).toBe(false);
     });
 
-    it("migrates a legacy community store to local mode on load", () => {
+    it("migrates a legacy community store to local mode as outdated until re-consented", () => {
       const store = loadTelemetry(tempDir);
       store.mode = "community";
+      store.consent.policyVersion = "1.0.0";
       mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
       writeFileSync(getTelemetryPath(tempDir), JSON.stringify(store, null, 2), "utf8");
 
       const migrated = loadTelemetry(tempDir);
       expect(migrated.mode).toBe("local");
-      expect(isTelemetryActive(tempDir)).toBe(true);
+      expect(getTelemetryConsentState(tempDir)).toBe("outdated");
+      expect(isTelemetryActive(tempDir)).toBe(false);
     });
 
-    it("can disable and clear telemetry store cleanly", () => {
-      enableTelemetry({ cwd: tempDir });
+    it("can disable and clear telemetry store cleanly while preserving sealed consent", () => {
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       expect(isTelemetryActive(tempDir)).toBe(true);
 
       disableTelemetry(tempDir);
       expect(isTelemetryActive(tempDir)).toBe(false);
+      expect(getTelemetryConsentState(tempDir)).toBe("declined");
 
       clearTelemetry(tempDir);
       const store = loadTelemetry(tempDir);
       expect(store.mode).toBe("off");
       expect(store.summary.totalCommits).toBe(0);
+      expect(store.consent.accepted).toBe(false);
+      expect(store.consent.declinedAt).not.toBeNull();
+      expect(getTelemetryConsentState(tempDir)).toBe("declined");
+    });
+
+    it("preserves prior acceptance as a sealed refusal when clearTelemetry resets data", () => {
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+      clearTelemetry(tempDir);
+
+      const store = loadTelemetry(tempDir);
+      expect(store.mode).toBe("off");
+      expect(store.consent.accepted).toBe(false);
+      expect(store.consent.acceptedAt).toBeNull();
+      expect(store.consent.declinedAt).not.toBeNull();
+      expect(store.consent.policyVersion).toBe(TELEMETRY_POLICY_VERSION);
+      expect(getTelemetryConsentState(tempDir)).toBe("declined");
+    });
+
+    it("fails silently when telemetry.json is an unwriteable directory", () => {
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+      const blockingDir = getTelemetryPath(tempDir);
+      rmSync(blockingDir, { force: true });
+      mkdirSync(blockingDir, { recursive: true });
+
+      expect(() => recordTaskStart("T1", tempDir)).not.toThrow();
+      expect(() => recordTaskFinish("T1", tempDir)).not.toThrow();
+      expect(() => recordReviewGateBlock(tempDir)).not.toThrow();
+      expect(() =>
+        recordCommitTelemetry({ sha: "HEAD", author: "gemini/flash", targetDir: tempDir }),
+      ).not.toThrow();
     });
   });
 
@@ -206,6 +282,24 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor("gemini/flash-lite (antigravity)")).toBe("tier-3");
       expect(inferTierFromAuthor("")).toBeNull();
       expect(inferTierFromAuthor(null)).toBeNull();
+    });
+
+    it("does not match human names as model tiers and handles Orchestrator qualifiers", () => {
+      expect(inferTierFromAuthor("Ana Carbonell")).toBeNull();
+      expect(inferTierFromAuthor("Ana Carbonell <ana@carbon.com>")).toBeNull();
+      expect(inferTierFromAuthor("Kimi Lee")).toBeNull();
+      expect(inferTierFromAuthor("Kimi Lee <kimi@vscode.com>")).toBeNull();
+      expect(inferTierFromAuthor("Qwen Lee")).toBeNull();
+      expect(inferTierFromAuthor("Kimi K3")).toBe("tier-3");
+      expect(inferTierFromAuthor("moonshot/kimi")).toBe("tier-3");
+      expect(inferTierFromAuthor("qwen/coder")).toBe("tier-3");
+      expect(inferTierFromAuthor("Qwen Coder")).toBe("tier-3");
+      expect(inferTierFromAuthor("Gemini 4 Carbon")).toBe("tier-1");
+      expect(inferTierFromAuthor("Claude Opus 5.5")).toBe("tier-1");
+      expect(inferTierFromAuthor("Orchestrator (Gemini 3.8 Flash)")).toBe("tier-2");
+      expect(inferTierFromAuthor("Orchestrator (gemini-flash-worker-agy)")).toBe("tier-3");
+      expect(inferTierFromAuthor("Orchestrator (Custom)")).toBe("tier-1");
+      expect(inferTierFromAuthor("Orchestrator ()")).toBe("tier-1");
     });
 
     it("classifies o1, o3, gpt-5, deepseek-r1, and gemini-pro-high tiers correctly", () => {
@@ -296,7 +390,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("records task durations, commits, gate blocks and computes cost savings", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       recordTaskStart("T1", tempDir);
       const duration = recordTaskFinish("T1", tempDir);
@@ -345,7 +439,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       attachCurrentStateToCommit(sha, { cwd: tempDir });
 
       expect(loadTelemetry(tempDir).summary.totalCommits).toBe(0);
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const { content } = generateTelemetryReportFile(tempDir);
       expect(content).toContain("`.ts`");
@@ -389,7 +483,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         { cwd: tempDir, stdio: "ignore", shell: false },
       );
 
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       generateTelemetryReportFile(tempDir);
 
       const store = loadTelemetry(tempDir);
@@ -422,14 +516,14 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         { cwd: tempDir, stdio: "ignore", shell: false },
       );
 
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       generateTelemetryReportFile(tempDir);
 
       expect(Object.values(loadTelemetry(tempDir).models)[0]?.tier).toBe("tier-2");
     });
 
     it("generates markdown report with HUD tables and frontmatter", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       writeFileSync(join(tempDir, "app.py"), "print('hello')\n", "utf8");
       execSync("git add app.py", { cwd: tempDir, stdio: "ignore" });
@@ -459,7 +553,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("displays only the Anonymous Project ID and redacts local repository metadata", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       const store = loadTelemetry(tempDir);
 
       const markdown = formatTelemetryMarkdownReport(store);
@@ -479,7 +573,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("sanitizes preserved custom notes when regenerating the report file", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       const store = loadTelemetry(tempDir);
       const repoName = basename(tempDir);
 
@@ -498,7 +592,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("confines outputPath to targetDir and rejects traversal escapes", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const nested = generateTelemetryReportFile(tempDir, join(".lognexus", "roi.md"));
       expect(nested.filePath).toBe(join(tempDir, ".lognexus", "roi.md"));
@@ -526,7 +620,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("ends the generated report with the custom notes marker", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const { content } = generateTelemetryReportFile(tempDir);
       expect(content).toContain(CUSTOM_NOTES_MARKER);
@@ -534,7 +628,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("documents opt-in diagnostic sharing without performing any upload", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const { content } = generateTelemetryReportFile(tempDir);
       const sharingIndex = content.indexOf("## 5. Opt-in Diagnostic Sharing (100% Local-First)");
@@ -546,7 +640,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("preserves user authored custom notes across report regeneration", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const first = generateTelemetryReportFile(tempDir);
       const notes =
@@ -567,7 +661,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("migrates custom notes from legacy reports without a marker", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const { filePath } = generateTelemetryReportFile(tempDir);
       const legacyReport = [
@@ -594,7 +688,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("does not invent custom notes when the existing report has none", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const { filePath, content } = generateTelemetryReportFile(tempDir);
       const stripped = content.split(CUSTOM_NOTES_MARKER)[0].replace(/\n*$/, "\n");
@@ -609,7 +703,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("builds a valid GDPR/CCPA compliant zero-PII local payload", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       const store = loadTelemetry(tempDir);
 
       const payload = buildAnonymousCommunityPayload(store);
@@ -942,7 +1036,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     };
 
     it("prices a heavy refactor far above a one-line change on the same tier", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       // Recorded straight from the commit so the incremental and replayed aggregates both
       // price the same commit identically.
@@ -962,8 +1056,8 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       expect(largeModel?.sourceLinesAdded).toBe(101);
       // `docsLinesAdded` folds documentation and configuration together. Here it is entirely
-      // configuration: the telemetry store the recorder itself writes (50 plus 43 lines).
-      expect(largeModel?.docsLinesAdded).toBe(93);
+      // configuration: the telemetry store the recorder itself writes (51 plus 43 lines).
+      expect(largeModel?.docsLinesAdded).toBe(94);
 
       const deltaCost = Number((largeCost - smallCost).toFixed(6));
       const deltaTokens = largeTokens - smallTokens;
@@ -974,7 +1068,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("prices source lines above documentation lines within one commit", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       writeLines("src/engine.ts", 10);
       mkdirSync(join(tempDir, "docs"), { recursive: true });
@@ -985,13 +1079,13 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(model?.sourceLinesAdded).toBe(10);
       // 20 guide lines plus the telemetry store the recorder writes during the commit (see
       // the bucket's total above); both land in the fold used for pricing.
-      expect(model?.docsLinesAdded).toBe(70);
-      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 70 doc/config lines at 0.000002.
-      expect(model?.estimatedCostUsd).toBeCloseTo(0.00222, 6);
+      expect(model?.docsLinesAdded).toBe(71);
+      // Tier-3: 0.002 base + 10 source lines at 0.000008 + 71 doc/config lines at 0.000002.
+      expect(model?.estimatedCostUsd).toBeCloseTo(0.002222, 6);
     });
 
     it("scales the frontier baseline with the LOC actually shipped", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       writeLines("src/engine.ts", 100);
       commitAndRecord("feat(#61/T4): engine", "gemini/flash", "tier-3");
@@ -1051,7 +1145,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         tier: "tier-3",
       });
 
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       const store = syncTelemetryFromGitNotes(tempDir, { issue: 58 });
 
       expect(store.summary.totalCommits).toBe(1);
@@ -1068,7 +1162,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       const other = commitFile("other.ts", "export const c = 3;\n", "feat(#61/T1): other");
       note(other, { issue: { id: 61 }, subtask: { id: "T1" } });
 
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       const persisted = syncTelemetryFromGitNotes(tempDir);
       const snapshot = readFileSync(getTelemetryPath(tempDir), "utf8");
       expect(persisted.summary.totalCommits).toBe(4);
@@ -1092,7 +1186,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       execSync("git checkout -q -b feature/telemetry", { cwd: tempDir, stdio: "ignore" });
       commitFile("branch.ts", "export const branch = true;\n", "feat(#61/T1): branch work");
 
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       syncTelemetryFromGitNotes(tempDir);
       const snapshot = readFileSync(getTelemetryPath(tempDir), "utf8");
 
@@ -1154,7 +1248,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
         new Date(baseMs + 420_000).toISOString(),
       );
 
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
       const store = syncTelemetryFromGitNotes(tempDir);
       const summary = store.summary;
 
@@ -1195,7 +1289,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("rolls one commit's source and test lines into a single extension entry", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       const source = join(tempDir, "src", "engine.ts");
       const tests = join(tempDir, "tests", "engine.test.ts");
@@ -1219,7 +1313,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("counts source lines removed so the deletion total is not always zero", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       writeFileSync(join(tempDir, "module.ts"), "export const a = 1;\n", "utf8");
       execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
@@ -1243,7 +1337,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("excludes merge commits from the commit aggregates", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       execSync("git checkout -q -b feature/merge", { cwd: tempDir, stdio: "ignore" });
       commitFile("src/side.ts", "export const side = 1;\n", "feat(#61/T5): side branch");
@@ -1306,7 +1400,7 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
     });
 
     it("reconciles swarmCommits, totalSwarmPosts and maxSwarmWorkers from Git Notes and propagates to diagnostic payload", () => {
-      enableTelemetry({ cwd: tempDir });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
 
       // 1. Legacy non-swarm commit (no swarm metrics)
       const legacySha = commitFile(
@@ -1389,6 +1483,123 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(diagnostic.summary.swarmCommits).toBe(3);
       expect(diagnostic.summary.totalSwarmPosts).toBe(19);
       expect(diagnostic.summary.maxSwarmWorkers).toBe(4);
+    });
+
+    it("keeps explicit --tier overrides while fixing inherited issue tiers and newest model tier", () => {
+      expect(
+        resolveCommitTier(
+          { $schema: "lognexus/note/v1", issue: { id: 67, tier: "tier-3" }, tier: "tier-3" },
+          "tier-2",
+        ),
+      ).toBe("tier-2");
+      expect(
+        resolveCommitTier(
+          { $schema: "lognexus/note/v1", issue: { id: 67, tier: "tier-3" }, tier: "tier-1" },
+          "tier-2",
+        ),
+      ).toBe("tier-1");
+      expect(
+        resolveCommitTier(
+          { $schema: "lognexus/note/v1", issue: { id: 67, tier: "tier-1" }, tier: "tier-3" },
+          "tier-2",
+        ),
+      ).toBe("tier-3");
+      expect(
+        resolveCommitTier(
+          { $schema: "lognexus/note/v1", issue: { id: 67, tier: "tier-3" }, tier: "tier-3" },
+          null,
+        ),
+      ).toBe("tier-3");
+
+      const baseMs = Date.parse(
+        execSync("git log -1 --format=%aI HEAD", { cwd: tempDir, encoding: "utf8" }).trim(),
+      );
+      const olderLite = commitFile(
+        "src/older.ts",
+        "export const older = 1;\n",
+        "feat(#67/T1): older lite",
+        "google/gemini-3.8-flash-lite <lite@example.com>",
+        new Date(baseMs + 60_000).toISOString(),
+      );
+      note(olderLite, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 67, tier: "tier-3" },
+        subtask: { id: "T1" },
+        tier: "tier-3",
+      });
+
+      const newerHigh = commitFile(
+        "src/newer.ts",
+        "export const newer = 1;\n",
+        "feat(#67/T2): newer flash",
+        "google/gemini-3.8-flash <flash@example.com>",
+        new Date(baseMs + 120_000).toISOString(),
+      );
+      note(newerHigh, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 67, tier: "tier-3" },
+        subtask: { id: "T2" },
+        tier: "tier-3",
+      });
+
+      const synced = syncTelemetryFromGitNotes(tempDir, { issue: 67 });
+      expect(synced.models["gemini/flash"]?.tier).toBe("tier-2");
+      expect(synced.summary.tierCommits["tier-2"]).toBe(1);
+      expect(synced.summary.tierCommits["tier-3"]).toBe(1);
+    });
+
+    it("updates contractedCommits, reworkCommits, escalations, and swarm fallback incrementally", () => {
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+
+      const compliantSha = commitFile(
+        "src/a.ts",
+        "export const a = 1;\n",
+        "feat(#67/T1): compliant work",
+      );
+      note(compliantSha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 67, tier: "tier-3" },
+        subtask: { id: "T1", contract: { allowedFiles: ["src/a.ts"] } },
+      });
+      recordCommitTelemetry({
+        sha: compliantSha,
+        author: "google/gemini-flash-worker-agy (antigravity)",
+        targetDir: tempDir,
+      });
+
+      const afterFirst = loadTelemetry(tempDir);
+      expect(afterFirst.summary.contractedCommits).toBe(1);
+      expect(afterFirst.summary.contractCompliancePct).toBe(100);
+      expect(afterFirst.summary.reworkCommits).toBe(0);
+      expect(afterFirst.summary.reworkRatioPct).toBe(0);
+      expect(afterFirst.summary.tierCommits["tier-3"]).toBe(1);
+      expect(afterFirst.summary.swarmCommits).toBe(1);
+
+      const breachSha = commitFile(
+        "src/outside.ts",
+        "export const outside = 1;\n",
+        "fix(#67/T2): repair breach [escalated]",
+      );
+      note(breachSha, {
+        $schema: "lognexus/note/v1",
+        issue: { id: 67, tier: "tier-3" },
+        subtask: { id: "T2", contract: { allowedFiles: ["src/a.ts"] } },
+        escalated: true,
+      });
+      recordCommitTelemetry({
+        sha: breachSha,
+        author: "Orchestrator (Carbon)",
+        targetDir: tempDir,
+      });
+
+      const afterSecond = loadTelemetry(tempDir);
+      expect(afterSecond.summary.contractedCommits).toBe(2);
+      expect(afterSecond.summary.contractCompliancePct).toBe(50);
+      expect(afterSecond.summary.reworkCommits).toBe(1);
+      expect(afterSecond.summary.reworkRatioPct).toBe(50);
+      expect(afterSecond.summary.escalatedCommits).toBe(1);
+      expect(afterSecond.summary.tierCommits["tier-1"]).toBe(1);
+      expect(afterSecond.summary.swarmCommits).toBe(2);
     });
   });
 });

@@ -19,6 +19,7 @@ import {
   type DiffCategory,
   type ExtensionStat,
   type ModelStat,
+  TELEMETRY_POLICY_VERSION,
   type TelemetryMode,
   type TelemetryStore,
   TelemetryStoreSchema,
@@ -168,6 +169,7 @@ function createModelStat(family: string, tier: string): ModelStat {
 function accumulateModelPricing(
   model: ModelStat,
   linesByCategory: Partial<Record<DiffCategory, number>>,
+  tier: string = model.tier,
 ): void {
   for (const [category, lines] of Object.entries(linesByCategory)) {
     const added = Number.isFinite(lines) ? (lines ?? 0) : 0;
@@ -178,7 +180,7 @@ function accumulateModelPricing(
     }
   }
 
-  const pricing = estimateCommitPricing(model.tier, linesByCategory);
+  const pricing = estimateCommitPricing(tier, linesByCategory);
   model.estimatedInputTokens += pricing.inputTokens;
   model.estimatedOutputTokens += pricing.outputTokens;
   model.estimatedCostUsd = round6(model.estimatedCostUsd + pricing.costUsd);
@@ -258,6 +260,8 @@ export function getTelemetryPath(targetDir: string = process.cwd()): string {
   return join(targetDir, ".lognexus", "telemetry.json");
 }
 
+export type TelemetryConsentState = "accepted" | "declined" | "outdated" | "unanswered";
+
 export function createDefaultTelemetryStore(targetDir: string = process.cwd()): TelemetryStore {
   return {
     schemaVersion: "2.0.0",
@@ -265,8 +269,9 @@ export function createDefaultTelemetryStore(targetDir: string = process.cwd()): 
     anonymousProjectId: randomUUID(),
     consent: {
       accepted: false,
-      policyVersion: "1.0.0",
+      policyVersion: TELEMETRY_POLICY_VERSION,
       acceptedAt: null,
+      declinedAt: null,
     },
     detectedStacks: detectProjectStacks(targetDir),
     taskTimings: {},
@@ -308,22 +313,56 @@ export function loadTelemetry(targetDir: string = process.cwd()): TelemetryStore
 }
 
 export function saveTelemetry(store: TelemetryStore, targetDir: string = process.cwd()): void {
-  const dirPath = join(targetDir, ".lognexus");
-  if (!existsSync(dirPath)) {
-    mkdirSync(dirPath, { recursive: true });
+  try {
+    const dirPath = join(targetDir, ".lognexus");
+    if (!existsSync(dirPath)) {
+      mkdirSync(dirPath, { recursive: true });
+    }
+
+    store.lastUpdated = new Date().toISOString();
+    store.detectedStacks = detectProjectStacks(targetDir);
+
+    const filePath = getTelemetryPath(targetDir);
+    writeFileSync(filePath, JSON.stringify(store, null, 2), "utf8");
+  } catch {
+    /* fail-silent */
+  }
+}
+
+export function getTelemetryConsentState(targetDir: string = process.cwd()): TelemetryConsentState {
+  if (isTelemetryGloballyDisabled() || !existsSync(getTelemetryPath(targetDir))) {
+    return "unanswered";
   }
 
-  store.lastUpdated = new Date().toISOString();
-  store.detectedStacks = detectProjectStacks(targetDir);
-
-  const filePath = getTelemetryPath(targetDir);
-  writeFileSync(filePath, JSON.stringify(store, null, 2), "utf8");
+  const store = loadTelemetry(targetDir);
+  if (store.consent.accepted && store.consent.policyVersion === TELEMETRY_POLICY_VERSION) {
+    return "accepted";
+  }
+  if (
+    !store.consent.accepted &&
+    store.consent.declinedAt !== null &&
+    store.consent.policyVersion === TELEMETRY_POLICY_VERSION
+  ) {
+    return "declined";
+  }
+  if (
+    (store.consent.accepted || store.consent.declinedAt !== null || store.mode === "local") &&
+    store.consent.policyVersion !== TELEMETRY_POLICY_VERSION
+  ) {
+    return "outdated";
+  }
+  return "unanswered";
 }
 
 export function isTelemetryActive(targetDir: string = process.cwd()): boolean {
   if (isTelemetryGloballyDisabled()) return false;
+  if (!existsSync(getTelemetryPath(targetDir))) return false;
   const store = loadTelemetry(targetDir);
-  return store.mode === "local";
+  return (
+    store.mode === "local" &&
+    store.consent.accepted === true &&
+    store.consent.policyVersion === TELEMETRY_POLICY_VERSION
+  );
 }
 
 export function enableTelemetry(options: {
@@ -339,61 +378,116 @@ export function enableTelemetry(options: {
   }
 
   store.mode = "local";
+  if (options.acceptTerms === true) {
+    store.consent = {
+      accepted: true,
+      policyVersion: TELEMETRY_POLICY_VERSION,
+      acceptedAt: new Date().toISOString(),
+      declinedAt: null,
+    };
+  }
   saveTelemetry(store, cwd);
   return { mode: store.mode, anonymousProjectId: store.anonymousProjectId };
 }
 
-export function disableTelemetry(targetDir: string = process.cwd()): void {
+export function declineTelemetry(targetDir: string = process.cwd()): void {
   const store = loadTelemetry(targetDir);
   store.mode = "off";
-  saveTelemetry(store, targetDir);
-}
-
-export function clearTelemetry(targetDir: string = process.cwd()): void {
-  const store = createDefaultTelemetryStore(targetDir);
-  store.mode = "off";
-  saveTelemetry(store, targetDir);
-}
-
-export function recordTaskStart(taskId: string, targetDir: string = process.cwd()): void {
-  if (!isTelemetryActive(targetDir)) return;
-
-  const store = loadTelemetry(targetDir);
-  store.taskTimings[taskId] = {
-    taskId,
-    startedAt: new Date().toISOString(),
-    completedAt: null,
-    durationSec: 0,
+  store.consent = {
+    accepted: false,
+    policyVersion: TELEMETRY_POLICY_VERSION,
+    acceptedAt: null,
+    declinedAt: new Date().toISOString(),
   };
   saveTelemetry(store, targetDir);
 }
 
-export function recordTaskFinish(taskId: string, targetDir: string = process.cwd()): number {
-  if (!isTelemetryActive(targetDir)) return 0;
+export function disableTelemetry(targetDir: string = process.cwd()): void {
+  declineTelemetry(targetDir);
+}
 
-  const store = loadTelemetry(targetDir);
-  const entry = store.taskTimings[taskId];
-  let durationSec = 0;
+function readStoredConsent(targetDir: string): TelemetryStore["consent"] | null {
+  const filePath = getTelemetryPath(targetDir);
+  if (!existsSync(filePath)) return null;
 
-  if (entry?.startedAt) {
-    const started = new Date(entry.startedAt).getTime();
-    const now = Date.now();
-    durationSec = Math.max(1, Math.round((now - started) / 1000));
-    entry.completedAt = new Date(now).toISOString();
-    entry.durationSec = durationSec;
+  try {
+    const parsed = TelemetryStoreSchema.safeParse(JSON.parse(readFileSync(filePath, "utf8")));
+    return parsed.success ? parsed.data.consent : null;
+  } catch {
+    return null;
   }
+}
 
-  store.summary.totalSubtasksCompleted += 1;
+export function clearTelemetry(targetDir: string = process.cwd()): void {
+  const previousConsent = readStoredConsent(targetDir);
+  const store = createDefaultTelemetryStore(targetDir);
+  store.mode = "off";
+  if (
+    previousConsent !== null &&
+    (previousConsent.accepted === true || previousConsent.declinedAt !== null)
+  ) {
+    store.consent = {
+      accepted: false,
+      policyVersion: previousConsent.policyVersion,
+      acceptedAt: null,
+      declinedAt: previousConsent.declinedAt ?? new Date().toISOString(),
+    };
+  }
   saveTelemetry(store, targetDir);
-  return durationSec;
+}
+
+export function recordTaskStart(taskId: string, targetDir: string = process.cwd()): void {
+  try {
+    if (!isTelemetryActive(targetDir)) return;
+
+    const store = loadTelemetry(targetDir);
+    store.taskTimings[taskId] = {
+      taskId,
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      durationSec: 0,
+    };
+    saveTelemetry(store, targetDir);
+  } catch {
+    /* fail-silent */
+  }
+}
+
+export function recordTaskFinish(taskId: string, targetDir: string = process.cwd()): number {
+  try {
+    if (!isTelemetryActive(targetDir)) return 0;
+
+    const store = loadTelemetry(targetDir);
+    const entry = store.taskTimings[taskId];
+    let durationSec = 0;
+
+    if (entry?.startedAt) {
+      const started = new Date(entry.startedAt).getTime();
+      const now = Date.now();
+      durationSec = Math.max(1, Math.round((now - started) / 1000));
+      entry.completedAt = new Date(now).toISOString();
+      entry.durationSec = durationSec;
+    }
+
+    store.summary.totalSubtasksCompleted += 1;
+    saveTelemetry(store, targetDir);
+    return durationSec;
+  } catch {
+    /* fail-silent */
+    return 0;
+  }
 }
 
 export function recordReviewGateBlock(targetDir: string = process.cwd()): void {
-  if (!isTelemetryActive(targetDir)) return;
+  try {
+    if (!isTelemetryActive(targetDir)) return;
 
-  const store = loadTelemetry(targetDir);
-  store.summary.reviewGateBlocksPrevented += 1;
-  saveTelemetry(store, targetDir);
+    const store = loadTelemetry(targetDir);
+    store.summary.reviewGateBlocksPrevented += 1;
+    saveTelemetry(store, targetDir);
+  } catch {
+    /* fail-silent */
+  }
 }
 
 /**
@@ -478,65 +572,6 @@ export function updateCostSavingsEstimate(store: TelemetryStore): void {
   sum.estimatedTokensSaved = Math.max(0, baselineTokens - actualTokens);
 }
 
-export function recordCommitTelemetry(options: {
-  sha: string;
-  author?: string;
-  tier?: string;
-  targetDir?: string;
-}): void {
-  const cwd = options.targetDir ?? process.cwd();
-  if (!isTelemetryActive(cwd)) return;
-
-  const store = loadTelemetry(cwd);
-  const diffItems = extractCommitDiffStats(options.sha, cwd);
-
-  let commitAdded = 0;
-  let commitDeleted = 0;
-  const seenExts = new Set<string>();
-
-  for (const item of diffItems) {
-    commitAdded += item.linesAdded;
-    commitDeleted += item.linesDeleted;
-    accumulateCategoryLines(store.summary, item.category, item.linesAdded, item.linesDeleted);
-
-    // One commit touching `.ts` in `src/` and `tests/` counts as a single `.ts` commit.
-    const isNewExtInCommit = !seenExts.has(item.ext);
-    if (isNewExtInCommit) seenExts.add(item.ext);
-    accumulateExtensionLines(store.extensions, item, isNewExtInCommit);
-  }
-
-  store.summary.totalCommits += 1;
-  store.summary.totalLinesAdded += commitAdded;
-  store.summary.totalLinesDeleted += commitDeleted;
-
-  const modelKey = extractModelFamilyCategory(options.author);
-  const tier = options.tier ?? "tier-3";
-  const existingModel: ModelStat = store.models[modelKey] ?? createModelStat(modelKey, tier);
-  existingModel.tier = tier;
-  existingModel.commits += 1;
-  accumulateModelPricing(existingModel, linesByCategory(diffItems));
-  store.models[modelKey] = existingModel;
-
-  const pricingTier = resolvePricingTier(tier);
-  if (store.summary.tierCommits === undefined) {
-    store.summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
-  }
-  store.summary.tierCommits[pricingTier] += 1;
-
-  const swarmMetrics = extractNoteSwarmMetrics(readParsedNote(options.sha, cwd));
-  if (swarmMetrics.isSwarm) {
-    store.summary.swarmCommits = (store.summary.swarmCommits ?? 0) + 1;
-    store.summary.totalSwarmPosts = (store.summary.totalSwarmPosts ?? 0) + swarmMetrics.posts;
-    store.summary.maxSwarmWorkers = Math.max(
-      store.summary.maxSwarmWorkers ?? 0,
-      swarmMetrics.workers,
-    );
-  }
-
-  updateCostSavingsEstimate(store);
-  saveTelemetry(store, cwd);
-}
-
 const GIT_LOG_FORMAT = "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%B%x1e";
 
 const EPHEMERAL_PATH_PREFIX = ".lognexus/";
@@ -544,6 +579,172 @@ const EPHEMERAL_PATH_PREFIX = ".lognexus/";
 const REWORK_SUBJECT_PATTERN = /^(?:fix|revert)(?:\(|:)/i;
 
 const ESCALATION_SUBJECT_PATTERN = /\[escalated\]/i;
+
+function percentage(part: number, whole: number, whenEmpty: number): number {
+  if (whole === 0) return whenEmpty;
+  return Number(((part / whole) * 100).toFixed(1));
+}
+
+function isSwarmAuthor(author: string): boolean {
+  const lowered = author.toLowerCase();
+  return (
+    lowered.includes("gemini-flash-worker-agy") ||
+    lowered.includes("orchestrator (carbon)") ||
+    lowered.includes("orchestrator (argon)")
+  );
+}
+
+function readCommitSubject(safeSha: string, targetDir: string): string {
+  try {
+    return execFileSync("git", ["show", "-s", "--format=%s", safeSha], {
+      cwd: targetDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
+function listChangedFiles(sha: string, targetDir: string): string[] {
+  try {
+    const raw = execFileSync(
+      "git",
+      ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", validateGitReference(sha)],
+      {
+        cwd: targetDir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
+      },
+    );
+
+    return raw
+      .split("\n")
+      .map((line) => line.trim().replace(/\\/g, "/"))
+      .filter((line) => line !== "" && !line.startsWith(EPHEMERAL_PATH_PREFIX));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Checks whether every non-ephemeral file of a commit fell inside the active subtask
+ * contract, which is what makes the contract a real execution boundary and not a comment.
+ */
+function isCommitContracted(sha: string, allowedFiles: string[], targetDir: string): boolean {
+  const allowed = new Set(allowedFiles.map((file) => file.trim().replace(/\\/g, "/")));
+  const changed = listChangedFiles(sha, targetDir);
+  if (changed.length === 0) return true;
+  return changed.every((file) => allowed.has(file));
+}
+
+export function recordCommitTelemetry(options: {
+  sha: string;
+  author?: string;
+  tier?: string;
+  targetDir?: string;
+}): void {
+  try {
+    const cwd = options.targetDir ?? process.cwd();
+    if (!isTelemetryActive(cwd)) return;
+
+    const store = loadTelemetry(cwd);
+    const diffItems = extractCommitDiffStats(options.sha, cwd);
+
+    let commitAdded = 0;
+    let commitDeleted = 0;
+    const seenExts = new Set<string>();
+
+    for (const item of diffItems) {
+      commitAdded += item.linesAdded;
+      commitDeleted += item.linesDeleted;
+      accumulateCategoryLines(store.summary, item.category, item.linesAdded, item.linesDeleted);
+
+      // One commit touching `.ts` in `src/` and `tests/` counts as a single `.ts` commit.
+      const isNewExtInCommit = !seenExts.has(item.ext);
+      if (isNewExtInCommit) seenExts.add(item.ext);
+      accumulateExtensionLines(store.extensions, item, isNewExtInCommit);
+    }
+
+    store.summary.totalCommits += 1;
+    store.summary.totalLinesAdded += commitAdded;
+    store.summary.totalLinesDeleted += commitDeleted;
+
+    const modelKey = extractModelFamilyCategory(options.author);
+    const tier = options.tier ?? inferTierFromAuthor(options.author) ?? "tier-3";
+    const existingModel: ModelStat = store.models[modelKey] ?? createModelStat(modelKey, tier);
+    existingModel.tier = tier;
+    existingModel.commits += 1;
+    accumulateModelPricing(existingModel, linesByCategory(diffItems), tier);
+    store.models[modelKey] = existingModel;
+
+    const pricingTier = resolvePricingTier(tier);
+    if (store.summary.tierCommits === undefined) {
+      store.summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
+    }
+    store.summary.tierCommits[pricingTier] += 1;
+
+    let safeSha: string | null = null;
+    try {
+      safeSha = validateGitReference(options.sha);
+    } catch {
+      safeSha = null;
+    }
+
+    const parsedNote = readParsedNote(safeSha ?? options.sha, cwd);
+    const subject = safeSha !== null ? readCommitSubject(safeSha, cwd) : "";
+
+    if (parsedNote?.escalated === true || ESCALATION_SUBJECT_PATTERN.test(subject)) {
+      store.summary.escalatedCommits = (store.summary.escalatedCommits ?? 0) + 1;
+    }
+
+    if (REWORK_SUBJECT_PATTERN.test(subject)) {
+      store.summary.reworkCommits = (store.summary.reworkCommits ?? 0) + 1;
+    }
+    store.summary.reworkRatioPct = percentage(
+      store.summary.reworkCommits ?? 0,
+      store.summary.totalCommits,
+      0,
+    );
+
+    const allowedFiles = parsedNote?.subtask?.contract?.allowedFiles;
+    if (Array.isArray(allowedFiles) && safeSha !== null) {
+      const declared = allowedFiles.filter((file): file is string => typeof file === "string");
+      if (declared.length > 0) {
+        const prevContracted = store.summary.contractedCommits ?? 0;
+        const prevCompliant =
+          prevContracted === 0
+            ? 0
+            : Math.round(((store.summary.contractCompliancePct ?? 100) / 100) * prevContracted);
+        const compliant = isCommitContracted(safeSha, declared, cwd) ? 1 : 0;
+        const nextContracted = prevContracted + 1;
+        store.summary.contractedCommits = nextContracted;
+        store.summary.contractCompliancePct = percentage(
+          prevCompliant + compliant,
+          nextContracted,
+          100,
+        );
+      }
+    }
+
+    const swarmMetrics = extractNoteSwarmMetrics(parsedNote);
+    if (swarmMetrics.isSwarm || isSwarmAuthor(options.author ?? "")) {
+      store.summary.swarmCommits = (store.summary.swarmCommits ?? 0) + 1;
+      store.summary.totalSwarmPosts = (store.summary.totalSwarmPosts ?? 0) + swarmMetrics.posts;
+      store.summary.maxSwarmWorkers = Math.max(
+        store.summary.maxSwarmWorkers ?? 0,
+        swarmMetrics.workers,
+      );
+    }
+
+    updateCostSavingsEstimate(store);
+    saveTelemetry(store, cwd);
+  } catch {
+    /* fail-silent */
+  }
+}
 
 /**
  * Normalizes an issue filter into a bare identifier: `58`, `"58"`, `"#58"` and `"#058"`
@@ -630,47 +831,9 @@ function median(values: number[]): number {
     : sorted[middle];
 }
 
-function percentage(part: number, whole: number, whenEmpty: number): number {
-  if (whole === 0) return whenEmpty;
-  return Number(((part / whole) * 100).toFixed(1));
-}
-
-function listChangedFiles(sha: string, targetDir: string): string[] {
-  try {
-    const raw = execFileSync(
-      "git",
-      ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", validateGitReference(sha)],
-      {
-        cwd: targetDir,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-        shell: false,
-      },
-    );
-
-    return raw
-      .split("\n")
-      .map((line) => line.trim().replace(/\\/g, "/"))
-      .filter((line) => line !== "" && !line.startsWith(EPHEMERAL_PATH_PREFIX));
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Checks whether every non-ephemeral file of a commit fell inside the active subtask
- * contract, which is what makes the contract a real execution boundary and not a comment.
- */
-function isCommitContracted(sha: string, allowedFiles: string[], targetDir: string): boolean {
-  const allowed = new Set(allowedFiles.map((file) => file.trim().replace(/\\/g, "/")));
-  const changed = listChangedFiles(sha, targetDir);
-  if (changed.length === 0) return true;
-  return changed.every((file) => allowed.has(file));
-}
-
 interface ParsedNote {
   $schema?: unknown;
-  issue?: { id?: unknown } | null;
+  issue?: { id?: unknown; tier?: unknown } | null;
   subtask?: {
     id?: unknown;
     contract?: {
@@ -729,12 +892,12 @@ export function extractNoteSwarmMetrics(parsedNote: ParsedNote | null): {
 /**
  * Resolves the routing tier of a noted commit.
  *
- * Modern notes (carrying `$schema`) are authoritative: an explicitly recorded `tier-3` is
- * preserved unless the author is unambiguously a frontier orchestrator, which keeps the
- * historical backfill of pre-1.3.4 notes working without letting a stale `tier-3` default
- * outvote a resolved tier-1 identity.
+ * Modern notes (carrying `$schema`) honour explicit `--tier` overrides: `inferredTier`
+ * overrides `noteTier` only when `noteTier` merely inherited `issue.tier`, while legacy
+ * notes without `$schema` still upgrade the historical `tier-3` default when an author
+ * identity resolves.
  */
-function resolveCommitTier(
+export function resolveCommitTier(
   parsedNote: ParsedNote | null,
   inferredTier: string | null,
 ): PricingTierKey {
@@ -742,7 +905,13 @@ function resolveCommitTier(
   const isModernNote = typeof parsedNote?.$schema === "string";
 
   if (noteTier === null) return resolvePricingTier(inferredTier);
-  if (isModernNote && noteTier === "tier-3" && inferredTier !== "tier-1") return "tier-3";
+  if (isModernNote) {
+    const issueTier = typeof parsedNote?.issue?.tier === "string" ? parsedNote.issue.tier : null;
+    if (inferredTier !== null && issueTier !== null && noteTier === issueTier) {
+      return resolvePricingTier(inferredTier);
+    }
+    return resolvePricingTier(noteTier);
+  }
   if (noteTier !== "tier-3") return resolvePricingTier(noteTier);
   return resolvePricingTier(inferredTier ?? noteTier);
 }
@@ -898,21 +1067,14 @@ export function syncTelemetryFromGitNotes(
 
     const modelKey = extractModelFamilyCategory(author);
     const existingModel: ModelStat = models[modelKey] ?? createModelStat(modelKey, tier);
-    existingModel.tier = tier;
     existingModel.commits += 1;
-    accumulateModelPricing(existingModel, linesByCategory(diffItems));
+    accumulateModelPricing(existingModel, linesByCategory(diffItems), tier);
     models[modelKey] = existingModel;
 
     summary.tierCommits[resolvePricingTier(tier)] += 1;
 
     const swarmMetrics = extractNoteSwarmMetrics(parsedNote);
-    const loweredAuthor = author.toLowerCase();
-    const isSwarmCommit =
-      swarmMetrics.isSwarm ||
-      loweredAuthor.includes("gemini-flash-worker-agy") ||
-      loweredAuthor.includes("orchestrator (carbon)") ||
-      loweredAuthor.includes("orchestrator (argon)");
-    if (isSwarmCommit) {
+    if (swarmMetrics.isSwarm || isSwarmAuthor(author)) {
       swarmCommits += 1;
       totalSwarmPosts += swarmMetrics.posts;
       maxSwarmWorkers = Math.max(maxSwarmWorkers, swarmMetrics.workers);

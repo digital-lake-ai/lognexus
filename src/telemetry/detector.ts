@@ -331,16 +331,69 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
 export type AuthorTier = "tier-1" | "tier-2" | "tier-3";
 
 /**
- * Lowercases an identity, drops version numbers and folds slug separators into
- * slashes, so `gemini-3.8-pro`, `google/gemini-3.8-flash-high` and `Gemini 4 Argon`
- * all compare against the same marker vocabulary. Trailing free text is untouched.
+ * Strips `<email>` tags in a single linear pass so Git email domains cannot masquerade as
+ * model family markers.
+ */
+function stripAngleBracketEmails(input: string): string {
+  let result = "";
+  let inAngle = false;
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i];
+    if (ch === "<") {
+      inAngle = true;
+      result += " ";
+    } else if (ch === ">") {
+      inAngle = false;
+      result += " ";
+    } else if (!inAngle) {
+      result += ch;
+    }
+  }
+  return result.trim();
+}
+
+/**
+ * Extracts the parenthetical qualifier of `Orchestrator (<qualifier>)` with balanced
+ * parenthesis scanning so nested qualifiers like `Orchestrator (deepseek/VS Code (kimi-code))`
+ * resolve cleanly.
+ */
+function extractOrchestratorQualifier(trimmedLower: string): string | null {
+  if (!trimmedLower.startsWith("orchestrator")) return null;
+  const afterKeyword = trimmedLower.slice("orchestrator".length);
+  if (afterKeyword !== "" && !afterKeyword.startsWith("(") && !/^\s/.test(afterKeyword)) {
+    return null;
+  }
+
+  const openIdx = trimmedLower.indexOf("(");
+  if (openIdx === -1) return null;
+
+  let depth = 0;
+  for (let i = openIdx; i < trimmedLower.length; i += 1) {
+    const ch = trimmedLower[i];
+    if (ch === "(") {
+      depth += 1;
+    } else if (ch === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return trimmedLower.slice(openIdx + 1, i).trim();
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Lowercases an identity, drops version numbers and folds separators into slashes, so
+ * `gemini-3.8-pro`, `google/gemini-3.8-flash-high` and `Gemini 4 Argon` all compare against
+ * exact slash-delimited marker boundaries without substring false positives on human names.
  */
 function normalizeIdentity(identityStr: string): string {
   return identityStr
     .trim()
     .toLowerCase()
     .replace(/\d+(?:\.\d+)*/g, "")
-    .replace(/[\s_-]+/g, "/")
+    .replace(/[\s_.,:;()[\]{}-]+/g, "/")
+    .replace(/^\/+|\/+$/g, "")
     .replace(/\/{2,}/g, "/");
 }
 
@@ -357,11 +410,22 @@ const TIER_1_MARKERS = [
   "opus",
   "openai/o1",
   "openai/o3",
-  "/o1",
-  "/o3",
 ];
 
 const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash/lite"];
+
+const BARE_AMBIGUOUS_TIER_3_MARKERS = new Set(["kimi", "qwen"]);
+
+const AI_COMPANION_TOKENS = new Set([
+  "moonshot",
+  "code",
+  "coder",
+  "k2",
+  "k3",
+  "antigravity",
+  "vscode",
+  "cursor",
+]);
 
 const TIER_2_MARKERS = [
   "gemini/flash/high",
@@ -385,6 +449,19 @@ const EFFORT_SUFFIXES = [
   "-none",
 ] as const;
 
+function matchesBoundaryMarker(
+  paddedNormalized: string,
+  marker: string,
+  rawHead: string,
+  rawTokens: Set<string>,
+): boolean {
+  if (!paddedNormalized.includes(`/${marker}/`)) return false;
+  if (BARE_AMBIGUOUS_TIER_3_MARKERS.has(marker)) {
+    return rawHead.includes("/") || [...AI_COMPANION_TOKENS].some((tok) => rawTokens.has(tok));
+  }
+  return true;
+}
+
 /**
  * Infers the routing tier of an author identity, so commit telemetry and the audit
  * can detect tier-1 models working outside their scope.
@@ -392,7 +469,19 @@ const EFFORT_SUFFIXES = [
 export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | null {
   if (!identityStr) return null;
 
-  let head = identityStr.split("(")[0].trim().toLowerCase();
+  const cleaned = stripAngleBracketEmails(identityStr);
+  if (cleaned === "") return null;
+
+  const trimmedLower = cleaned.toLowerCase();
+  const orchestratorQualifier = extractOrchestratorQualifier(trimmedLower);
+  if (orchestratorQualifier !== null) {
+    return (
+      (orchestratorQualifier === "" ? null : inferTierFromAuthor(orchestratorQualifier)) ?? "tier-1"
+    );
+  }
+
+  const rawHead = cleaned.split("(")[0].trim().toLowerCase();
+  let head = rawHead;
   for (let i = 0; i < 2; i++) {
     const suffix = EFFORT_SUFFIXES.find((candidate) => head.endsWith(candidate));
     if (!suffix) break;
@@ -402,27 +491,48 @@ export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | n
   if (head.includes("flash-worker-agy") || head.includes("worker-agy")) {
     return "tier-3";
   }
-  if (/(?:^|[/_-])(?:gpt-4o-mini|flash-lite)(?:$|[/_-])/.test(head)) {
+  if (/(?:^|[\s/_-])(?:gpt-4o-mini|flash-lite)(?:$|[\s/_-])/.test(head)) {
     return "tier-3";
   }
-  if (/(?:^|[/_-])(?:o1-mini|o3-mini|o4-mini)(?:$|[/_-])/.test(head)) {
+  if (/(?:^|[\s/_-])(?:o1-mini|o3-mini|o4-mini|gpt-4o)(?:$|[\s/_-])/.test(head)) {
     return "tier-2";
   }
-  if (/(?:^|[/_-])(?:o1|o3|o4|gpt-5(?:\.\d+)?)(?:$|[/_-])/.test(head)) {
+  if (/(?:^|[\s/_-])(?:o1|o3|o4|gpt-5(?:\.\d+)?)(?:$|[\s/_-])/.test(head)) {
     return "tier-1";
   }
-  if (head.includes("deepseek") && /(?:^|[/_-])(?:r1|reasoner)(?:$|[/_-])/.test(head)) {
+  if (head.includes("deepseek") && /(?:^|[\s/_-])(?:r1|reasoner)(?:$|[\s/_-])/.test(head)) {
     return "tier-1";
   }
 
-  // Collapse slug separators so 'gemini-3.8-pro' matches the 'gemini/pro' marker.
-  const normalized = normalizeIdentity(identityStr);
+  // Collapse slug separators so 'gemini-3.8-pro' matches the '/gemini/pro/' boundary.
+  const normalized = normalizeIdentity(cleaned);
   if (normalized === "") return null;
 
+  const paddedNormalized = `/${normalized}/`;
+  const rawTokens = new Set(trimmedLower.split(/[^a-z0-9]+/).filter((token) => token !== ""));
+
   // tier-3 markers win over tier-2 so 'gemini/flash-lite' never escalates to tier-2
-  if (TIER_3_MARKERS.some((marker) => normalized.includes(marker))) return "tier-3";
-  if (TIER_1_MARKERS.some((marker) => normalized.includes(marker))) return "tier-1";
-  if (TIER_2_MARKERS.some((marker) => normalized.includes(marker))) return "tier-2";
+  if (
+    TIER_3_MARKERS.some((marker) =>
+      matchesBoundaryMarker(paddedNormalized, marker, rawHead, rawTokens),
+    )
+  ) {
+    return "tier-3";
+  }
+  if (
+    TIER_1_MARKERS.some((marker) =>
+      matchesBoundaryMarker(paddedNormalized, marker, rawHead, rawTokens),
+    )
+  ) {
+    return "tier-1";
+  }
+  if (
+    TIER_2_MARKERS.some((marker) =>
+      matchesBoundaryMarker(paddedNormalized, marker, rawHead, rawTokens),
+    )
+  ) {
+    return "tier-2";
+  }
 
   return null;
 }

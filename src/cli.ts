@@ -35,15 +35,19 @@ import {
 import {
   buildAnonymousDiagnosticPayload,
   clearTelemetry,
+  declineTelemetry,
   disableTelemetry,
   enableTelemetry,
+  getTelemetryConsentState,
   isTelemetryGloballyDisabled,
   LOCAL_ONLY_TELEMETRY_ERROR,
   loadTelemetry,
   type ScopedTelemetryFilter,
   syncTelemetryFromGitNotes,
 } from "./telemetry/collector.js";
+import { isAgentEnvironment, maybePromptTelemetryConsent } from "./telemetry/consent-prompt.js";
 import { generateTelemetryReportFile } from "./telemetry/report.js";
+import { TELEMETRY_POLICY_VERSION } from "./telemetry/schema.js";
 import { getJourneyTimeline } from "./timeline/timeline.js";
 import {
   acceptTerms,
@@ -75,13 +79,24 @@ function printHeader() {
   console.log("   The Universal Git-Powered Context & Rules Framework for Native AI Agents\n");
 }
 
+const STARTUP_GATE_EXEMPT_COMMANDS = new Set([
+  "mcp",
+  "terms",
+  "version",
+  "help",
+  "--help",
+  "-h",
+  "--version",
+  "-v",
+]);
+
 /**
  * Runs the non-interactive startup gate. The MCP transport is exempt because stdout
- * carries JSON-RPC frames there, and the gate is also skipped for `mcp`, `terms` and
- * `version` so an operator can always inspect or clear a block.
+ * carries JSON-RPC frames there, and the gate is also skipped for `mcp`, `terms`,
+ * `version`, and `help` aliases so an operator can always inspect or clear a block.
  */
 function runStartupGate(command: string | undefined): void {
-  if (command === "mcp" || command === "terms" || command === "version") return;
+  if (command !== undefined && STARTUP_GATE_EXEMPT_COMMANDS.has(command)) return;
 
   const result = checkUpdateGate({ currentVersion: getCliVersion() });
   const notice = formatUpdateGateResult(result);
@@ -141,6 +156,7 @@ function printUsage() {
 Commands:
   init         Scaffold .lognexus/ configuration and rules in current repository
                (--protect-tokens) also writes multi-model token-ignore files
+               (--enable-telemetry | --no-telemetry | --disable-telemetry) set local telemetry choice
   doctor       Check Git, GitHub CLI authentication, and repository rules health
   status       Inspect current branch, active issue, and recommended tier
   commit       Atomic commit with trailers, contract validation, and Git Note
@@ -242,9 +258,16 @@ async function handleInit(args: string[] = []) {
   printHeader();
 
   let protectTokens = false;
+  let enableTelemetryFlag = false;
+  let disableTelemetryFlag = false;
+
   for (const arg of args) {
     if (arg === "--protect-tokens") {
       protectTokens = true;
+    } else if (arg === "--enable-telemetry") {
+      enableTelemetryFlag = true;
+    } else if (arg === "--no-telemetry" || arg === "--disable-telemetry") {
+      disableTelemetryFlag = true;
     } else if (arg.startsWith("-")) {
       console.error(`[ERROR] Unknown init option: ${arg}\n`);
       printUsage();
@@ -252,8 +275,16 @@ async function handleInit(args: string[] = []) {
     }
   }
 
+  if (enableTelemetryFlag && disableTelemetryFlag) {
+    console.error(
+      "[ERROR] Cannot combine --enable-telemetry with --no-telemetry or --disable-telemetry.\n",
+    );
+    process.exit(1);
+  }
+
   console.log("Initializing LogNexus in current repository...\n");
-  const res = initProject(process.cwd(), { protectTokens });
+  const cwd = process.cwd();
+  const res = initProject(cwd, { protectTokens });
 
   if (res.created.length > 0) {
     console.log("Created files:");
@@ -267,6 +298,24 @@ async function handleInit(args: string[] = []) {
     for (const f of res.skipped) {
       console.log(`  [.] ${f}`);
     }
+  }
+
+  if (enableTelemetryFlag) {
+    if (isAgentEnvironment()) {
+      process.stderr.write(
+        "Confirm telemetry opt-in from an interactive human terminal (automated agent sealing is disabled).\n",
+      );
+    } else {
+      enableTelemetry({ cwd, acceptTerms: true });
+    }
+  } else if (disableTelemetryFlag) {
+    declineTelemetry(cwd);
+  } else {
+    await maybePromptTelemetryConsent({
+      command: "init",
+      args,
+      targetDir: cwd,
+    });
   }
 
   console.log("\nNext Steps:");
@@ -877,19 +926,39 @@ async function handleTelemetry(args: string[]) {
   switch (sub) {
     case "status": {
       printHeader();
-      const store = loadTelemetry();
+      const cwd = process.cwd();
+      const store = loadTelemetry(cwd);
+      const consentState = getTelemetryConsentState(cwd);
       const globallyDisabled = isTelemetryGloballyDisabled();
+
+      let consentLabel: string;
+      switch (consentState) {
+        case "accepted":
+          consentLabel = `Accepted (v${TELEMETRY_POLICY_VERSION} — Local Only)`;
+          break;
+        case "declined":
+          consentLabel = `Declined (v${TELEMETRY_POLICY_VERSION})`;
+          break;
+        case "outdated":
+          consentLabel = `Paused — Re-consent Required (v${store.consent.policyVersion} -> v${TELEMETRY_POLICY_VERSION})`;
+          break;
+        default:
+          consentLabel = "Unanswered (Off)";
+          break;
+      }
+
       console.log("LogNexus Telemetry Status:\n");
       console.log(
         `  Globally Disabled (DO_NOT_TRACK): ${globallyDisabled ? "Yes (Forced OFF)" : "No"}`,
       );
       console.log(`  Operating Mode:                   ${store.mode.toUpperCase()}`);
       console.log(`  Anonymous Project ID:             ${store.anonymousProjectId}`);
-      console.log(
-        `  Community Consent:                ${store.consent.accepted ? "Accepted (Shared)" : "No (Local Only)"}`,
-      );
+      console.log(`  Policy Consent:                   ${consentLabel}`);
       if (store.consent.acceptedAt) {
         console.log(`  Consent Recorded At:              ${store.consent.acceptedAt}`);
+      }
+      if (store.consent.declinedAt) {
+        console.log(`  Consent Declined At:              ${store.consent.declinedAt}`);
       }
       console.log(
         `  Detected Stacks:                  ${store.detectedStacks.join(", ") || "(none)"}`,
@@ -916,8 +985,15 @@ async function handleTelemetry(args: string[]) {
         process.exit(1);
       }
 
+      if (isAgentEnvironment()) {
+        process.stderr.write(
+          "Confirm telemetry opt-in from an interactive human terminal (automated agent sealing is disabled).\n",
+        );
+        process.exit(1);
+      }
+
       try {
-        enableTelemetry({ cwd: process.cwd() });
+        enableTelemetry({ cwd: process.cwd(), acceptTerms: true });
         console.log("[OK] Telemetry enabled in LOCAL mode.");
         console.log("     Metrics are stored strictly locally in .lognexus/telemetry.json.");
         console.log(
@@ -1067,9 +1143,19 @@ async function main() {
       await handleInit(args.slice(1));
       break;
     case "doctor":
+      await maybePromptTelemetryConsent({
+        command,
+        args: args.slice(1),
+        targetDir: process.cwd(),
+      });
       await handleDoctor();
       break;
     case "status":
+      await maybePromptTelemetryConsent({
+        command,
+        args: args.slice(1),
+        targetDir: process.cwd(),
+      });
       await handleStatus();
       break;
     case "state":
