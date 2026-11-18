@@ -590,7 +590,9 @@ function isSwarmAuthor(author: string): boolean {
   return (
     lowered.includes("gemini-flash-worker-agy") ||
     lowered.includes("orchestrator (carbon)") ||
-    lowered.includes("orchestrator (argon)")
+    lowered.includes("orchestrator (argon)") ||
+    lowered.includes("orchestrator (neon)") ||
+    lowered.includes("gemini-pro-orchestrator")
   );
 }
 

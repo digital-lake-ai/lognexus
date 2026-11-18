@@ -23,6 +23,7 @@ export interface InteractiveConsentOptions {
 export interface MaybePromptConsentOptions extends InteractiveConsentOptions {
   askQuestion?: (promptText: string) => Promise<string | null>;
   writeNotice?: (text: string) => void;
+  onInterrupt?: () => void;
 }
 
 const INTERACTIVE_CONSENT_COMMANDS = new Set(["init", "status", "doctor"]);
@@ -150,7 +151,7 @@ export function isInteractiveConsentAllowed(options: InteractiveConsentOptions =
   return hasRoutingMarker || hasStateMarker;
 }
 
-function defaultAskQuestion(promptText: string): Promise<string | null> {
+function defaultAskQuestion(promptText: string, onInterrupt?: () => void): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -160,23 +161,39 @@ function defaultAskQuestion(promptText: string): Promise<string | null> {
       terminal: Boolean(process.stdin.isTTY),
     });
 
-    const finish = (value: string | null): void => {
+    const finish = (
+      value: string | null,
+      options?: { writeNewline?: boolean; interrupted?: boolean },
+    ): void => {
       if (settled) return;
       settled = true;
       if (timer !== undefined) {
         clearTimeout(timer);
         timer = undefined;
       }
-      try {
-        rl.close();
-      } finally {
-        process.stdin.pause();
+      if (options?.writeNewline) {
+        process.stderr.write("\n");
       }
-      resolve(value);
+      try {
+        try {
+          rl.close();
+        } finally {
+          process.stdin.pause();
+        }
+        if (options?.interrupted) {
+          if (onInterrupt) {
+            onInterrupt();
+          } else {
+            process.exit(130);
+          }
+        }
+      } finally {
+        resolve(value);
+      }
     };
 
     timer = setTimeout(() => {
-      finish(null);
+      finish(null, { writeNewline: true });
     }, CONSENT_PROMPT_TIMEOUT_MS);
     timer.unref();
 
@@ -184,7 +201,7 @@ function defaultAskQuestion(promptText: string): Promise<string | null> {
       finish(line);
     });
     rl.once("SIGINT", () => {
-      finish(null);
+      finish(null, { writeNewline: true, interrupted: true });
     });
     rl.once("close", () => {
       finish(null);
@@ -226,7 +243,9 @@ export async function maybePromptTelemetryConsent(
       "Review details in docs/TELEMETRY_PRIVACY.md (opt out anytime via 'lognexus telemetry disable').\n",
   );
 
-  const ask = options.askQuestion ?? defaultAskQuestion;
+  const ask =
+    options.askQuestion ??
+    ((promptText: string) => defaultAskQuestion(promptText, options.onInterrupt));
   let answer: string | null;
   try {
     answer = await ask(
