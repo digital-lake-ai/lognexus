@@ -9,8 +9,11 @@ import {
   checkSelfApproval,
   extractTrailers,
   extractVendor,
+  isInvalidPlaceholderIdentity,
+  matchesPath,
   parseIdentity,
 } from "../src/audit/audit.js";
+import { executeAtomicCommit } from "../src/commit.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
 import { attachNote } from "../src/notes/notes.js";
 
@@ -738,6 +741,200 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
         expect(gateWarns).toHaveLength(1);
         expect(gateWarns[0].message).toContain("weakens review_gate");
         expect(result.passed).toBe(false);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("Cycle 4 review-gate hardening, placeholder rejection, and linear glob matching", () => {
+    it("blocks self-review between Gemini 3.8 Flash display name and google/gemini-3.8-flash-high slug", () => {
+      expect(parseIdentity("Gemini 3.8 Flash")?.family).toBe("gemini/3.8-flash");
+      expect(parseIdentity("(google/gemini-3.8-flash-high)")?.family).toBe("gemini/3.8-flash");
+      const wrapped = parseIdentity("(google/gemini-3.8-flash-high)");
+      expect(wrapped).not.toBeNull();
+      if (wrapped) expect(extractVendor(wrapped)).toBe("gemini");
+
+      const res = checkReviewGate(
+        "Gemini 3.8 Flash",
+        "google/gemini-3.8-flash-high (antigravity)",
+        "intra-fleet",
+      );
+      expect(res.violated).toBe(true);
+      expect(res.severity).toBe("error");
+    });
+
+    it("resolves Orchestrator (<qualifier>) models cleanly across intra-fleet and cross-vendor gates", () => {
+      const orchFlash = parseIdentity("Orchestrator (google/gemini-3.8-flash-high)");
+      expect(orchFlash?.family).toBe("gemini/3.8-flash");
+      if (orchFlash) expect(extractVendor(orchFlash)).toBe("gemini");
+
+      expect(parseIdentity("Orchestrator (Gemini 3.8 Flash)")?.family).toBe("gemini/3.8-flash");
+      expect(parseIdentity("Orchestrator (Gemini 4 Hydrogen)")?.family).toBe("gemini/hydrogen");
+
+      const intraAllowed = checkReviewGate(
+        "Orchestrator (google/gemini-3.8-flash-high)",
+        "google/gemini-4-argon",
+        "intra-fleet",
+      );
+      expect(intraAllowed.violated).toBe(false);
+
+      const crossBlocked = checkReviewGate(
+        "Orchestrator (google/gemini-3.8-flash-high)",
+        "google/gemini-4-argon",
+        "cross-vendor",
+      );
+      expect(crossBlocked.violated).toBe(true);
+      expect(crossBlocked.severity).toBe("error");
+
+      const distinctOrch = checkReviewGate(
+        "Orchestrator (Gemini 3.8 Flash)",
+        "Orchestrator (Carbon)",
+        "intra-fleet",
+      );
+      expect(distinctOrch.violated).toBe(false);
+
+      const sameOrchSelf = checkReviewGate(
+        "Orchestrator (Gemini 3.8 Flash)",
+        "google/gemini-3.8-flash-high (antigravity)",
+        "intra-fleet",
+      );
+      expect(sameOrchSelf.violated).toBe(true);
+      expect(sameOrchSelf.severity).toBe("error");
+    });
+
+    it("rejects placeholder identities in checkReviewGate regardless of mode and flags invalid-identity in auditBranch", () => {
+      for (const placeholder of [
+        "auto",
+        "Auto (antigravity)",
+        "orchestrator",
+        "Orchestrator ()",
+        "unknown",
+        "unknown/other",
+        "<provider>/<model> (<client>)",
+      ]) {
+        expect(isInvalidPlaceholderIdentity(placeholder)).toBe(true);
+        for (const mode of ["intra-fleet", "cross-vendor", "advisory", "off"] as const) {
+          const asAuthor = checkReviewGate(placeholder, "claude/opus-4.6", mode);
+          expect(asAuthor.violated).toBe(true);
+          expect(asAuthor.severity).toBe("error");
+
+          const asReviewer = checkReviewGate(
+            "google/gemini-3.8-flash-high (antigravity)",
+            placeholder,
+            mode,
+          );
+          expect(asReviewer.violated).toBe(true);
+          expect(asReviewer.severity).toBe("error");
+        }
+      }
+
+      expect(isInvalidPlaceholderIdentity(null)).toBe(false);
+      expect(isInvalidPlaceholderIdentity("")).toBe(false);
+      expect(isInvalidPlaceholderIdentity("Orchestrator (Carbon)")).toBe(false);
+      expect(isInvalidPlaceholderIdentity("google/gemini-flash-worker-agy (antigravity)")).toBe(
+        false,
+      );
+
+      const tempDir = mkdtempSync(join(tmpdir(), "lognexus-audit-placeholder-"));
+      try {
+        execSync("git init", { cwd: tempDir, stdio: "ignore" });
+        execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+        execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+        execSync('git config commit.gpgsign "false"', { cwd: tempDir, stdio: "ignore" });
+        commitFile(tempDir, "README.md", "# seed", "chore: seed");
+        const base = git("branch --show-current", tempDir) || "main";
+        execSync("git checkout -b issue/67-placeholder-audit", { cwd: tempDir, stdio: "ignore" });
+
+        commitFile(
+          tempDir,
+          "bad.ts",
+          "export const x = 1;\n",
+          "feat(#67/T3): placeholder trailer\n\nAuthored-by: auto\n",
+        );
+        attachCurrentStateToCommit("HEAD", { cwd: tempDir, force: true });
+
+        const result = auditBranch(base, tempDir);
+        const invalid = result.violations.find((v) => v.rule === "invalid-identity");
+        expect(invalid).toBeDefined();
+        expect(invalid?.severity).toBe("error");
+        expect(result.passed).toBe(false);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it("matches contract paths cleanly with linear multi-* and ** glob rules", () => {
+      expect(matchesPath("", "src/*.ts")).toBe(false);
+      expect(matchesPath("src/a.ts", "")).toBe(false);
+      expect(matchesPath("src/audit/audit.ts", "src/audit/audit.ts")).toBe(true);
+      expect(matchesPath("./src\\audit\\audit.ts", "src/audit/audit.ts")).toBe(true);
+      expect(matchesPath("src/audit/audit.ts", "src/audit/")).toBe(true);
+      expect(matchesPath("src/a.ts", "src/*.ts")).toBe(true);
+      expect(matchesPath("src/nested/a.ts", "src/*.ts")).toBe(false);
+      expect(matchesPath("src/my-test-unit-spec-v2.ts", "src/*test*spec*.ts")).toBe(true);
+      expect(matchesPath("src/my-test-unit.ts", "src/*test*spec*.ts")).toBe(false);
+      expect(matchesPath("src/a", "src/a*a")).toBe(false);
+      expect(matchesPath("src/aa", "src/a*a")).toBe(true);
+      expect(matchesPath("src/aba", "src/a*a")).toBe(true);
+      expect(matchesPath("src/a.ts", "src/**/*.ts")).toBe(true);
+      expect(matchesPath("src/a/b/c.ts", "src/**/*.ts")).toBe(true);
+      expect(matchesPath("tests/a.ts", "src/**/*.ts")).toBe(false);
+      expect(matchesPath("a.test.ts", "**/*.test.ts")).toBe(true);
+      expect(matchesPath("tests/unit/a.test.ts", "**/*.test.ts")).toBe(true);
+      expect(matchesPath("src/a/b.ts", "src/**")).toBe(true);
+      expect(matchesPath("a/b/c.ts", "a/**/b/**/c.ts")).toBe(true);
+      expect(matchesPath("a/x/b/y/z/c.ts", "a/**/b/**/c.ts")).toBe(true);
+
+      const start = performance.now();
+      expect(matchesPath("a".repeat(50_000), `${"*a".repeat(1000)}*b`)).toBe(false);
+      expect(performance.now() - start).toBeLessThan(100);
+    });
+
+    it("rejects placeholder identities in executeAtomicCommit while allowing omitted reviewer", () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "lognexus-commit-placeholder-"));
+      try {
+        execSync("git init", { cwd: tempDir, stdio: "ignore" });
+        execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+        execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+        execSync('git config commit.gpgsign "false"', { cwd: tempDir, stdio: "ignore" });
+        commitFile(tempDir, "README.md", "# seed", "chore: seed");
+        execSync("git checkout -b issue/67-commit-guard", { cwd: tempDir, stdio: "ignore" });
+
+        writeFileSync(join(tempDir, "feature.ts"), "export const ok = true;\n", "utf8");
+        execSync("git add feature.ts", { cwd: tempDir, stdio: "ignore" });
+
+        for (const badAuthor of [
+          "auto",
+          "orchestrator",
+          "unknown/other",
+          "<provider>/<model> (<client>)",
+        ]) {
+          expect(() =>
+            executeAtomicCommit({
+              message: "feat(#67/T3): reject placeholder author",
+              author: badAuthor,
+              targetDir: tempDir,
+            }),
+          ).toThrow(/Invalid placeholder identity/);
+        }
+
+        expect(() =>
+          executeAtomicCommit({
+            message: "feat(#67/T3): reject placeholder reviewer",
+            author: "google/gemini-flash-worker-agy (antigravity)",
+            reviewer: "auto",
+            targetDir: tempDir,
+          }),
+        ).toThrow(/Invalid placeholder identity/);
+
+        const res = executeAtomicCommit({
+          message: "feat(#67/T3): allow omitted reviewer with valid author",
+          author: "google/gemini-flash-worker-agy (antigravity)",
+          targetDir: tempDir,
+        });
+        expect(res.reviewer).toBeNull();
+        expect(res.noteAttached).toBe(true);
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }

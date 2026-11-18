@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 export type RoutingMode = "confirm" | "warn" | "off";
 
+export type OrchestrationMode = "auto" | "swarm" | "subagent" | "off";
+
 export type ReviewGateMode = "auto" | "cross-vendor" | "intra-fleet" | "advisory" | "off";
 
 export type EffectiveReviewGateMode = "cross-vendor" | "intra-fleet" | "advisory" | "off";
@@ -28,6 +30,7 @@ export interface DetectedEcosystems {
 
 export interface ParsedRoutingConfig {
   routingMode: RoutingMode;
+  orchestrationMode: OrchestrationMode;
   configuredReviewGate: ReviewGateMode;
   implementer: string | null;
   reviewer: string | null;
@@ -100,6 +103,7 @@ export const ECOSYSTEM_MARKERS: Record<
 };
 
 const VALID_ROUTING_MODES = new Set<string>(["confirm", "warn", "off"]);
+const VALID_ORCHESTRATION_MODES = new Set<string>(["auto", "swarm", "subagent", "off"]);
 const VALID_REVIEW_GATES = new Set<string>([
   "auto",
   "cross-vendor",
@@ -173,6 +177,7 @@ function isLowerSnakeKey(value: string): boolean {
  */
 export function parseRoutingConfigContent(content: string): ParsedRoutingConfig {
   let routingMode: RoutingMode = "confirm";
+  let orchestrationMode: OrchestrationMode = "auto";
   let configuredReviewGate: ReviewGateMode = "auto";
   let implementer: string | null = null;
   let reviewer: string | null = null;
@@ -225,6 +230,17 @@ export function parseRoutingConfigContent(content: string): ParsedRoutingConfig 
         }
         break;
       }
+      case "orchestration": {
+        const normalized = value.toLowerCase();
+        if (VALID_ORCHESTRATION_MODES.has(normalized)) {
+          orchestrationMode = normalized as OrchestrationMode;
+        } else {
+          warnings.push(
+            `Invalid orchestration value '${value}' in .lognexus/routing.md; defaulting to 'auto'`,
+          );
+        }
+        break;
+      }
       case "review_gate": {
         const normalized = value.toLowerCase();
         if (VALID_REVIEW_GATES.has(normalized)) {
@@ -250,6 +266,7 @@ export function parseRoutingConfigContent(content: string): ParsedRoutingConfig 
 
   return {
     routingMode,
+    orchestrationMode,
     configuredReviewGate,
     implementer,
     reviewer,
@@ -268,6 +285,7 @@ export function resolveRoutingProfile(targetDir: string = process.cwd()): Routin
   if (!existsSync(routingPath)) {
     return {
       routingMode: "confirm",
+      orchestrationMode: "auto",
       configuredReviewGate: "auto",
       effectiveReviewGate: "intra-fleet",
       implementer: null,
@@ -284,6 +302,7 @@ export function resolveRoutingProfile(targetDir: string = process.cwd()): Routin
   } catch {
     return {
       routingMode: "confirm",
+      orchestrationMode: "auto",
       configuredReviewGate: "auto",
       effectiveReviewGate: "intra-fleet",
       implementer: null,

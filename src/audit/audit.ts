@@ -15,6 +15,7 @@ export interface AuditViolation {
   rule:
     | "commit-format"
     | "authored-by-trailer"
+    | "invalid-identity"
     | "git-note-presence"
     | "contract-files"
     | "review-gate-separation"
@@ -63,6 +64,81 @@ export interface Identity {
   family: string;
 }
 
+function isWrappedInSingleParenPair(value: string): boolean {
+  if (!value.startsWith("(") || !value.endsWith(")")) return false;
+  let depth = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === "(") {
+      depth += 1;
+    } else if (value[i] === ")") {
+      depth -= 1;
+      if (depth === 0 && i < value.length - 1) {
+        return false;
+      }
+    }
+  }
+  return depth === 0;
+}
+
+function stripStrayOuterParens(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === "(") start += 1;
+  while (end > start && value[end - 1] === ")") end -= 1;
+  return value.slice(start, end);
+}
+
+function extractBalancedParenthetical(value: string, openIdx: number): string {
+  let depth = 0;
+  for (let i = openIdx; i < value.length; i += 1) {
+    if (value[i] === "(") {
+      depth += 1;
+    } else if (value[i] === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return value.slice(openIdx + 1, i).trim();
+      }
+    }
+  }
+  return value.slice(openIdx + 1).trim();
+}
+
+const INVALID_PLACEHOLDER_HEADS = new Set(["auto", "unknown", "unknown/other"]);
+
+/**
+ * Rejects template or placeholder agent identities (`auto`, bare `orchestrator`,
+ * `unknown`, `unknown/other`, or `<provider>/<model>` placeholders) while keeping
+ * empty/omitted strings (`false`) and qualified orchestrators (`Orchestrator (Carbon)`) distinct.
+ */
+export function isInvalidPlaceholderIdentity(raw?: string | null): boolean {
+  if (raw == null) return false;
+  let current = raw.trim().toLowerCase();
+  if (current === "") return false;
+  if (current.includes("<") || current.includes(">")) {
+    return true;
+  }
+
+  for (let depth = 0; depth < 16 && current !== ""; depth += 1) {
+    const parenIdx = current.indexOf("(");
+    const head = (parenIdx === -1 ? current : current.slice(0, parenIdx)).trim();
+    if (INVALID_PLACEHOLDER_HEADS.has(head)) {
+      return true;
+    }
+    if (head !== "orchestrator") {
+      return false;
+    }
+    if (parenIdx === -1) {
+      return true;
+    }
+    const qualifier = extractBalancedParenthetical(current, parenIdx);
+    if (qualifier === "") {
+      return true;
+    }
+    current = qualifier;
+  }
+  return true;
+}
+
 /**
  * Client qualifiers can carry spaces (`deepseek/VS Code (kimi-code)`), so a naive
  * first-token match would truncate the family to `deepseek/vs`. The family is the
@@ -70,11 +146,12 @@ export interface Identity {
  * to single dashes; `deepseek/chat` keeps resolving to `deepseek/chat`.
  */
 function extractFamily(value: string): string | null {
-  const head = value.split("(")[0].trim();
+  const head = stripStrayOuterParens(value.split("(")[0].trim());
   if (FAMILY_PATTERN.test(head)) {
     return head.replace(/\s+/g, "-").toLowerCase();
   }
-  for (const token of value.trim().split(/\s+/)) {
+  for (const rawToken of value.trim().split(/\s+/)) {
+    const token = stripStrayOuterParens(rawToken);
     const slashIdx = token.indexOf("/");
     if (slashIdx > 0 && slashIdx < token.length - 1) {
       return token.toLowerCase();
@@ -104,6 +181,41 @@ const PROVIDER_ALIASES: ReadonlyArray<readonly [readonly string[], string]> = [
   [["anthropic/"], "claude"],
 ];
 
+function isAsciiDigits(value: string): boolean {
+  if (value.length === 0) return false;
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 48 || code > 57) return false;
+  }
+  return true;
+}
+
+function isLowerAlnumOrDash(value: string): boolean {
+  if (value.length === 0) return false;
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    const isLower = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
+    if (!isLower && !isDigit && code !== 45) return false;
+  }
+  return true;
+}
+
+/** Converts trailing `-<major>-<minor>` dash pairs on `claude/` slugs to `.<minor>` in O(n). */
+function normalizeClaudeTrailingVersion(slug: string): string {
+  if (!slug.startsWith("claude/")) return slug;
+  const rest = slug.slice("claude/".length);
+  const parts = rest.split("-");
+  if (parts.length < 3) return slug;
+  const minor = parts[parts.length - 1];
+  const major = parts[parts.length - 2];
+  const prefix = parts.slice(0, -2).join("-");
+  if (!isLowerAlnumOrDash(prefix) || !isAsciiDigits(major) || !isAsciiDigits(minor)) {
+    return slug;
+  }
+  return `claude/${prefix}-${major}.${minor}`;
+}
+
 function stripCanonicalDecorations(collapsed: string): string {
   let slug = collapsed;
   for (let i = 0; i < 2; i++) {
@@ -120,10 +232,9 @@ function stripCanonicalDecorations(collapsed: string): string {
     else slug = rest.startsWith(`${target}/`) ? rest : `${target}/${rest}`;
     break;
   }
+  if (slug.startsWith("gemini-")) slug = `gemini/${slug.slice("gemini-".length)}`;
   if (slug.startsWith("claude-")) slug = `claude/${slug.slice("claude-".length)}`;
-  if (slug.startsWith("claude/")) {
-    slug = slug.replace(/^claude\/([a-z0-9-]+)-(\d+)-(\d+)$/, "claude/$1-$2.$3");
-  }
+  slug = normalizeClaudeTrailingVersion(slug);
   return slug;
 }
 
@@ -164,38 +275,48 @@ const CANONICAL_FLAGSHIP_BASENAMES = new Map<string, string>([
   ["flash-worker-agy", "gemini/flash-worker-agy"],
 ]);
 
-export function parseIdentity(value: string | null): Identity | null {
+function parseIdentityInternal(value: string | null, depth: number): Identity | null {
   if (value === null) return null;
 
   const trimmedValue = value.trim();
   if (trimmedValue === "") return null;
 
-  const parenIdx = trimmedValue.indexOf("(");
-  const head = (parenIdx === -1 ? trimmedValue : trimmedValue.slice(0, parenIdx)).trim();
+  let cleaned = trimmedValue;
+  while (isWrappedInSingleParenPair(cleaned)) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  if (cleaned === "") return null;
+
+  const parenIdx = cleaned.indexOf("(");
+  const rawHead = (parenIdx === -1 ? cleaned : cleaned.slice(0, parenIdx)).trim();
+  const head = stripStrayOuterParens(rawHead);
   const collapsedHead = head.toLowerCase().replace(/[\s_]+/g, "-");
-  if (collapsedHead === "orchestrator" && parenIdx !== -1) {
-    const closeIdx = trimmedValue.indexOf(")", parenIdx);
-    const qualifier = (
-      closeIdx === -1
-        ? trimmedValue.slice(parenIdx + 1)
-        : trimmedValue.slice(parenIdx + 1, closeIdx)
-    )
-      .trim()
-      .toLowerCase();
-    if (qualifier.includes("carbon")) {
+  if (collapsedHead === "orchestrator" && parenIdx !== -1 && depth < 16) {
+    const qualifier = extractBalancedParenthetical(cleaned, parenIdx);
+    const lowerQualifier = qualifier.toLowerCase();
+    if (lowerQualifier.includes("carbon")) {
       return { full: trimmedValue.toLowerCase(), family: "gemini/carbon" };
     }
-    if (qualifier.includes("argon")) {
+    if (lowerQualifier.includes("argon")) {
       return { full: trimmedValue.toLowerCase(), family: "gemini/argon" };
+    }
+    if (qualifier !== "") {
+      const inner = parseIdentityInternal(qualifier, depth + 1);
+      if (inner !== null) {
+        return { full: trimmedValue.toLowerCase(), family: inner.family };
+      }
     }
   }
 
-  const family = extractFamily(value);
+  const family = extractFamily(cleaned);
   if (family === null) {
     const trimmed = head.toLowerCase();
     if (trimmed === "") {
-      const fullOnly = trimmedValue.toLowerCase();
-      return { full: fullOnly, family: normalizeCanonicalFamily(fullOnly) };
+      const strippedFull = stripStrayOuterParens(cleaned).toLowerCase();
+      return {
+        full: trimmedValue.toLowerCase(),
+        family: normalizeCanonicalFamily(strippedFull || cleaned.toLowerCase()),
+      };
     }
     return {
       full: trimmedValue.toLowerCase(),
@@ -204,6 +325,10 @@ export function parseIdentity(value: string | null): Identity | null {
   }
 
   return { full: trimmedValue.toLowerCase(), family: normalizeCanonicalFamily(family) };
+}
+
+export function parseIdentity(value: string | null): Identity | null {
+  return parseIdentityInternal(value, 0);
 }
 
 export function extractTrailers(commitBody: string): {
@@ -255,6 +380,25 @@ export function checkReviewGate(
   reviewerStr: string | null,
   mode: EffectiveReviewGateMode = "intra-fleet",
 ): ReviewGateCheckResult {
+  if (isInvalidPlaceholderIdentity(authorStr)) {
+    return {
+      violated: true,
+      severity: "error",
+      message: `Invalid placeholder author identity '${authorStr}'. Specify the exact runtime model identity (e.g. 'google/gemini-3.8-flash-high (antigravity)').`,
+    };
+  }
+  if (
+    reviewerStr !== null &&
+    reviewerStr.trim() !== "" &&
+    isInvalidPlaceholderIdentity(reviewerStr)
+  ) {
+    return {
+      violated: true,
+      severity: "error",
+      message: `Invalid placeholder reviewer identity '${reviewerStr}'. Specify the exact runtime model identity (e.g. 'claude/opus-4.6 (claude-code)').`,
+    };
+  }
+
   const author = parseIdentity(authorStr);
   const reviewer = parseIdentity(reviewerStr);
   if (author === null || reviewer === null) {
@@ -310,19 +454,70 @@ function toStringList(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string").map(normalizePath);
 }
 
-function matchesPath(file: string, rule: string): boolean {
-  if (rule === "") return false;
-  if (rule.endsWith("/")) return file.startsWith(rule);
-  if (rule.includes("*")) {
-    const pattern = new RegExp(
-      `^${rule
-        .split("*")
-        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-        .join(".*")}$`,
-    );
-    return pattern.test(file);
+function matchSegment(segment: string, pattern: string): boolean {
+  if (pattern === "*" || pattern === "**") return true;
+  if (!pattern.includes("*")) return segment === pattern;
+
+  const parts = pattern.split("*");
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  if (!segment.startsWith(first)) return false;
+  if (last !== "" && !segment.endsWith(last)) return false;
+
+  let pos = first.length;
+  const limit = segment.length - last.length;
+  if (pos > limit) return false;
+
+  for (let i = 1; i < parts.length - 1; i += 1) {
+    const part = parts[i];
+    if (part === "") continue;
+    const idx = segment.indexOf(part, pos);
+    if (idx === -1 || idx + part.length > limit) return false;
+    pos = idx + part.length;
   }
-  return file === rule;
+  return true;
+}
+
+/**
+ * Matches a normalized repository path against a contract rule (`dir/`, exact path,
+ * intra-segment `*` wildcards, or `**` directory-crossing segments) in deterministic
+ * linear time without `new RegExp`.
+ */
+export function matchesPath(file: string, rule: string): boolean {
+  const normFile = normalizePath(file);
+  const normRule = normalizePath(rule);
+  if (normFile === "" || normRule === "") return false;
+  if (normRule.endsWith("/")) return normFile.startsWith(normRule);
+  if (!normRule.includes("*")) return normFile === normRule;
+
+  const fileSegments = normFile.split("/");
+  const ruleSegments = normRule.split("/");
+  let fi = 0;
+  let ri = 0;
+  let starRi = -1;
+  let matchFi = 0;
+
+  while (fi < fileSegments.length) {
+    if (ri < ruleSegments.length && ruleSegments[ri] === "**") {
+      starRi = ri;
+      matchFi = fi;
+      ri += 1;
+    } else if (ri < ruleSegments.length && matchSegment(fileSegments[fi], ruleSegments[ri])) {
+      fi += 1;
+      ri += 1;
+    } else if (starRi !== -1) {
+      matchFi += 1;
+      fi = matchFi;
+      ri = starRi + 1;
+    } else {
+      return false;
+    }
+  }
+
+  while (ri < ruleSegments.length && ruleSegments[ri] === "**") {
+    ri += 1;
+  }
+  return ri === ruleSegments.length;
 }
 
 function listCommitFiles(sha: string, targetDir: string): string[] {
@@ -439,16 +634,37 @@ function auditCommit(
     });
   }
 
-  const gateCheck = checkReviewGate(item.author, item.reviewer, gateMode);
-  if (gateCheck.violated) {
+  const hasInvalidAuthor = isInvalidPlaceholderIdentity(item.author);
+  const hasInvalidReviewer = isInvalidPlaceholderIdentity(item.reviewer);
+  if (hasInvalidAuthor) {
     violations.push({
       ...base,
-      rule: "review-gate-separation",
-      message:
-        gateCheck.message ??
-        `Self-approval detected: author '${item.author}' and reviewer '${item.reviewer}' share the same identity.`,
-      severity: gateCheck.severity,
+      rule: "invalid-identity",
+      message: `Invalid placeholder Authored-by identity '${item.author}'. Specify the exact runtime model identity (e.g. 'google/gemini-3.8-flash-high (antigravity)').`,
+      severity: "error",
     });
+  }
+  if (hasInvalidReviewer) {
+    violations.push({
+      ...base,
+      rule: "invalid-identity",
+      message: `Invalid placeholder Reviewed-by identity '${item.reviewer}'. Specify the exact runtime model identity (e.g. 'claude/opus-4.6 (claude-code)').`,
+      severity: "error",
+    });
+  }
+
+  if (!hasInvalidAuthor && !hasInvalidReviewer) {
+    const gateCheck = checkReviewGate(item.author, item.reviewer, gateMode);
+    if (gateCheck.violated) {
+      violations.push({
+        ...base,
+        rule: "review-gate-separation",
+        message:
+          gateCheck.message ??
+          `Self-approval detected: author '${item.author}' and reviewer '${item.reviewer}' share the same identity.`,
+        severity: gateCheck.severity,
+      });
+    }
   }
 
   const changedFiles = listCommitFiles(item.sha, targetDir);
