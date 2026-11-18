@@ -12,6 +12,7 @@ import {
   isInvalidPlaceholderIdentity,
   matchesPath,
   parseIdentity,
+  unwrapOuterBalancedParens,
 } from "../src/audit/audit.js";
 import { executeAtomicCommit } from "../src/commit.js";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
@@ -883,12 +884,106 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
       expect(matchesPath("a.test.ts", "**/*.test.ts")).toBe(true);
       expect(matchesPath("tests/unit/a.test.ts", "**/*.test.ts")).toBe(true);
       expect(matchesPath("src/a/b.ts", "src/**")).toBe(true);
+      expect(matchesPath("src/a.ts", "src/*")).toBe(true);
+      expect(matchesPath("src/nested/a.ts", "src/*")).toBe(false);
+      expect(matchesPath("src/a.ts", "src/**")).toBe(true);
+      expect(matchesPath("src/nested/a.ts", "src/**")).toBe(true);
+      expect(matchesPath("src/sub/a.ts", "src/*/")).toBe(true);
+      expect(matchesPath("src/sub/deep/a.ts", "src/*/")).toBe(true);
+      expect(matchesPath("src/a.ts", "src/*/")).toBe(false);
+      expect(matchesPath("src/sub/a.ts", "src/**/")).toBe(true);
+      expect(matchesPath("src/a.ts", "src/**/")).toBe(true);
+      expect(matchesPath("other/sub/a.ts", "src/*/")).toBe(false);
+      expect(matchesPath("src/audit-other/audit.ts", "src/audit/")).toBe(false);
       expect(matchesPath("a/b/c.ts", "a/**/b/**/c.ts")).toBe(true);
       expect(matchesPath("a/x/b/y/z/c.ts", "a/**/b/**/c.ts")).toBe(true);
 
       const start = performance.now();
       expect(matchesPath("a".repeat(50_000), `${"*a".repeat(1000)}*b`)).toBe(false);
       expect(performance.now() - start).toBeLessThan(100);
+    });
+
+    it("unwraps deeply nested balanced outer parentheses in O(n) without stripping sibling groups", () => {
+      expect(unwrapOuterBalancedParens("(a) (b)")).toBe("(a) (b)");
+      expect(unwrapOuterBalancedParens("  (( (a) (b) ))  ")).toBe("(a) (b)");
+      expect(unwrapOuterBalancedParens("(   )")).toBe("");
+      expect(unwrapOuterBalancedParens("((a)")).toBe("((a)");
+
+      const nested = `${"(".repeat(20_000)}a${")".repeat(20_000)}`;
+      const nestedNeon = `${"(".repeat(20_000)}google/gemini-4-neon-extra${")".repeat(20_000)}`;
+      const start = performance.now();
+      expect(unwrapOuterBalancedParens(nested)).toBe("a");
+      expect(parseIdentity(nestedNeon)?.family).toBe("gemini/neon");
+      expect(performance.now() - start).toBeLessThan(200);
+    });
+
+    describe("Gemini 4 Neon normalization and review-gate matrix", () => {
+      it.each([
+        "Gemini 4 Neon",
+        "Gemini 4 Neon (Extra)",
+        "Gemini 4 Neon (XHigh)",
+        "gemini/neon",
+        "gemini/4-neon",
+        "gemini-4-neon",
+        "google/gemini-4-neon",
+        "google/gemini-4-neon-high",
+        "google/gemini-4-neon-xhigh",
+        "google/gemini-4-neon-extra",
+        "google/gemini-4-neon-extra-high (antigravity)",
+        "Orchestrator (Neon)",
+        "Orchestrator (Gemini 4 Neon)",
+        "gemini-pro-orchestrator-neon",
+        "google/gemini-pro-orchestrator-neon (antigravity)",
+      ])("normalizes %s to gemini/neon", (identity) => {
+        expect(parseIdentity(identity)?.family).toBe("gemini/neon");
+      });
+
+      it("blocks self-review across Gemini 4 Neon display names, effort suffixes, and orchestrator aliases", () => {
+        for (const [author, reviewer] of [
+          ["Gemini 4 Neon", "google/gemini-4-neon-xhigh"],
+          ["Gemini 4 Neon (Extra)", "google/gemini-4-neon-extra"],
+          ["Orchestrator (Neon)", "gemini-pro-orchestrator-neon"],
+          ["google/gemini-pro-orchestrator-neon (antigravity)", "Gemini 4 Neon (Extra)"],
+        ] as const) {
+          const gate = checkReviewGate(author, reviewer, "intra-fleet");
+          expect(gate.violated).toBe(true);
+          expect(gate.severity).toBe("error");
+          expect(checkSelfApproval(author, reviewer).isSelfApproval).toBe(true);
+        }
+      });
+
+      it("permits intra-fleet review between Neon and Hydrogen, Flash, Carbon, and Argon", () => {
+        for (const peer of [
+          "google/gemini-4-hydrogen-high (antigravity)",
+          "google/gemini-3.8-flash-high (antigravity)",
+          "Orchestrator (Carbon)",
+          "Orchestrator (Argon)",
+        ]) {
+          const asReviewer = checkReviewGate(peer, "Orchestrator (Neon)", "intra-fleet");
+          expect(asReviewer.violated).toBe(false);
+
+          const asAuthor = checkReviewGate("Gemini 4 Neon (Extra)", peer, "intra-fleet");
+          expect(asAuthor.violated).toBe(false);
+        }
+      });
+
+      it("blocks Orchestrator (Neon) vs google/gemini-4-hydrogen-high under cross-vendor on vendor gemini", () => {
+        const res = checkReviewGate(
+          "Orchestrator (Neon)",
+          "google/gemini-4-hydrogen-high",
+          "cross-vendor",
+        );
+        expect(res.violated).toBe(true);
+        expect(res.severity).toBe("error");
+        expect(res.message).toContain("('gemini')");
+
+        const crossVendorAllowed = checkReviewGate(
+          "Orchestrator (Neon)",
+          "claude/opus-4.6",
+          "cross-vendor",
+        );
+        expect(crossVendorAllowed.violated).toBe(false);
+      });
     });
 
     it("rejects placeholder identities in executeAtomicCommit while allowing omitted reviewer", () => {

@@ -20,10 +20,10 @@ review_gate: auto
 implementer: auto
 reviewer: auto
 
-# Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Opus -> Sonnet, Argon/Carbon -> Hydrogen/Flash) works out of the box for single-provider teams.
+# Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Opus -> Sonnet, Argon/Carbon/Neon -> Hydrogen/Flash) works out of the box for single-provider teams.
 
 # Operational Tier Taxonomy (Empirical recommendations across Gemini, Claude, OpenAI, DeepSeek, Kimi)
-# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Claude Opus, OpenAI o3/GPT-5, DeepSeek R1
+# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Gemini 4 Neon, Claude Opus, OpenAI o3/GPT-5, DeepSeek R1
 # tier-2 (Orchestration / Large Context >500 lines): Gemini 4 Hydrogen, Gemini 3.8 Flash High, Claude Sonnet, Kimi K3 / K2.7 Code
 # tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini Flash, DeepSeek V3 (Chat), Kimi Code, Claude Haiku, GPT-4o-mini
 

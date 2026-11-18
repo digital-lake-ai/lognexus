@@ -17,10 +17,12 @@ import type { SubtaskIsolation } from "./schema.js";
 export const IMPLEMENTER_IDENTITY = "deepseek/VS Code (kimi-code)";
 /** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
 export const AUDITOR_IDENTITY = "google/gemini-3.8-flash-high (antigravity)";
-/** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
+/** @deprecated Tier-1 flagship default (`Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Neon`); use `.lognexus/routing.md` (`reviewer`) instead. */
 export const ARCHITECT_IDENTITY = "Gemini 4 Argon";
 /** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
 export const CO_ARCHITECT_IDENTITY = "Gemini 4 Carbon";
+/** @deprecated Use `.lognexus/routing.md` (`reviewer`) instead. */
+export const NEON_ARCHITECT_IDENTITY = "Gemini 4 Neon";
 
 /** Hard ceiling on implementation files a single subtask may touch in one turn. */
 export const CONTEXT_MAX_FILES = 6;

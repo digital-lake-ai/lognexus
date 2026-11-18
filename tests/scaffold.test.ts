@@ -81,6 +81,8 @@ describe("initProject", () => {
     expect(content).not.toContain("# implementer: auto");
     expect(content).not.toContain("# reviewer: auto");
     expect(content).toContain("Cross-family review is recommended");
+    expect(content).toContain("Gemini 4 Neon");
+    expect(content).toContain("Argon/Carbon/Neon -> Hydrogen/Flash");
 
     const parsed = parseRoutingConfigContent(content);
     expect(parsed.routingMode).toBe("confirm");

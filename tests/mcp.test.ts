@@ -604,6 +604,8 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain('omitting `model` (`"auto"`) on implementation workers');
       expect(text).toContain("real runtime model identity");
       expect(text).toContain("keep telemetry `100%` silent in the background");
+      expect(text).toContain("Gemini 4 Carbon / Argon / Neon");
+      expect(text).toContain("(`Neon`/`Carbon`/`Argon`/`Opus`)");
     });
 
     it("gets the lognexus-review prompt with the gate checklist", async () => {

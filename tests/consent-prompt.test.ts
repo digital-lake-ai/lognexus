@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -19,6 +20,25 @@ import {
 } from "../src/telemetry/consent-prompt.js";
 import { TELEMETRY_POLICY_VERSION } from "../src/telemetry/schema.js";
 
+const readlineState = vi.hoisted(() => ({
+  nextRl: null as (EventEmitter & { close: ReturnType<typeof vi.fn> }) | null,
+}));
+
+vi.mock("node:readline", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:readline")>();
+  return {
+    ...actual,
+    createInterface: vi.fn((options: Parameters<typeof actual.createInterface>[0]) => {
+      if (readlineState.nextRl) {
+        const rl = readlineState.nextRl;
+        readlineState.nextRl = null;
+        return rl;
+      }
+      return actual.createInterface(options);
+    }),
+  };
+});
+
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
@@ -34,6 +54,9 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
   });
 
   afterEach(() => {
+    readlineState.nextRl = null;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     delete process.env.DO_NOT_TRACK;
     delete process.env.LOGNEXUS_TELEMETRY_DISABLED;
     rmSync(tempDir, { recursive: true, force: true });
@@ -427,6 +450,125 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
 
       expect(notices).toHaveLength(0);
       expect(askQuestion).not.toHaveBeenCalled();
+    });
+
+    it("writes trailing newline, closes readline, pauses stdin, invokes onInterrupt, and persists zero files on SIGINT", async () => {
+      seedInitializedRepo();
+      const rl = Object.assign(new EventEmitter(), {
+        close: vi.fn(() => {
+          rl.emit("close");
+        }),
+      });
+      readlineState.nextRl = rl;
+
+      const writes: string[] = [];
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      });
+      const pauseSpy = vi.spyOn(process.stdin, "pause").mockImplementation(() => process.stdin);
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+      const onInterrupt = vi.fn();
+
+      const promise = maybePromptTelemetryConsent({
+        ...baseOptions(),
+        writeNotice: () => {},
+        onInterrupt,
+      });
+
+      expect(writes).toHaveLength(1);
+      expect(writes[0]).toContain("[y/N]: ");
+
+      rl.emit("SIGINT");
+      const outcome = await promise;
+
+      expect(outcome).toBe("skipped");
+      expect(writes).toEqual([expect.stringContaining("[y/N]: "), "\n"]);
+      expect(rl.close).toHaveBeenCalledTimes(1);
+      expect(pauseSpy).toHaveBeenCalledTimes(1);
+      expect(onInterrupt).toHaveBeenCalledTimes(1);
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(existsSync(getTelemetryPath(tempDir))).toBe(false);
+      expect(getTelemetryConsentState(tempDir)).toBe("unanswered");
+    });
+
+    it("exits with POSIX code 130 after closing readline and pausing stdin when SIGINT occurs without onInterrupt", async () => {
+      seedInitializedRepo();
+      const callOrder: string[] = [];
+      const rl = Object.assign(new EventEmitter(), {
+        close: vi.fn(() => {
+          callOrder.push("close");
+          rl.emit("close");
+        }),
+      });
+      readlineState.nextRl = rl;
+
+      const writes: string[] = [];
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      });
+      vi.spyOn(process.stdin, "pause").mockImplementation(() => {
+        callOrder.push("pause");
+        return process.stdin;
+      });
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+        callOrder.push("exit");
+        return undefined;
+      }) as never);
+
+      const promise = maybePromptTelemetryConsent({
+        ...baseOptions(),
+        writeNotice: () => {},
+      });
+
+      rl.emit("SIGINT");
+      const outcome = await promise;
+
+      expect(outcome).toBe("skipped");
+      expect(writes).toEqual([expect.stringContaining("[y/N]: "), "\n"]);
+      expect(exitSpy).toHaveBeenCalledWith(130);
+      expect(callOrder).toEqual(["close", "pause", "exit"]);
+      expect(existsSync(getTelemetryPath(tempDir))).toBe(false);
+      expect(getTelemetryConsentState(tempDir)).toBe("unanswered");
+    });
+
+    it("writes trailing newline and resolves skipped without invoking onInterrupt or persisting files on timeout", async () => {
+      vi.useFakeTimers();
+      seedInitializedRepo();
+      const rl = Object.assign(new EventEmitter(), {
+        close: vi.fn(() => {
+          rl.emit("close");
+        }),
+      });
+      readlineState.nextRl = rl;
+
+      const writes: string[] = [];
+      vi.spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      });
+      const pauseSpy = vi.spyOn(process.stdin, "pause").mockImplementation(() => process.stdin);
+      const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+      const onInterrupt = vi.fn();
+
+      const promise = maybePromptTelemetryConsent({
+        ...baseOptions(),
+        writeNotice: () => {},
+        onInterrupt,
+      });
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      const outcome = await promise;
+
+      expect(outcome).toBe("skipped");
+      expect(writes).toEqual([expect.stringContaining("[y/N]: "), "\n"]);
+      expect(rl.close).toHaveBeenCalledTimes(1);
+      expect(pauseSpy).toHaveBeenCalledTimes(1);
+      expect(onInterrupt).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(existsSync(getTelemetryPath(tempDir))).toBe(false);
+      expect(getTelemetryConsentState(tempDir)).toBe("unanswered");
     });
   });
 

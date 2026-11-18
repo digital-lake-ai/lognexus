@@ -258,16 +258,28 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   // Explicit flagship Gemini 4 identities take precedence over generic client-role fallbacks.
   if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
   if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
+  if ((trimmed.includes("gemini") || trimmed.includes("antigravity")) && trimmed.includes("neon")) {
+    return "gemini/neon";
+  }
   if (trimmed.includes("gemini") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
   if (trimmed.includes("antigravity") && trimmed.includes("carbon")) return "gemini/carbon";
   if (trimmed.includes("antigravity") && trimmed.includes("argon")) return "gemini/argon";
   if (trimmed.includes("antigravity") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
 
-  // Antigravity Orchestrator (Carbon/Argon) display & slug forms and Flash worker-agy forms.
+  // Antigravity Orchestrator (Carbon/Argon/Neon) display & slug forms and Flash worker-agy forms.
+  if (
+    trimmed === "orchestrator (neon)" ||
+    (trimmed.includes("orchestrator") && trimmed.includes("neon")) ||
+    trimmed.includes("gemini-pro-orchestrator-neon")
+  ) {
+    return "gemini/neon";
+  }
   if (
     trimmed === "orchestrator (carbon)" ||
     (trimmed.includes("orchestrator") && trimmed.includes("carbon")) ||
-    (trimmed.includes("gemini-pro-orchestrator") && !trimmed.includes("argon"))
+    (trimmed.includes("gemini-pro-orchestrator") &&
+      !trimmed.includes("argon") &&
+      !trimmed.includes("neon"))
   ) {
     return "gemini/carbon";
   }
@@ -401,8 +413,10 @@ const TIER_1_MARKERS = [
   "gemini/pro",
   "gemini/argon",
   "gemini/carbon",
+  "gemini/neon",
   "argon",
   "carbon",
+  "neon",
   "lead/orchestrator",
   "orchestrator",
   "antigravity/lead",
@@ -442,6 +456,7 @@ const EFFORT_SUFFIXES = [
   "-extra-high",
   "-xtrahigh",
   "-xhigh",
+  "-extra",
   "-minimal",
   "-medium",
   "-high",

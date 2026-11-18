@@ -286,9 +286,14 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
     it("does not match human names as model tiers and handles Orchestrator qualifiers", () => {
       expect(inferTierFromAuthor("Ana Carbonell")).toBeNull();
-      expect(inferTierFromAuthor("Ana Carbonell <ana@carbon.com>")).toBeNull();
+      expect(inferTierFromAuthor("Ana Carbonell <ana@carbon.example.com>")).toBeNull();
       expect(inferTierFromAuthor("Kimi Lee")).toBeNull();
-      expect(inferTierFromAuthor("Kimi Lee <kimi@vscode.com>")).toBeNull();
+      expect(inferTierFromAuthor("Kimi Lee <kimi@vscode.example.com>")).toBeNull();
+      expect(inferTierFromAuthor("Neonila Perez <neonila@example.com>")).toBeNull();
+      expect(inferTierFromAuthor("Neonila Perez <neonila@neon.example.com>")).toBeNull();
+      expect(extractModelFamilyCategory("Neonila Perez <neonila@example.com>")).toBe(
+        "unknown/other",
+      );
       expect(inferTierFromAuthor("Qwen Lee")).toBeNull();
       expect(inferTierFromAuthor("Kimi K3")).toBe("tier-3");
       expect(inferTierFromAuthor("moonshot/kimi")).toBe("tier-3");
@@ -989,6 +994,80 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor("gemini-flash-worker-agy")).toBe("tier-3");
       expect(inferTierFromAuthor("flash-worker-agy")).toBe("tier-3");
       expect(inferTierFromAuthor("deepseek/VS Code (kimi-code, orchestrator)")).toBe("tier-3");
+    });
+  });
+
+  describe("Gemini 4 Neon Routing", () => {
+    it("classifies every Gemini 4 Neon and Orchestrator (Neon) variant as gemini/neon and tier-1", () => {
+      for (const identity of [
+        "Gemini 4 Neon",
+        "Gemini 4 Neon (Low)",
+        "Gemini 4 Neon (Medium)",
+        "Gemini 4 Neon (High)",
+        "Gemini 4 Neon (XHigh)",
+        "Gemini 4 Neon (Extra)",
+        "gemini/neon",
+        "gemini/neon (antigravity)",
+        "google/gemini-4-neon-low (antigravity)",
+        "google/gemini-4-neon-medium (antigravity)",
+        "google/gemini-4-neon-high (antigravity)",
+        "google/gemini-4-neon-xhigh (antigravity)",
+        "google/gemini-4-neon-extra (antigravity)",
+        "Orchestrator (Neon)",
+        "gemini-pro-orchestrator-neon",
+        "google/gemini-pro-orchestrator-neon (antigravity)",
+      ]) {
+        expect(extractModelFamilyCategory(identity)).toBe("gemini/neon");
+        expect(inferTierFromAuthor(identity)).toBe("tier-1");
+      }
+
+      // Ensure Carbon orchestrator variants remain distinct from Neon.
+      expect(extractModelFamilyCategory("gemini-pro-orchestrator")).toBe("gemini/carbon");
+      expect(extractModelFamilyCategory("Orchestrator (Carbon)")).toBe("gemini/carbon");
+    });
+
+    it("detects Orchestrator (Neon) and gemini-pro-orchestrator-neon as swarm commits", () => {
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+
+      const firstFile = join(tempDir, "src", "neon-a.ts");
+      mkdirSync(dirname(firstFile), { recursive: true });
+      writeFileSync(firstFile, "export const neonA = 1;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "feat(#69/T1): orchestrator neon" --author "Orchestrator (Neon) <neon@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
+      const shaA = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+      recordCommitTelemetry({
+        sha: shaA,
+        author: "Orchestrator (Neon)",
+        targetDir: tempDir,
+      });
+
+      const secondFile = join(tempDir, "src", "neon-b.ts");
+      writeFileSync(secondFile, "export const neonB = 2;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync(
+        'git commit -q -m "feat(#69/T2): pro orchestrator neon" --author "google/gemini-pro-orchestrator-neon (antigravity) <neon@example.com>"',
+        { cwd: tempDir, stdio: "ignore" },
+      );
+      const shaB = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+      recordCommitTelemetry({
+        sha: shaB,
+        author: "gemini-pro-orchestrator-neon",
+        targetDir: tempDir,
+      });
+
+      const live = loadTelemetry(tempDir);
+      expect(live.summary.swarmCommits).toBe(2);
+      expect(live.models["gemini/neon"]?.commits).toBe(2);
+      expect(live.models["gemini/neon"]?.tier).toBe("tier-1");
+      expect(live.summary.tierCommits["tier-1"]).toBe(2);
+
+      const synced = syncTelemetryFromGitNotes(tempDir);
+      expect(synced.summary.swarmCommits).toBe(2);
+      expect(synced.models["gemini/neon"]?.commits).toBe(2);
+      expect(synced.models["gemini/neon"]?.tier).toBe("tier-1");
     });
   });
 
