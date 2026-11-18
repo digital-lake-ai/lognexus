@@ -11,7 +11,7 @@
 LogNexus operates under a **100% Offline / Local-Only** architecture.
 
 1. **Zero Network Transmissions:** LogNexus never sends telemetry anywhere. There is no ingestion endpoint, no remote collector, and no dispatch code in the shipped package.
-2. **Disabled by Default:** No metrics are recorded until you explicitly run `lognexus telemetry enable`.
+2. **Disabled by Default:** No metrics are recorded until a human operator explicitly accepts Policy `v2.0.0` via the one-time interactive `[y/N]` prompt (`init`, `status`, or `doctor`) or runs `lognexus telemetry enable` / `lognexus init --enable-telemetry` from a human terminal.
 3. **Strictly Local Storage:** Every metric lives in a single file inside your own working directory — `.lognexus/telemetry.json` — and never leaves that path.
 4. **Single Operating Level:** The only supported mode is `local`. The former `community` mode has been retired; the `--share` and `--accept-terms` flags no longer exist and fail with an explicit error.
 5. **Zero-PII Guarantee:** LogNexus **never** stores source code, file contents, file paths, commit messages, issue titles, author emails, or secrets in its telemetry store.
@@ -53,7 +53,20 @@ export DO_NOT_TRACK=1
 export LOGNEXUS_TELEMETRY_DISABLED=1
 ```
 
-Under a kill switch, the store reports mode `off`, no metrics file is written, and active recording is a no-op.
+Under a kill switch, the store reports mode `off`, no metrics file is written, no interactive consent prompt is shown, and active recording is a no-op.
+
+### 3.1 Interactive Consent Gate & Policy Versioning (v2.0.0)
+
+LogNexus treats local performance recording as an explicit, human-confirmed opt-in:
+
+1. **One-Time Interactive Prompt (`[y/N]`):** On interactive human TTY runs of `lognexus init`, `lognexus status`, or `lognexus doctor` inside an initialized repository (`.lognexus/routing.md` or `.lognexus/state.json`), LogNexus displays a concise 3-line disclosure on `stderr` and asks once: `Enable local-only telemetry (Policy v2.0.0)? [y/N]:`. Pressing Enter (`""`) or `n` defaults to **No**; EOF, Ctrl+C, or a 60-second timeout persists nothing (`unanswered`).
+2. **Sealed Refusal & Silent Execution:** Declining seals `mode: "off"`, `consent.accepted: false`, `consent.policyVersion: "2.0.0"`, and a `consent.declinedAt` timestamp. Once a choice is sealed (`accepted` or `declined`), subsequent runs execute **100% silently** with zero re-prompting.
+3. **Automatic Pause & Re-Consent on Policy Updates:** Whenever `TELEMETRY_POLICY_VERSION` increases (for example from `1.0.0` to `2.0.0` due to expanded data-scope fields), existing stores enter the `outdated` state (`Paused — Re-consent Required`). Passive metric hooks pause immediately until a human confirms the updated policy.
+4. **Non-Blocking Agent & CI Guard:** AI agent runtimes (`LOGNEXUS_AUTHOR`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_TRACE_ID`, `CODEX_SANDBOX`, `ANTIGRAVITY_CLI`, `GEMINI_CLI`, `AIDER_MODEL`, or VS Code agent environments), CI/non-TTY pipelines (`CI`, `GITHUB_ACTIONS`, `VITEST`, `NODE_ENV=test`, `TERM=dumb`, `LOGNEXUS_NO_PROMPT=1`, `LOGNEXUS_NO_UPDATE_CHECK=1`), and non-interactive flags (`--json`, `--prompt`, `--compact-prompt`, `--pr-body`, `--help`, `--version`, etc.) are never prompted. Calling `lognexus_telemetry` (`action: "enable"`) via MCP or invoking `telemetry enable` / `init --enable-telemetry` from an agent environment cannot seal human GDPR consent without interactive human confirmation.
+5. **Withdrawal & Erasure:**
+   - **Withdrawal (`lognexus telemetry disable` / `lognexus init --no-telemetry` / `--disable-telemetry`):** Immediately switches `mode` to `"off"`, clears `accepted`, and stamps `declinedAt`.
+   - **Erasure (`lognexus telemetry clear`):** Erases all accumulated metrics and rotates `anonymousProjectId` to a new random UUID while preserving your sealed refusal metadata (`declinedAt` and `policyVersion`) so clearing data never re-triggers first-run prompts.
+6. **User-Invoked Local Projections (`report`, `snapshot`, `inspect`):** Running `telemetry report`, `telemetry snapshot`, or `telemetry inspect` computes an on-demand projection in memory from local Git history and `refs/notes/lognexus` even when passive recording is off (`snapshot` pins only the random `anonymousProjectId` if not yet saved); passive background recording remains disabled unless active consent is granted.
 
 ---
 
@@ -84,8 +97,9 @@ Example payload:
   "anonymousProjectId": "e4f8d2c1-4b3e-412a-9c0f-7e6d5b4a3c2d",
   "consent": {
     "accepted": false,
-    "policyVersion": "1.0.0",
-    "acceptedAt": null
+    "policyVersion": "2.0.0",
+    "acceptedAt": null,
+    "declinedAt": null
   },
   "environment": {
     "os": "win32",
