@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-18T21:37:06.010Z",
+  "issue": {
+    "id": 67,
+    "title": "feat: native auto-swarm orchestration, Turn-1 probe gate, and sealed GDPR telemetry consent v2.0",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T5",
+    "title": "Align governance rules and routing config with auto-swarm and silent telemetry",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".agents/rules.md",
+        ".lognexus/routing.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "isolation": "swarm",
+      "swarmWorkers": 4
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 4,
+    "posts": 77
+  }
+}
