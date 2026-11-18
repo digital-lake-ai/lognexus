@@ -599,6 +599,11 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain("Swarm Token-Hygiene");
       expect(text).toContain("`swarm`");
       expect(text).toContain("--isolation swarm --swarm-workers <n> --swarm-posts <count>");
+      expect(text).toContain("NEVER read `> 3` codebase files directly in the orchestrator");
+      expect(text).toContain("orchestration: auto");
+      expect(text).toContain('omitting `model` (`"auto"`) on implementation workers');
+      expect(text).toContain("real runtime model identity");
+      expect(text).toContain("keep telemetry `100%` silent in the background");
     });
 
     it("gets the lognexus-review prompt with the gate checklist", async () => {
@@ -616,6 +621,9 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain("intra-fleet");
       expect(text).toContain("Verdict");
       expect(text).toContain("npm test");
+      expect(text).toContain("anti-spoofing");
+      expect(text).toContain("placeholder identities");
+      expect(text).toContain("Telemetry silence");
     });
 
     it("rejects an unknown prompt name with -32602", async () => {

@@ -112,14 +112,14 @@ ${issueLine}
 ${contextBlock}
 ## Rules
 
-1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files), automatically delegate read-only codebase exploration to \`tier-2\`/\`tier-3\` subagents (zero writes) to save \`tier-1\` tokens.
-2. Decompose the work into ordered subtasks, each named \`[tier-X]\` according to the model tier suited to it, with pre-delimited subagent/isolation assignments awaiting developer confirmation before executing writes.
+1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files, with or without an active issue), NEVER read \`> 3\` codebase files directly in the orchestrator; immediately auto-dispatch read-only discovery probes (zero writes) to \`tier-2\`/\`tier-3\` subagents without asking first — pin a fast \`tier-2\`/\`tier-3\` model (e.g. \`flash\`) whenever the orchestrator is \`tier-1\` (\`Carbon\`/\`Argon\`/\`Opus\`), and omit \`model\` only when the coordinator itself is \`tier-2\`/\`tier-3\`.
+2. Decompose the work into ordered subtasks, each named \`[tier-X]\` according to the model tier suited to it, with pre-delimited subagent/isolation assignments awaiting developer confirmation before executing writes. Once the developer confirms the plan, when \`orchestration: auto\` and Antigravity \`Orchestrator\` (\`swarm\` tool) are active, launch native \`swarm\` execution automatically without asking again, omitting \`model\` (\`"auto"\`) on implementation workers unless a specific model is requested.
 3. Every subtask must carry a closed delegation contract. Never leave a subtask open-ended.
 4. Subtasks must not overlap in the files they touch. If they would, split further or sequence them.
 5. Each subtask must end in a state where the verification command passes.
 6. Prefer the lowest tier that can safely complete the subtask. Escalate to tier-1 only for decisions the executor must not make.
 7. Do not invent dependencies or APIs. If a capability is missing, the subtask must say "stop and ask".
-8. Swarm Token-Hygiene: cap active swarm workers at \`<= 4\`, prohibit \`tier-1\` models on read-only probes when \`tier-2\`/\`tier-3\` suffice, enforce selective \`@name\` mentions (avoiding \`@all\` broadcast bloat), and pass \`--isolation swarm --swarm-workers <n> --swarm-posts <count>\` on subtask completion.
+8. Swarm Token-Hygiene & Silent Telemetry: cap active swarm workers at \`<= 4\`, prohibit \`tier-1\` models on read-only probes when \`tier-2\`/\`tier-3\` suffice, enforce selective \`@name\` mentions (avoiding \`@all\` broadcast bloat), pass \`--isolation swarm --swarm-workers <n> --swarm-posts <count>\` on subtask completion, sign every commit with each worker's real runtime model identity (never literal \`"auto"\` or \`<provider>/<model>\`), and keep telemetry \`100%\` silent in the background (never output telemetry notices unless explicitly requested).
 
 ## Tier taxonomy
 
@@ -163,8 +163,9 @@ ${diffBlock}
 3. **Scope**: no unrelated refactor, no unrequested dependency in \`package.json\`, no dead code or commented-out blocks.
 4. **Correctness**: edge cases, error paths, encoding/line-ending handling and platform differences (Windows vs POSIX) are addressed.
 5. **Traceability**: commits follow \`feat(#N/Tk)\` / \`fix(#N/Tk)\`, and the PR links the issue and the subtask contracts.
-6. **Attribution**: authorship trailers (\`Authored-by\`, \`Reviewed-by\`, \`Last-code-by\`) are present and the reviewer uses a distinct model per \`.lognexus/routing.md\` (\`cross-vendor\` or distinct \`intra-fleet\` model; identical-model self-approval is strictly rejected).
+6. **Attribution**: authorship trailers (\`Authored-by\`, \`Reviewed-by\`, \`Last-code-by\`) are present, reject placeholder identities (\`auto\`, bare \`orchestrator\`, \`unknown/other\`, \`<provider>/<model>\`), enforce strict anti-spoofing (an author never writes \`Reviewed-by:\` or merges its own PR), and ensure the reviewer uses a distinct model per \`.lognexus/routing.md\` (\`cross-vendor\` or distinct \`intra-fleet\` model; identical-model self-approval is strictly rejected).
 7. **Tests**: new behaviour is covered by tests that fail when the behaviour is reverted. Tests must not be weakened to make them pass.
+8. **Telemetry silence**: keep local telemetry \`100%\` silent in the background during review and never output telemetry notices unless explicitly requested.
 
 ## Output format
 

@@ -439,11 +439,13 @@ describe("Context Handoff Generator", () => {
 
     const active = generateContextHandoff(tempDir);
     expect(active.nextAction).toBe("Implementer: google/gemini-4-hydrogen-high (antigravity)");
+    expect(active.routing?.orchestration).toBe("auto");
     expect(active.contract?.assignee).toBe("google/gemini-4-hydrogen-high (antigravity)");
     expect(active.contract?.isolation).toBe("subagent");
     expect(active.contract?.forbiddenFiles).toEqual(["src/mcp/tools.ts"]);
 
     const md = renderContextHandoff(active);
+    expect(md).toContain("- Orchestration Mode: `auto`");
     expect(md).toContain("- **Assigned agent:** `google/gemini-4-hydrogen-high (antigravity)`");
     expect(md).toContain("- **Isolation:** subagent");
 
@@ -464,5 +466,35 @@ describe("Context Handoff Generator", () => {
       "Independent Reviewer: route review to claude/opus (review_gate: intra-fleet)",
     );
     expect(done.nextAction).not.toContain("Reviewed-by:");
+  });
+
+  it("propagates orchestration: swarm and emits real runtime --author guidance when implementer is auto", () => {
+    seedState();
+    mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+    writeFileSync(
+      join(tempDir, ".lognexus", "routing.md"),
+      "routing: confirm\norchestration: swarm\nreview_gate: auto\nimplementer: auto\nreviewer: auto\n",
+      "utf8",
+    );
+    setSubtask(
+      "T4",
+      "Propagate orchestration auto mode",
+      { allowedFiles: ["src/state/handoff.ts"], decisionBudget: "none" },
+      tempDir,
+    );
+
+    const handoff = generateContextHandoff(tempDir);
+    expect(handoff.routing?.orchestration).toBe("swarm");
+    expect(handoff.routing?.implementer).toBeNull();
+
+    const md = renderContextHandoff(handoff);
+    expect(md).toContain("- Orchestration Mode: `swarm`");
+    expect(md).toContain("Substitute your real runtime model identity in `--author`");
+    expect(md).toContain("never pass literal `auto`");
+
+    const prompt = renderCompactDispatchPrompt(handoff);
+    expect(prompt.split("\n").length).toBeLessThanOrEqual(12);
+    expect(prompt).toContain("<provider>/<model> (<client>)");
+    expect(prompt).toContain("never pass literal `auto`");
   });
 });
