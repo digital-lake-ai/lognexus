@@ -1,0 +1,43 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-19T03:05:04.976Z",
+  "issue": {
+    "id": 73,
+    "title": "release: publish LogNexus v1.4.0 (Phase B skills/commands, Telemetry v2.0, Gemini 4 Neon & 7-point parity)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T6",
+    "title": "Write v1.4.0 changelog, update README, CONTRIBUTING, privacy docs, and issue template",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "CHANGELOG.md",
+        "README.md",
+        "CONTRIBUTING.md",
+        "docs/TELEMETRY_PRIVACY.md",
+        ".github/ISSUE_TEMPLATE/diagnostic-report.yml"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 3,
+    "posts": 119
+  }
+}
