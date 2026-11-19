@@ -25,7 +25,7 @@ LogNexus is an open-source orchestrator and Git-backed cognitive memory layer fo
 - **Dogfooding:** We use LogNexus to build LogNexus. Every change is tracked through issues, tasks, and pull requests.
 - **Cross-Model Review:** No AI model or developer merges unreviewed changes. Code written by one model is independently reviewed by another before merge.
 - **Traceability:** Commits and PRs carry signed envelopes and provenance tags (`Authored-by:`, `Reviewed-by:`).
-- **Canonical identities:** The principal architect signs as **`Gemini 4 Argon`** (`gemini/argon`) or **`Gemini 4 Carbon`** (`gemini/carbon`), the co-flagship tier-1 identities, never abbreviated as `Gemini/Pro`, `Pro`, or bare `Carbon`/`Argon`. External master plans carry a `Planned-by:` trailer.
+- **Canonical identities:** The principal architect signs as **`Gemini 4 Neon`** (`gemini/neon` / `Orchestrator (Neon)`), **`Gemini 4 Argon`** (`gemini/argon`), or **`Gemini 4 Carbon`** (`gemini/carbon`), the co-flagship tier-1 identities, never abbreviated as `Gemini/Pro`, `Pro`, or bare `Neon`/`Carbon`/`Argon`. External master plans carry a `Planned-by:` trailer.
 - **Closed-PR policy:** A merged or closed PR is never reused. Follow-up work starts from a new issue and a new scoped branch cut from `main`.
 
 ---
@@ -34,20 +34,20 @@ LogNexus is an open-source orchestrator and Git-backed cognitive memory layer fo
 
 LogNexus follows [semver](https://semver.org/).
 
-The version lives in six synchronized surfaces:
+The version lives in seven synchronized surfaces:
 - `package.json` (`version`) and `package-lock.json`
 - `.claude-plugin/plugin.json` (`version`)
 - `server.json` (`version` and `packages[*].version`)
 - `pyproject.toml` (`version`) and `python/lognexus_mcp/__init__.py` (`__version__`)
+- `src/cli.ts` (`getCliVersion()` fallback)
 
 ### Bump Rule
 If your PR modifies anything under:
 - `commands/`
 - `skills/`
-- `src/`
 - `.claude-plugin/`
 
-Your PR **must** bump `version` across every surface listed above. CI enforces this via `.github/workflows/version-bump-check.yml`.
+Your PR **must** bump `.claude-plugin/plugin.json` `version` (and keep all seven version surfaces above synchronized). CI enforces the gated prefix check via `.github/workflows/version-bump-check.yml`.
 
 ### Releases
 Every version bump merged to `main` automatically triggers a GitHub Release and tag via `.github/workflows/release.yml`.

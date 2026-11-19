@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-11-19
+
+### Summary
+A major telemetry, adaptive-routing, and skills release (`#62`, `#64`, `#66`, `#68`, `#70`, `#72`, and Phase B `#73`). **Telemetry Engine v2.0** introduces LOC-weighted ROI pricing, source/test/docs/config diff categorization, scoped `--issue` / `--since` / `--branch` projections, offline Zero-PII snapshots (`telemetry snapshot` & `telemetry benchmark`), native swarm metrics, and **Sealed GDPR `[y/N]` Consent (`Policy v2.0.0`)** with human IDE integrated-terminal detection and 100% silent background execution. **Adaptive Ecosystem Routing** adds a linear `O(n)` `.lognexus/routing.md` parser (`orchestration: auto`, `review_gate: auto | intra-fleet | cross-vendor`), universal effort-suffix stripping, placeholder identity rejection, first-class **`Gemini 4 Neon`** (`gemini/neon`, `Orchestrator (Neon)`), and multi-manifest SemVer drift diagnostics. **Phase B** updates `20` skill and command files with the Hard Turn-1 Discovery Probe Gate (`> 3` files), automatic post-plan native `swarm` execution, `lognexus handoff --prompt`, the `security/<id>-<slug>` branch lane, and strict Software Version vs. Document Revision separation — while preserving **TDQS Grade A in Security & Schema Integrity** with `0` changes to `src/mcp/tools.ts`.
+
+### Added
+- **Telemetry Engine v2.0 & Cohort Benchmarking (`#62`):**
+  - LOC-weighted ROI estimator (`src/telemetry/roi.ts`) pricing `source` and `test` lines above `docs` and `config` boilerplate (`classifyFileCategory()`, `isGovernanceOrConfigSurface()`).
+  - Scoped in-memory projections (`--issue <id>`, `--since <iso>`, `--branch <ref>`) across `lognexus telemetry inspect`, `report`, and `snapshot` without mutating `.lognexus/telemetry.json`.
+  - Offline Zero-PII snapshot exporter (`lognexus telemetry snapshot`) and multi-repo cohort aggregator (`lognexus telemetry benchmark --json`), backed by `TelemetryStoreSchema` v2.0.0 and automatic `saveTelemetry()` migration from `"1.0.0"` -> `"2.0.0"`.
+  - Native swarm coordination metrics (`--isolation swarm`, `--swarm-workers <n>`, `--swarm-posts <n>`) tracked across `state set-task`, `note attach`, `commit`, and `telemetry`.
+- **Sealed GDPR Consent Gate (`Policy v2.0.0`, `#68`, `#72`):**
+  - One-time interactive human-TTY `[y/N]` prompt on `lognexus init`, `status`, and `doctor` with sealed acceptance/refusal persistence, `outdated` pause & re-consent on material policy bumps, and `lognexus init --enable-telemetry` / `--no-telemetry` / `--disable-telemetry`.
+  - Automated agent/CI suppression plus human IDE integrated-terminal detection (Antigravity, Cursor, VS Code) using exact `ANTIGRAVITY_AGENT_` / `CURSOR_AGENT_` prefixes so human terminals still receive the one-time prompt.
+- **Adaptive Ecosystem Routing & `Gemini 4 Neon` (`#64`, `#66`, `#70`):**
+  - Declarative `.lognexus/routing.md` `O(n)` parser supporting `orchestration: auto | swarm | subagent | off`, `review_gate: auto | cross-vendor | intra-fleet | advisory | off`, `implementer: auto`, and `reviewer: auto`.
+  - First-class **`Gemini 4 Neon`** (`gemini/neon`, `Orchestrator (Neon)`, `gemini-pro-orchestrator-neon`) alongside `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Flash`, and `gemini-flash-worker-agy`, with universal effort-suffix stripping (`-none` through `-extra-high`) and multi-manifest SemVer drift diagnostics in `doctor` and `status`.
+  - Contract extensions for `--assignee`, `--tier`, `--allowed`, `--forbidden`, `--budget`, `--verify`, and `--isolation <subagent|swarm|worktree|branch|shared>`.
+
+### Changed
+- **Phase B Skills & Commands (`20` files updated):**
+  - Enforced the **Hard Turn-1 Discovery Probe Gate** (`> 3` files -> immediate read-only `invoke_subagent` / `swarm` probes pinned to Tier-2/3 when Tier-1 orchestrates) and **Automatic Post-Plan Native Swarm** under `orchestration: auto` (`<= 4` workers, selective `@name`, `model` omitted on implementers unless requested, real runtime `--author`).
+  - Standardized `lognexus handoff --prompt`, `CONTEXT_MAX_FILES` (`6`) / `CONTEXT_MAX_LOC` (`1200`), the `security/<id>-<slug>` lane, Software Version vs. Document Revision separation, `Planned-by:` provenance, and 100% silent background telemetry.
+- **CLI Usage & Version Contract (`1.4.0`):**
+  - Synchronized version `1.4.0` across all 7 manifest surfaces (`package.json`, `package-lock.json`, `.claude-plugin/plugin.json`, `server.json`, `pyproject.toml`, `python/lognexus_mcp/__init__.py`, and `src/cli.ts` `getCliVersion()` fallback).
+  - Updated `printUsage()` in `src/cli.ts` with all `state set-task` and `note attach` swarm flags and deduplicated `lognexus telemetry inspect`.
+- **Migration note:** Single-star contract globs (`src/*`) now strictly match a single directory segment; use `src/**` (or trailing slash `src/`) for recursive matching.
+
+### Fixed
+- **Circular ESM TDZ in `getCliVersion()` (`src/cli.ts`):** Replaced module-level `const __cliDir` with hoisted `getCliDir()` so `MCP_SERVER_VERSION` reads `package.json` cleanly when `src/mcp/server.ts` loads before `src/cli.ts` finishes top-level evaluation.
+- **Word-boundary hardening in `extractModelFamilyCategory()` (`src/telemetry/detector.ts`):** Added linear boundary regex guards (`NEON_MARKER_PATTERN`, `CARBON_MARKER_PATTERN`, `ARGON_MARKER_PATTERN`, `HYDROGEN_MARKER_PATTERN`) so human names like `Neonila Perez (antigravity)` and `Orchestrator (Neonila)` classify as `unknown/other` instead of `gemini/neon`.
+- **Placeholder identity rejection & `O(1)` passive telemetry hooks:** Rejected literal placeholder strings (`auto`, `<provider>/<model>`, `orchestrator`) and reduced passive telemetry hooks to `O(1)` fail-silent execution.
+
+### Security
+- **TDQS Grade A in Security & Schema Integrity:** `0` changes to `src/mcp/tools.ts`; `"lognexusPolicy.minCriticalVersion"` remains `"0.0.0"`.
+- **Strict Offline Telemetry Guarantee:** `0` network egress, `0` `fetch(` or `http(s)://` literals in `src/telemetry/`, and `O(n)` linear parsing across `.lognexus/routing.md`, contract globs, and nested parenthetical identities.
+
+---
+
 ## [1.3.7] - 2026-11-15
 
 ### Summary
