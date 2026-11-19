@@ -8,6 +8,8 @@ External PR skills remain usable for their validation features (security scannin
 
 ## Step 1: Pre-flight checks
 
+Both scoped lanes are supported and recognized identically: `issue/<id>-<slug>` and `security/<id>-<slug>`.
+
 ### Bash
 
 ```bash
@@ -109,7 +111,12 @@ Use the lognexus PR timeline template from `../pr.md`. The PR body must include:
 6. Changes (commit list)
 7. Testing / Verification
 8. Knowledge for Future Reference
-9. Provenance signature (`Authored-by:`, `Last-code-by:`)
+9. Provenance signature (`Authored-by:`, `Last-code-by:`, and `Planned-by:` if driven by an external master plan)
+
+Sign exclusively with canonical model identities:
+- **Tier-1:** `Gemini 4 Neon` (`gemini/neon`, `Orchestrator (Neon)` / `gemini-pro-orchestrator-neon`), `Gemini 4 Carbon`, `Gemini 4 Argon`, `Claude Opus 5.5`.
+- **Tier-2 / Tier-3:** `Gemini 4 Hydrogen` (`google/gemini-4-hydrogen-high (antigravity)`), `Gemini 3.8 Flash` (`google/gemini-3.8-flash-high (antigravity)`), `gemini-flash-worker-agy`, `Claude Sonnet 5.5`, `deepseek/VS Code (kimi-code)`.
+- Never use literal placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`).
 
 ### Labels
 
@@ -144,16 +151,17 @@ Always use the repo's default branch (`$DEFAULT_BRANCH`), not a hardcoded value.
 
 ## Step 5: Review gate
 
-Every PR requires cross-model review before merge. After creating the PR:
+Review gating is configured via `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (`auto` defaults to `intra-fleet`). Both Cross-Vendor Review and Intra-Fleet Distinct-Model Review (`Gemini 4 Neon` / `Carbon` / `Argon` reviewing `Gemini 4 Hydrogen` / `3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5`) satisfy the independent review gate (`Authored-by` != `Reviewed-by`).
 
 1. Note the review requirement in the PR body or a comment.
 2. See `closure-and-review.md` for the full review protocol.
-3. The review must come from a different model than the one that authored the PR.
-4. Sign the review artifact per the agent identity signing rules.
-5. After each signed review comment, refresh the PR body's review snapshot in place.
-6. If new code lands after a review, flip the snapshot to `needs re-review` before asking for another review.
+3. The review must come from a distinct model than the one that authored the PR (identical model family across any effort suffix is strictly blocked from self-approving).
+4. **Anti-Spoofing Rule:** The authoring agent never writes a `Reviewed-by:` trailer and never executes `gh pr merge`. Both actions belong exclusively to the independent reviewing identity.
+5. Sign the review artifact per the agent identity signing rules.
+6. After each signed review comment, refresh the PR body's review snapshot in place.
+7. If new code lands after a review, flip the snapshot to `needs re-review` before asking for another review.
 
-Do not merge without a cross-model review sign-off (`Authored-by` != `Reviewed-by`).
+Do not merge without an independent review sign-off (`Authored-by` != `Reviewed-by`).
 
 ### Merge Execution (Strict `--no-ff` Mandatory)
 
@@ -166,6 +174,14 @@ gh pr merge <PR_NUMBER> --merge --delete-branch
 **Prohibición absoluta de Squash y Rebase:**
 - Never use `--squash` or `--rebase`.
 - Squash and rebase merges collapse all atomic subtask commits (`T1..Tn`) and orphan LogNexus Git Notes (`refs/notes/lognexus`) on disconnected commit SHAs.
+
+## SemVer & Release Milestone Policy
+
+1. **Greenfield Bootstrap (`0.1.0`):** New repositories (`0` published releases) should start at `0.1.0` in `package.json` / `pyproject.toml` rather than the `npm init -y` default `1.0.0`.
+2. **Subtasks Never Bump Version (`T1..Tn`):** Subtasks (`T1`, `T2`, `T3`...) are atomic commits inside a single feature/fix branch (`issue/<id>-<slug>`). Do **not** increment the project version per subtask (`T1 != 0.1.0`, `T2 != 0.2.0`).
+3. **One Version Bump per Cycle at PR Closure (`--no-ff`):** Bump the project version at most once per Issue/PR cycle (typically in the final subtask before opening/merging the PR via `gh pr merge --merge --delete-branch`): `fix:` -> `PATCH` (`0.1.x`), `feat:` -> `MINOR` (`0.x.0`), and reserve `1.0.0` for the first production-validated milestone.
+4. **No `lognexus release` Command:** LogNexus does not have a `lognexus release` CLI command; releases are cut through standard manifest version bumps merged into `main` (`--no-ff`) and tagged via Git/CI.
+5. **Multi-Manifest SemVer Separation:** Keep **Software Version** (e.g. `0.1.0` pre-release until validated) strictly separate from **Document Revision** (e.g. `rev. 1.3`) across all manifests (`package.json`, `pyproject.toml`, `.claude-plugin/plugin.json`, `server.json`), skill docs, and UI labels.
 
 ## Step 6: Post-merge (after review and merge)
 

@@ -16,14 +16,26 @@ Push the branch and create a PR whose body is a complete timeline of the work: i
 6. Reviews placeholder
 7. Sig block: `Authored-by:` and `Last-code-by:` (both set to the creating model at creation)
 
-**Provenance signatures (both required):**
+**Provenance signatures:**
 ```
 Authored-by: <family>/<version> (<tool>)
 Last-code-by: <family>/<version> (<tool>)
+Planned-by: <family>/<version> (<tool>) — <plan-id> (optional: for external master plans)
 ```
 `Last-code-by:` is updated whenever new code is pushed to the branch after PR creation. See SKILL.md → "Agent Identity Signing" for code provenance rules.
 
-**Review gate:** do NOT merge until a cross-model `Reviewed-by:` + `Disposition: approve` (or `approve-with-follow-ups`) comment exists on the PR. Self-review does not satisfy the gate. See `commands/lognexus/review.md` for the full review sub-skill, and `references/closure-and-review.md` §3 for the cross-model gate policy.
+Sign exclusively with canonical model identities:
+- **Tier-1:** `Gemini 4 Neon` (`gemini/neon`, `Orchestrator (Neon)` / `gemini-pro-orchestrator-neon`), `Gemini 4 Carbon` (`gemini/carbon`), `Gemini 4 Argon` (`gemini/argon`), `Claude Opus 5.5` (`claude/opus-5.5`).
+- **Tier-2 / Tier-3:** `Gemini 4 Hydrogen` (`google/gemini-4-hydrogen-high (antigravity)`), `Gemini 3.8 Flash` (`google/gemini-3.8-flash-high (antigravity)`), `gemini-flash-worker-agy`, `Claude Sonnet 5.5`, `deepseek/VS Code (kimi-code)`.
+- Never use literal placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`).
+
+**Branch lanes:** Both scoped lanes (`issue/<id>-<slug>` and `security/<id>-<slug>`) are supported and recognized identically.
+
+**Review gate & Anti-Spoofing:**
+- Configured via `review_gate: auto | intra-fleet | cross-vendor | advisory | off` (`auto` resolves to `intra-fleet`). Both Cross-Vendor Review and Intra-Fleet Distinct-Model Review (`Gemini 4 Neon` / `Carbon` / `Argon` reviewing `Gemini 4 Hydrogen` / `3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5`) satisfy the gate (`Authored-by` != `Reviewed-by`).
+- Identical canonical model family across any reasoning-effort suffix is strictly blocked from self-approving.
+- **Anti-Spoofing Rule:** the authoring agent never writes a `Reviewed-by:` trailer and never executes `gh pr merge`. Both actions belong exclusively to the independent reviewing identity.
+- **Mandatory Merge Commit (`--no-ff`):** Merge exclusively using `gh pr merge <num> --merge --delete-branch`. Squash and rebase merges are strictly prohibited as they destroy atomic subtask history and orphan Git Notes (`refs/notes/lognexus`).
 
 **Partial delivery:** use `Addresses #<N> (completes T1, T2)` instead of `Closes #<N>` when some tasks remain. Post a `[lognexus/milestone]` comment on the issue after merge.
 
@@ -120,6 +132,7 @@ gh issue edit <N> --remove-label "lognexus/in-progress" --add-label "lognexus/ne
 2. **Subtasks Never Bump Version (`T1..Tn`):** Subtasks (`T1`, `T2`, `T3`...) are atomic commits inside a single feature/fix branch (`issue/<id>-<slug>`). Do **not** increment the project version per subtask (`T1 != 0.1.0`, `T2 != 0.2.0`).
 3. **One Version Bump per Cycle at PR Closure (`--no-ff`):** Bump the project version at most once per Issue/PR cycle (typically in the final subtask before opening/merging the PR via `gh pr merge --merge --delete-branch`): `fix:` -> `PATCH` (`0.1.x`), `feat:` -> `MINOR` (`0.x.0`), and reserve `1.0.0` for the first production-validated milestone.
 4. **No `lognexus release` Command:** LogNexus does not have a `lognexus release` CLI command; releases are cut through standard manifest version bumps merged into `main` (`--no-ff`) and tagged via Git/CI.
+5. **Multi-Manifest SemVer Separation:** Keep **Software Version** (e.g. `0.1.0` pre-release until validated) strictly separate from **Document Revision** (e.g. `rev. 1.3`) across all manifests (`package.json`, `pyproject.toml`, `.claude-plugin/plugin.json`, `server.json`), skill docs, and UI labels.
 
 ## Acceptance Checklist
 

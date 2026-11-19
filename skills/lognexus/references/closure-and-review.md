@@ -140,45 +140,27 @@ This policy does NOT normalize:
 
 Every PR merge requires a positive review from a model different from the author. Same-model self-review does not count as independent review.
 
-### Why this matters
+### Review Modes & Configuration
 
-The review loop is part of the safety model. If lognexus captures the workflow but omits signed review, it is missing one of the core mechanisms that makes the process trustworthy. A single model authoring, reviewing, and merging its own work is the anti-pattern this protocol prevents.
+Configured via `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (`auto` defaults to `intra-fleet`).
 
-### Review artifacts
+Two independent review modes are supported:
+1. **Cross-Vendor Review** *(recommended best practice for milestone releases)*: The reviewer belongs to a different provider family than the author (e.g., `gemini/*` reviewed by `claude/*`, `openai/*`, or `deepseek/*`).
+2. **Intra-Fleet Distinct-Model Review** *(supported for single-provider workflows such as Antigravity or Claude Code)*: The reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Neon`, `Gemini 4 Carbon`, or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5` or `Claude Haiku`).
 
-A review produces one of four artifacts:
+### Anti-Spoofing Rule (Non-Negotiable)
 
-| Artifact | Meaning |
-|----------|---------|
-| **Approve** | No issues found; merge is authorized |
-| **Approve with follow-ups** | Non-blocking findings exist; merge is authorized after a tracking issue is filed for the findings |
-| **Request changes** | Issues found; author must address before re-review |
-| **Comment** | Observations that do not block merge |
-
-For AI-operated lognexus reviews, these outcomes are recorded as signed comment artifacts. The `Disposition:` line is the authoritative outcome; formal GitHub review states and badges are advisory at best.
-
-### Sign-off format
-
-Every review comment must include all four fields:
-
-```
-Reviewed-by: <family>/<version> (<tool>)
-Disposition: approve | approve-with-follow-ups | request-changes
-Scope: <what was reviewed>
-Follow-ups: #<issue-number> | none
-```
-
-When using `approve-with-follow-ups`, the `Follow-ups:` field must reference a valid open issue. Create the tracking issue **before** posting the review sign-off.
-
-The `Disposition:` line is the authoritative outcome; formal GitHub review states are advisory only.
-
-For the full review runbook — comment template, PR body snapshot fields, self-review audit artifact, review contract template — see `commands/lognexus/review.md`.
+- **No author agent (`Authored-by`) may write `Reviewed-by:` trailers or run `gh pr merge`.**
+- Writing one's own review sign-off — under any model name, including one attributed to another model family — is strictly prohibited and forges the gate.
+- The review sign-off belongs exclusively to the independent reviewer operating in an independent session.
+- Merge execution is also reserved to the independent reviewer or repository orchestrator after the sign-off exists; the author never merges its own work.
 
 ### What constitutes "different model"
 
-- Different model family (e.g., Claude vs Gemini, OpenAI vs DeepSeek, Opus vs Sonnet, Gemini Pro vs Flash).
-- Different model version within the same family counts IF explicitly documented (e.g., Opus 4.6 reviewing Opus 4.5 work).
-- Same model, same version, different session does NOT count as independent.
+- **Cross-vendor pairing:** Different provider families (e.g., Claude vs Gemini, OpenAI vs DeepSeek).
+- **Intra-fleet distinct-model pairing:** Distinct canonical models within the same provider family (e.g., `Gemini 4 Neon` / `Carbon` / `Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5`).
+- **Strictly blocked:** Identical canonical model family across any reasoning-effort suffix (`-none | -minimal | -low | -medium | -high | -extra | -xhigh | -xtrahigh | -extra-high`) is strictly blocked from self-approving.
+- **Strictly prohibited:** Literal placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`) are invalid.
 - Human review always counts as independent.
 
 ### Review target selection
@@ -232,11 +214,24 @@ For the full review execution runbook — bounded reviewer lane dispatch, review
 
 A PR may be merged when:
 
-1. At least one cross-model review with `Disposition: approve` or `Disposition: approve-with-follow-ups` exists.
+1. At least one independent review with `Disposition: approve` or `Disposition: approve-with-follow-ups` exists (satisfying `review_gate`).
 2. All `request-changes` reviews have been addressed (new review cycle or author response).
 3. If any approving review uses `approve-with-follow-ups`, the `Follow-ups:` field must reference a valid open issue containing the non-blocking findings. Do not merge until this issue exists.
 4. The PR body includes `Closes #<N>` linking to the tracking issue.
 5. The issue closure will have linked evidence (the merged PR itself serves as evidence).
+
+### Mandatory `--no-ff` Merge Command
+
+Merge PRs exclusively using `--merge` to force a merge commit (`--no-ff`):
+
+```bash
+gh pr merge <PR_NUMBER> --merge --delete-branch
+```
+
+> [!CAUTION]
+> **Squash and Rebase are strictly prohibited:**
+> - NEVER use `--squash` or `--rebase` when merging Pull Requests.
+> - Squash merging flattens discrete `T1..Tn` subtask commit history into a single commit and **orphans LogNexus Git Notes (`refs/notes/lognexus`)** on discarded commit SHAs.
 
 ### Implementation issue capture check
 
