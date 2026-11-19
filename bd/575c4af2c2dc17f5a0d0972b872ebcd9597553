@@ -1,0 +1,44 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-19T02:59:25.219Z",
+  "issue": {
+    "id": 73,
+    "title": "release: publish LogNexus v1.4.0 (Phase B skills/commands, Telemetry v2.0, Gemini 4 Neon & 7-point parity)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Update review gate, PR, closure, and hunt skills/commands for v1.4.0",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "skills/lognexus/references/closure-and-review.md",
+        "skills/lognexus/pr.md",
+        "skills/lognexus/references/pr-workflow.md",
+        "commands/lognexus/pr.md",
+        "commands/lognexus/review.md",
+        "commands/lognexus/hunt.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 3,
+    "posts": 115
+  }
+}
