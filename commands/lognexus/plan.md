@@ -14,6 +14,8 @@ Convert a brainstorm to a planning issue when:
 - Multiple tasks with dependencies exist
 - Cross-model review will be required before shipping
 
+**Hard Turn-1 Probe Gate (`> 3` files):** When exploring code or context across more than 3 repository files, a Tier-1 orchestrator (`Neon` / `Carbon` / `Argon` / `Opus`) must **NEVER** read `> 3` files directly into its own context. Instead, immediately auto-dispatch read-only exploration probes (`Agent`, `invoke_subagent`, or read-only `swarm` probes) pinned to Tier-2/3 models (e.g. `google/gemini-3.8-flash-high (antigravity)`) without prompting first, performing zero file writes. Casual queries (`<= 3` files) remain conversational and direct.
+
 **Issue envelope requirements (mandatory):**
 - `kind: state` — planning issues carry state kind
 - `status: open`
@@ -84,16 +86,23 @@ updated_at: <ISO_TIMESTAMP>
 
 ## Tasks
 
+Each task is self-contained and bounded by contract budgets (`CONTEXT_MAX_FILES = 6` implementation files, `CONTEXT_MAX_LOC = 1200` lines).
+
 - [ ] **T1: <Title>** `[tier-<N>]`
   - **What:** <what this task does>
-  - **Files:** <files affected>
+  - **Files:** <files affected> (max 6 implementation files)
   - **Allowed to change:** <explicit scope>
   - **Must not change:** <explicit constraints>
   - **Forbidden judgment calls:** <what the implementor must NOT decide>
   - **Verification:** <how to confirm this task is done>
+  - **Assignee:** <canonical identity, e.g. google/gemini-3.8-flash-high (antigravity)>
+  - **Isolation:** swarm | subagent | worktree | branch | shared
 
 - [ ] **T2: <Title>** `[tier-<N>]`
   - (same fields)
+
+**Post-Plan Auto-Swarm Handoff (`orchestration: auto`):**
+Present the complete `T1..Tn` task plan and await explicit developer confirmation before executing writes. Once confirmed, when Antigravity `Orchestrator` is active, launch native `swarm` or subagents automatically under LogNexus task contracts without asking again (`<= 4` active workers, selective `@name`, `model` omitted = `"auto"` on implementation workers, real runtime `--author`). Hand off context via `npx @digital-lake/lognexus handoff --prompt`.
 
 ## Open Questions
 
@@ -116,6 +125,7 @@ gh issue edit <N> --add-label "lognexus/ready"
 2. **Subtasks Never Bump Version (`T1..Tn`):** Subtasks (`T1`, `T2`, `T3`...) are atomic commits inside a single feature/fix branch (`issue/<id>-<slug>`). Do **not** increment the project version per subtask (`T1 != 0.1.0`, `T2 != 0.2.0`).
 3. **One Version Bump per Cycle at PR Closure (`--no-ff`):** Bump the project version at most once per Issue/PR cycle (typically in the final subtask before opening/merging the PR via `gh pr merge --merge --delete-branch`): `fix:` -> `PATCH` (`0.1.x`), `feat:` -> `MINOR` (`0.x.0`), and reserve `1.0.0` for the first production-validated milestone.
 4. **No `lognexus release` Command:** LogNexus does not have a `lognexus release` CLI command; releases are cut through standard manifest version bumps merged into `main` (`--no-ff`) and tagged via Git/CI.
+5. **Multi-Manifest SemVer Separation:** Keep **Software Version** (e.g. `0.1.0` pre-release until validated) strictly separate from **Document Revision** (e.g. `rev. 1.3`) across all manifests (`package.json`, `pyproject.toml`, `.claude-plugin/plugin.json`, `server.json`), skill docs, and UI labels.
 
 ## Acceptance Checklist
 

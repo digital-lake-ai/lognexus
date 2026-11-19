@@ -8,7 +8,7 @@ description: "Phase 3: Handle mid-work discoveries — fix inline, stack a prere
 <!-- routing: tier-2, plan then agent -->
 <!-- cross-cutting: references/model-routing.md (Step 0), SKILL.md → "Agent Identity Signing", references/labels.md, references/shell-portability.md -->
 
-0. **Routing check.** Run the phase entry check from `references/model-routing.md`.
+0. **Routing check & Turn-1 Probe Gate.** Run the phase entry check from `references/model-routing.md`. When investigating discoveries across more than 3 repository files, a Tier-1 orchestrator must never read `> 3` files directly into context; immediately auto-dispatch read-only exploration probes (`invoke_subagent` or read-only `swarm` probes pinned to Tier-2/3, e.g. `google/gemini-3.8-flash-high (antigravity)`) without prompting first, performing zero file writes. Casual investigation (`<= 3` files) remains conversational and direct.
 
 1. **Classify the discovery:**
 
