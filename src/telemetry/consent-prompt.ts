@@ -49,8 +49,12 @@ const AGENT_ENV_KEYS = [
   "CLAUDECODE",
   "CLAUDE_CODE_ENTRYPOINT",
   "CURSOR_TRACE_ID",
+  "CURSOR_AGENT",
   "CODEX_SANDBOX",
   "ANTIGRAVITY_CLI",
+  "ANTIGRAVITY_AGENT",
+  "ANTIGRAVITY_TRAJECTORY_ID",
+  "ANTIGRAVITY_SOURCE_METADATA",
   "GEMINI_CLI",
   "AIDER_MODEL",
 ] as const;
@@ -86,8 +90,8 @@ export function isAgentEnvironment(env: NodeJS.ProcessEnv = process.env): boolea
       if (
         key.startsWith("VSCODE_AGENT_") ||
         key.startsWith("VSCODE_COPILOT_") ||
-        key.startsWith("ANTIGRAVITY_") ||
-        key.startsWith("CURSOR_")
+        key.startsWith("ANTIGRAVITY_AGENT") ||
+        key.startsWith("CURSOR_AGENT")
       ) {
         return true;
       }
