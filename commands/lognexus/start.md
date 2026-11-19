@@ -8,7 +8,33 @@ Go from an open issue to a live branch in one step. Load the issue, create the b
 
 ## Policy
 
-**Branch naming:** `issue/<id>-<brief-slug>` where `<id>` is the issue number and `<slug>` is 2-5 words from the title, hyphen-separated, lowercase. Example: `issue/42-auth-middleware`.
+**Branch naming & Scoped Lanes:**
+Two scoped branch lanes are recognized and treated identically across the LogNexus engine:
+- `issue/<id>-<brief-slug>` — feature, fix, chore, docs, ci, and refactor work.
+- `security/<id>-<brief-slug>` — security remediation, audits, and supply-chain hardening.
+`<id>` is the issue number and `<slug>` is 2-5 words from the title, hyphen-separated, lowercase. Example: `issue/42-auth-middleware`, `security/42-audit-fix`.
+
+**State Sync & Subtask Contract Tracking:**
+Immediately after creating or checking out the branch, run:
+```bash
+npx @digital-lake/lognexus state sync
+```
+Before implementing any subtask, declare the contract in `.lognexus/state.json`:
+```bash
+npx @digital-lake/lognexus state set-task <id> "<title>" \
+  --assignee "<canonical-identity>" \
+  --isolation <subagent|swarm|worktree|branch|shared> \
+  --swarm-workers <n> \
+  --swarm-posts <n> \
+  --allowed "<csv-paths>" \
+  --verify "<cmd>"
+```
+Render the compact dispatch prompt:
+```bash
+npx @digital-lake/lognexus handoff --prompt
+```
+- **Context Budgets:** Subtasks must strictly respect `CONTEXT_MAX_FILES = 6` implementation files (test files exempt) and `CONTEXT_MAX_LOC = 1200` lines.
+- **Swarm Attribution Rules:** Under `orchestration: auto`, implementation workers omit `model` (`"auto"`) unless requested, and MUST sign `--author` with their real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
 
 **Branch base:** always from the default branch tip (`origin/<default>`). Never branch from another feature branch unless this is an explicitly stacked PR.
 
@@ -74,7 +100,7 @@ gh issue comment <N> --body-file <temp-file>
 
 ## Acceptance Checklist
 
-- [ ] Branch name follows `issue/<id>-<slug>` convention
+- [ ] Branch name follows `issue/<id>-<slug>` or `security/<id>-<slug>` convention
 - [ ] Branch was created from `origin/<default-branch>` tip, not from another feature branch
 - [ ] Issue label transitioned from `lognexus/ready` (or `lognexus/plan`) to `lognexus/in-progress`
 - [ ] Issue body `readiness:` field updated to `in-progress`

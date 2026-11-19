@@ -12,31 +12,52 @@ description: "Phase 2: Create a branch from an issue, set up worktree, and post 
 
 1. **Load context.** `gh issue view <N> --json title,body,labels,comments,milestone` and search knowledge graph. If the issue is missing obvious LogNexus labels, backfill per `references/labels.md`.
 
-2. **Create branch (worktree-first).** One branch, one worktree, one agent for the primary line of work.
+2. **Create branch (worktree-first) & Synchronize State.** One branch, one worktree, one agent for the primary line of work.
+
+   LogNexus recognizes two scoped branch lanes treated identically across the engine:
+   - `issue/<id>-<slug>` — feature, fix, chore, docs, ci, and refactor work.
+   - `security/<id>-<slug>` — security remediation, audits, and supply-chain hardening.
 
    Delegate to `superpowers:using-git-worktrees` if available. Otherwise:
    ```bash
    DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
    git fetch origin $DEFAULT_BRANCH
-   BRANCH=issue/<ISSUE_NUMBER>-<brief-description>
+   BRANCH=issue/<ISSUE_NUMBER>-<brief-description> # or security/<ISSUE_NUMBER>-<brief-description>
    git worktree add ../$BRANCH -b $BRANCH origin/$DEFAULT_BRANCH
    cd ../$BRANCH
+   npx @digital-lake/lognexus state sync
    ```
    ```powershell
    $defaultBranch = gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
    git fetch origin $defaultBranch
-   $branch = 'issue/<ISSUE_NUMBER>-<brief-description>'
+   $branch = 'issue/<ISSUE_NUMBER>-<brief-description>' # or security/<ISSUE_NUMBER>-<brief-description>
    git worktree add ../$branch -b $branch origin/$defaultBranch
    Set-Location ../$branch
+   npx @digital-lake/lognexus state sync
    ```
    See `references/shell-portability.md` for shell-specific notes.
    If a delegated lane later uses a forked workspace, tmux session, or other runtime-specific isolation backend, keep this feature branch/worktree as the canonical lognexus record for the work.
-   **Fallback (in-place checkout):** Only when the user explicitly requests no worktree.
+   **Fallback (in-place checkout):** Only when the user explicitly requests no worktree. Always run `npx @digital-lake/lognexus state sync` upon checkout.
 
 3. **Post timeline entry.** Comment on the issue using the session-start template below. Record the workspace path when known. Sign per the signing spec — see SKILL.md → "Agent Identity Signing".
 
-4. **Load plan** if it exists. Delegate to `superpowers:executing-plans` or `ork:implement`.
-   For delegated or tier-3 work, the plan should define a contract: allowed files, forbidden changes, stop conditions, verification, return artifact, and decision budget.
+4. **Load plan & Bounded Subtask Tracking.**
+   Before implementing any subtask, declare its bounded contract in `.lognexus/state.json`:
+   ```bash
+   npx @digital-lake/lognexus state set-task <id> "<title>" \
+     --assignee "<canonical-identity>" \
+     --isolation <subagent|swarm|worktree|branch|shared> \
+     --swarm-workers <n> \
+     --swarm-posts <n> \
+     --allowed "<csv-paths>" \
+     --verify "<cmd>"
+   ```
+   Generate the self-contained dispatch prompt for the next agent/worker:
+   ```bash
+   npx @digital-lake/lognexus handoff --prompt
+   ```
+   - **Contract Budgets:** Subtasks must strictly respect `CONTEXT_MAX_FILES = 6` implementation files (test files exempt) and `CONTEXT_MAX_LOC = 1200` lines.
+   - **Swarm Attribution Rules:** Under `orchestration: auto`, implementation workers omit `model` (`"auto"`) unless requested, and MUST sign `--author` with their real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
 
 ---
 
@@ -58,7 +79,7 @@ updated_at: <ISO_TIMESTAMP>
 
 ## [lognexus/session-start] <Brief description of the work>
 
-**Branch:** `issue/<N>-<description>`
+**Branch:** `issue/<N>-<description>` or `security/<N>-<description>`
 **Workspace:** `[absolute-or-relative-worktree-path if known]`
 **Approach:** [1-2 sentences about the plan for this session]
 
