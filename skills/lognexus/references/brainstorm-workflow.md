@@ -5,9 +5,10 @@
 
 Turn ideas into fully formed designs through collaborative dialogue, then capture them as **lognexus** issues with structured task contracts.
 
-## Hard Gate
+## Hard Gate & Turn-1 Probe Rule
 
-Do NOT write code, scaffold, or take any implementation action until a design is presented and the user approves it. Every project goes through this process regardless of perceived simplicity.
+1. **No Unapproved Writes:** Do NOT write code, scaffold, or take any implementation action until a design is presented and the user approves it. Every project goes through this process regardless of perceived simplicity.
+2. **Hard Turn-1 Probe Gate (`> 3` files):** During Step 1 (context exploration), if exploration spans more than 3 repository files, a Tier-1 orchestrator (`Neon` / `Carbon` / `Argon` / `Opus`) must **NEVER** read `> 3` files directly into its own context. Instead, immediately auto-dispatch read-only exploration probes (`invoke_subagent` or read-only `swarm` probes) pinned to Tier-2/3 models (e.g. `google/gemini-3.8-flash-high (antigravity)`) without asking first, performing zero file writes. Casual queries (`<= 3` files) remain conversational and direct.
 
 ## Process
 

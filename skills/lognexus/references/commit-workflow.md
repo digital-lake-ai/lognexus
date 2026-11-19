@@ -6,7 +6,9 @@ External commit skills remain usable as a convenience, but this reference is the
 
 ---
 
-## Step 1: Pre-commit safety
+## Step 1: Pre-commit safety & Lane Check
+
+Commits must be on a scoped branch lane (`issue/<id>-<slug>` or `security/<id>-<slug>`). Committing directly to protected branches (`main`, `master`, `dev`) is strictly blocked by repository rulesets and the LogNexus commit engine.
 
 ### Bash
 
@@ -15,7 +17,7 @@ BRANCH=$(git branch --show-current)
 
 # Must be on an issue branch, not the default branch
 if [[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "dev" ]]; then
-  echo "STOP: Cannot commit directly to $BRANCH. Use issue/<id>-<slug> branch."
+  echo "STOP: Cannot commit directly to $BRANCH. Use issue/<id>-<slug> or security/<id>-<slug> branch."
   exit 1
 fi
 ```
@@ -27,7 +29,7 @@ $branch = git branch --show-current
 
 # Must be on an issue branch, not the default branch
 if ($branch -in @('main', 'master', 'dev')) {
-  Write-Host "STOP: Cannot commit directly to $branch. Use issue/<id>-<slug> branch."
+  Write-Host "STOP: Cannot commit directly to $branch. Use issue/<id>-<slug> or security/<id>-<slug> branch."
   exit 1
 }
 ```
@@ -63,7 +65,30 @@ git add <files>      # Stage specific files
 
 Prefer staging specific files over `git add .` to avoid accidentally including sensitive files.
 
-## Step 4: Commit with lognexus format
+## Step 4: Commit with LogNexus Engine (Standard)
+
+Prefer `npx @digital-lake/lognexus commit` to enforce contract boundaries, attach structured Git Notes (`refs/notes/lognexus`), and mark subtasks completed:
+
+```bash
+npx @digital-lake/lognexus commit \
+  -m "<type>(#<issue-id>/<Tn>): <brief description>" \
+  --author "<real-canonical-identity>" \
+  --stage-allowed \
+  --finish-task \
+  --swarm-workers <n> \
+  --swarm-posts <n>
+```
+
+Use `-F / --file <filePath>` for multiline messages or on Windows shells to prevent quote-stripping.
+
+**Identity & Anti-Spoofing Rules:**
+- Literal placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`) are strictly prohibited. Sign with real canonical runtime identities.
+- The authoring agent must never write `Reviewed-by:` trailers or self-approve.
+
+**Silent Background Telemetry:**
+Commit telemetry runs 100% silently in the background when enabled. Never print telemetry notices, banners, or invoke `lognexus telemetry` during normal commits.
+
+### Alternative: Standard Git Commit
 
 **Issue-level commit** (most common):
 

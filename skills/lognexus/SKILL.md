@@ -19,12 +19,32 @@ Use GitHub as a complete knowledge graph where every brainstorm, commit, review,
 
 To eliminate cognitive amnesia between conversation resets, context compactations, or model handoffs:
 1. **At Session Start or after conversation compactation:**
-   Inspect .lognexus/state.json or run px @digital-lake/lognexus state show\ to immediately recover active issue, branch, current subtask, and delegation contract.
+   Inspect `.lognexus/state.json` or run `npx @digital-lake/lognexus state show` to immediately recover active issue, branch, current subtask, and delegation contract.
 2. **Synchronize State:**
-   Run px @digital-lake/lognexus state sync\ upon branch checkout or switching to update local state from Git and GitHub.
-3. **Subtask Tracking:**
-   - Before coding: px @digital-lake/lognexus state set-task <taskId> [title]   - After verification passes: px @digital-lake/lognexus state finish-task <taskId>4. **Post-Merge Cleanup:**
-   Run px @digital-lake/lognexus state clear\ after PR merge.
+   Run `npx @digital-lake/lognexus state sync` upon branch checkout or switching to update local state from Git and GitHub.
+3. **Subtask Tracking & Contract Declaration:**
+   - Before coding, declare the bounded contract:
+     ```bash
+     npx @digital-lake/lognexus state set-task <id> "<title>" \
+       --assignee "<identity>" \
+       --isolation <subagent|swarm|worktree|branch|shared> \
+       --swarm-workers <n> \
+       --swarm-posts <n> \
+       --allowed "<csv>" \
+       --verify "<cmd>"
+     ```
+   - Render the compact dispatch prompt for the next agent/worker:
+     ```bash
+     npx @digital-lake/lognexus handoff --prompt
+     ```
+   - After verification passes:
+     ```bash
+     npx @digital-lake/lognexus state finish-task <id>
+     ```
+4. **Post-Merge Cleanup:**
+   Run `npx @digital-lake/lognexus state clear` after PR merge.
+5. **Silent Background Telemetry Directive:**
+   Never print telemetry notices, banners, or invoke `lognexus telemetry` during normal turns unless explicitly requested by the developer; sealed GDPR `[y/N]` consent (`Policy v2.0.0`) runs strictly in interactive human TTY sessions (`lognexus init --enable-telemetry` / `--no-telemetry`, `status`, `doctor`). Telemetry stays 100% silent in the background during automated agent workflows.
 
 ---
 
@@ -96,7 +116,19 @@ Authored-by: claude/sonnet-4.6 (claude-code)
 
 ### Step 3 — Commit Context (`/lognexus commit`)
 
-After implementing T1, load `commands/lognexus/commit.md` and commit:
+After implementing T1, load `commands/lognexus/commit.md` and commit. Prefer `npx @digital-lake/lognexus commit` to stage contract-allowed files, complete the subtask, and attach structured Git Notes (`refs/notes/lognexus`) automatically:
+
+```bash
+npx @digital-lake/lognexus commit \
+  -m "feat(#999/T1): add X-RateLimit-* headers to response middleware" \
+  --author "claude/sonnet-4.6 (claude-code)" \
+  --stage-allowed \
+  --finish-task \
+  --swarm-workers 2 \
+  --swarm-posts 42
+```
+
+Alternatively, commit via standard Git following the ID-first convention:
 
 ```bash
 git add src/middleware/rate_limit.ts
@@ -146,9 +178,11 @@ Transition issue label:
 gh issue edit 999 --remove-label "lognexus/in-progress" --add-label "lognexus/needs-review"
 ```
 
-### Step 5 — Cross-Model Review (`/lognexus review`)
+### Step 5 — Independent Review (`/lognexus review`)
 
-A different model (e.g., `openai/gpt-5.4 (codex)`) loads `commands/lognexus/review.md`, reads the diff, and posts the signed review comment on the PR:
+Review gating is controlled by `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (where `auto` resolves to `intra-fleet` distinct-model review).
+
+An independent reviewer model (e.g., `openai/gpt-5.4 (codex)` under cross-vendor review, or a distinct Tier-1 model like `Gemini 4 Argon` or `Gemini 4 Neon` under intra-fleet review) loads `commands/lognexus/review.md`, reads the diff, and posts the signed review comment on the PR:
 
 ```
 [lognexus/review-handoff] #999: Review of PR #<PR>
@@ -171,9 +205,20 @@ Source artifact: <URL to review comment>
 Needs re-review since: —
 ```
 
-### Step 6 — Merge
+**Anti-Spoofing Rule:** No author agent (`Authored-by`) may write `Reviewed-by:` trailers or run `gh pr merge`. Writing one's own review sign-off—under any model name—is strictly prohibited. The review sign-off belongs exclusively to the independent reviewer.
 
-Cross-model gate is satisfied (`Last-code-by: claude/sonnet-4.6` ≠ `Reviewed-by: openai/gpt-5.4`). Merge the PR. Remove all lifecycle labels from issue #999. GitHub closes #999 automatically via `Closes #999`.
+### Step 6 — Merge (`--no-ff` Mandatory)
+
+The independent review gate is satisfied (`Last-code-by: claude/sonnet-4.6` ≠ `Reviewed-by: openai/gpt-5.4`).
+
+Merge the PR exclusively using `--merge` to force a merge commit (`--no-ff`):
+```bash
+gh pr merge 999 --merge --delete-branch
+```
+> [!IMPORTANT]
+> Never use `--squash` or `--rebase`. Squash merging flattens subtask commits (`T1..Tn`) into a single commit and orphans LogNexus Git Notes (`refs/notes/lognexus`).
+
+Remove all lifecycle labels from issue #999. GitHub closes #999 automatically via `Closes #999`.
 
 ---
 
@@ -183,6 +228,7 @@ Cross-model gate is satisfied (`Last-code-by: claude/sonnet-4.6` ≠ `Reviewed-b
 2. **Subtasks Never Bump Version (`T1..Tn`):** Subtasks (`T1`, `T2`, `T3`...) are atomic commits inside a single feature/fix branch (`issue/<id>-<slug>`). Do **not** increment the project version per subtask (`T1 != 0.1.0`, `T2 != 0.2.0`).
 3. **One Version Bump per Cycle at PR Closure (`--no-ff`):** Bump the project version at most once per Issue/PR cycle (typically in the final subtask before opening/merging the PR via `gh pr merge --merge --delete-branch`): `fix:` -> `PATCH` (`0.1.x`), `feat:` -> `MINOR` (`0.x.0`), and reserve `1.0.0` for the first production-validated milestone.
 4. **No `lognexus release` Command:** LogNexus does not have a `lognexus release` CLI command; releases are cut through standard manifest version bumps merged into `main` (`--no-ff`) and tagged via Git/CI.
+5. **Multi-Manifest SemVer Separation:** Keep **Software Version** (e.g. `0.1.0` pre-release until validated) strictly separate from **Document Revision** (e.g. `rev. 1.3`) across all manifests (`package.json`, `pyproject.toml`, `.claude-plugin/plugin.json`, `server.json`), skill docs, and UI labels.
 
 ---
 
@@ -285,7 +331,7 @@ All artifacts use `#ID` as the primary key for fast, token-efficient retrieval.
 
 | Artifact | Convention | Example |
 |----------|-----------|---------|
-| Branch | `issue/<id>-<slug>` | `issue/42-auth-middleware` |
+| Branch | `issue/<id>-<slug>` or `security/<id>-<slug>` | `issue/42-auth-middleware`, `security/42-audit-fix` |
 | Commit | `<type>(#<id>): <msg>` | `feat(#42): add JWT validation` |
 | Commit (task) | `<type>(#<id>/<Tn>): <msg>` | `feat(#42/T2): add middleware chain` |
 | PR title | `<type>(#<id>): <msg>` | `feat(#42): add auth middleware` |
@@ -296,6 +342,8 @@ All artifacts use `#ID` as the primary key for fast, token-efficient retrieval.
 | Stacked branch | `issue/<new-id>-<slug>` | `issue/43-fix-race-condition` |
 | Stacked PR title | `<type>(#<new-id>): ... [stack: #<parent>]` | `fix(#43): race cond [stack: #42]` |
 | Memory entry | `#<id>: <decision>` | `#42: chose JWT over sessions` |
+
+**Branch lanes:** Both scoped lanes (`issue/<id>-<slug>` and `security/<id>-<slug>`) are recognized and treated identically across the LogNexus engine (`status`, `timeline`, `audit`, and protected branch guard). Direct commits or pushes to `main` are strictly blocked.
 
 **Task IDs:** Tasks carry local IDs (`T1`, `T2`, ...) scoped to the issue. Commits use `#<id>/<Tn>`.
 
@@ -347,24 +395,43 @@ Every lognexus artifact (comments, PR bodies, review sign-offs) must carry a pro
 
 | Field | Values | Examples |
 |-------|--------|---------|
-| `role` | `Authored-by`, `Updated-by`, `Reviewed-by`, or `Last-code-by` | — |
-| `family` | Provider name, lowercase | `claude`, `openai`, `google` |
-| `version` | Model identifier | `opus-4.6`, `sonnet-4.6`, `gpt-5.4` |
-| `tool` | Runtime environment, lowercase | `claude-code`, `codex`, `cursor` |
+| `role` | `Authored-by`, `Updated-by`, `Reviewed-by`, `Last-code-by`, or `Planned-by` | — |
+| `family` | Provider name, lowercase | `claude`, `openai`, `google`, `deepseek` |
+| `version` | Model identifier | `opus-5.5`, `sonnet-5.5`, `gpt-5.4`, `carbon`, `argon`, `neon`, `hydrogen` |
+| `tool` | Runtime environment, lowercase | `claude-code`, `codex`, `cursor`, `antigravity`, `kimi-code` |
 | `qualifier` | Optional metadata string; may be compound when needed | `effort: high`, `orchestrator`, `sub-agent: reviewer`, `effort: high; orchestrator` |
 
-**Searching:** `Authored-by:` → original authorship. `Updated-by:` → later material editors. `Reviewed-by:` → review artifacts. `Last-code-by:` → most recent code author on a PR branch. `claude/` → all Claude artifacts. `(codex` → all Codex artifacts.
+**Searching:** `Planned-by:` → external master plan provenance. `Authored-by:` → original authorship. `Updated-by:` → later material editors. `Reviewed-by:` → review artifacts. `Last-code-by:` → most recent code author on a PR branch. `claude/` → all Claude artifacts. `(codex` → all Codex artifacts.
 
 ### Model detection per tool
 
 | Tool | Source | Example signature |
 |------|--------|-------------------|
-| Claude Code | System prompt model name | `claude/opus-4.6 (claude-code)` |
+| Claude Code | System prompt model name | `claude/opus-5.5 (claude-code)`, `claude/sonnet-5.5 (claude-code)` |
 | Codex | `~/.codex/config.toml` `model` + `model_reasoning_effort` | `openai/gpt-5.4 (codex, effort: high)` |
-| Cursor | System prompt model identifier | `claude/opus-4.6 (cursor)` |
-| Antigravity | Workspace agent configuration | `Gemini 4 Carbon (antigravity, role: orchestrator)` |
-| Kimi Code | Active model identifier in editor | deepseek/VS Code (kimi-code) |
+| Cursor | System prompt model identifier | `claude/opus-5.5 (cursor)` |
+| Antigravity (Tier-1 Orchestrators) | Workspace agent configuration | **`Gemini 4 Neon`** (`gemini/neon`, `Orchestrator (Neon)` / `gemini-pro-orchestrator-neon`), `Gemini 4 Carbon` (`gemini/carbon`), `Gemini 4 Argon` (`gemini/argon`) |
+| Antigravity (Tier-2/3 Workers) | Runtime subagent or swarm worker | `google/gemini-4-hydrogen-high (antigravity)`, `google/gemini-3.8-flash-high (antigravity)`, `gemini-flash-worker-agy` |
+| Kimi Code | Active model identifier in editor | `deepseek/VS Code (kimi-code)` |
 | Other | Best available model identifier | `<family>/<version> (<tool>)` |
+
+### Master Plan Provenance: `Planned-by:`
+
+When work originates from a plan authored outside this repository (an external "master plan" produced by an external orchestrator session), record that provenance with a `Planned-by:` trailer in the PR body, alongside the commit trailers:
+
+```markdown
+Planned-by: <family>/<version> (<client>) — <plan identifier>
+Authored-by: <family>/<version> (<client>)
+Reviewed-by: <family>/<version> (<client>)
+```
+
+`Planned-by:` documents where the plan came from; it does **not** grant review authority, merge rights, or any exception from the independent review gate.
+
+### Prohibited Placeholder Identities
+
+Literal placeholder identities are strictly prohibited across all artifacts, issue comments, PR bodies, and `--author` commit flags:
+- **NEVER** use literal `"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, or `"unknown/other"`.
+- Every agent and swarm worker must resolve and sign with its real canonical runtime identity (e.g. `google/gemini-3.8-flash-high (antigravity)` or `gemini/carbon`).
 
 ### Orchestration role qualifiers
 
@@ -398,6 +465,7 @@ If a lognexus artifact carries an incorrect or incomplete signature, correct it 
 
 | Field | Tracks | Updated when |
 |-------|--------|-------------|
+| `Planned-by:` | External master plan provenance | Recorded in PR body alongside commit trailers |
 | `Authored-by:` | Original artifact text author | Artifact is created |
 | `Updated-by:` | Later artifact text editor | Artifact body is materially edited |
 | `Reviewed-by:` | Review author | Review sign-off is posted |
@@ -605,14 +673,29 @@ Alongside the command files, `skills/lognexus/*.md` are the phase sub-skills car
 
 **Conflict avoidance:** This skill sets the WORKFLOW context. External skills provide IMPLEMENTATION helpers. LogNexus's internalized conventions always take precedence for artifact format, signing, labels, and review gates.
 
-#### Runtime-Aware Orchestration
+#### Runtime-Aware Orchestration & Swarm Governance
 
 LogNexus records orchestration honestly instead of assuming one agent backend fits every runtime.
 
 - **Local parallel tool fan-out:** one orchestrator runs multiple independent helper calls in parallel. Good for sidecar reads; not a separate reviewer identity.
 - **Bounded sub-agent:** the orchestrator spawns a child lane with a scoped contract and collects a return artifact.
+- **Native Swarm (`orchestration: auto | swarm`):** the orchestrator coordinates multi-agent work across a shared message board with discrete task contracts.
 - **External session delegation:** a separate tmux session, terminal agent, or other durable worker runs the lane outside the current orchestrator.
 - **Contract-only fallback:** lognexus emits the handoff or review contract when the current runtime cannot execute the lane itself.
+
+##### Hard Turn-1 Probe Gate (`> 3` files)
+When exploring code across more than 3 files (with or without an active issue), a Tier-1 orchestrator (`Neon` / `Carbon` / `Argon` / `Opus`) must **NEVER** read `> 3` repository files directly into its own context. Instead, immediately auto-dispatch read-only exploration probes (`invoke_subagent` or read-only `swarm` probes) without asking first:
+- Pin a Tier-2/Tier-3 model (e.g. `google/gemini-3.8-flash-high (antigravity)`) whenever the orchestrator is Tier-1, performing zero file writes.
+- Stay conversational and direct on small queries (`<= 3` files) without spawning subagents.
+
+##### Automatic Post-Plan Native Swarm (`orchestration: auto`)
+Before implementation writes begin, the Tier-1 orchestrator emits the `T1..Tn` plan with pre-assigned subagents/models (`--assignee`), tier, isolation mode (`--isolation`), and file/LOC budgets, awaiting explicit developer confirmation. Once confirmed under `orchestration: auto`:
+- When Antigravity `Orchestrator` (`Neon` / `Carbon` / `Argon`) with `swarm` is active, launch native `swarm` automatically under LogNexus contracts without asking again.
+- Maintain `<= 4` active swarm workers and use selective `@name` mentions (no `@all` broadcast chatter).
+- Omit `model` (`"auto"`) on implementation workers unless explicitly requested by the developer, allowing Antigravity to allocate runtime capacity dynamically.
+- Sign `--author` with each worker's real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
+- Record `--isolation swarm --swarm-workers <n> --swarm-posts <count>` on commits and state updates.
+- Keep subtask contracts strictly within context budgets (`CONTEXT_MAX_FILES = 6` implementation files, `CONTEXT_MAX_LOC = 1200` lines), handing context via `npx @digital-lake/lognexus handoff --prompt`.
 
 Isolation backend is tracked separately from the orchestration primitive. A git worktree, forked workspace, or tmux session may all isolate delegated work, but only the primary feature branch/worktree is lognexus's canonical branch record.
 

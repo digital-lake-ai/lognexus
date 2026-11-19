@@ -16,7 +16,24 @@ Scope: <what was reviewed>
 Follow-ups: #<issue-number> | none
 ```
 
-**Cross-model gate:** the reviewer's `<family>/<version>` must differ from the PR's last-code author. A review from the same model and version as the code author does NOT satisfy the gate, even from a different session. See `references/closure-and-review.md` §3 ("What constitutes 'different model'") for the full rule.
+**Review Gate Modes & Policy:**
+Configured via `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (`auto` resolves to `intra-fleet`). Two independent review modes are supported:
+- **Cross-Vendor Review:** Reviewer belongs to a different provider family than the author (e.g., `gemini/*` reviewed by `claude/*`, `openai/*`, or `deepseek/*`).
+- **Intra-Fleet Distinct-Model Review:** Reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Neon`, `Gemini 4 Carbon`, or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5` or `Claude Haiku`).
+- **Strictly blocked:** Identical canonical model family across any reasoning-effort suffix (`-none | -minimal | -low | -medium | -high | -extra | -xhigh | -xtrahigh | -extra-high`) is strictly blocked from reviewing or approving its own code.
+- **Strictly prohibited:** Placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`). Every agent must sign with its real canonical runtime identity.
+
+**Anti-Spoofing Rule (non-negotiable):**
+- No author agent (`Authored-by`) may write `Reviewed-by:` trailers or execute `gh pr merge`.
+- The review sign-off belongs exclusively to the independent reviewer.
+- Merge execution is reserved to the independent reviewer or repository orchestrator after the sign-off exists; the author never merges its own work.
+
+**Mandatory Merge Command (`--no-ff`):**
+Merge PRs exclusively using `--merge` to force a merge commit:
+```bash
+gh pr merge <PR_NUMBER> --merge --delete-branch
+```
+Never use `--squash` or `--rebase`, as they flatten discrete subtask commits and orphan LogNexus Git Notes (`refs/notes/lognexus`).
 
 **`approve-with-follow-ups`:** create the follow-up tracking issue BEFORE posting the review. The `Follow-ups:` field must reference a valid open issue. Do not post `approve-with-follow-ups` without this.
 

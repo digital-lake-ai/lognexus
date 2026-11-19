@@ -39,9 +39,20 @@ Create `.lognexus/routing.md` in your project root:
 # Model Routing
 
 routing: confirm
+orchestration: auto
+review_gate: auto
+implementer: auto
+reviewer: auto
 ```
 
-That's it. One field. If the file doesn't exist, the skill runs the setup prompt on first activation (see [Setup Prompt](#setup-prompt)).
+Configuration fields:
+- `routing: confirm | warn | off` — Prompt policy for phase transitions.
+- `orchestration: auto | swarm | subagent | off` — Multi-agent execution mode (`auto` defaults to native swarm under Antigravity Orchestrator or subagent when available).
+- `review_gate: auto | cross-vendor | intra-fleet | advisory | off` — PR review gate policy (`auto` resolves to `intra-fleet` distinct-model review).
+- `implementer: auto` — Runtime implementer assignment.
+- `reviewer: auto` — Runtime reviewer assignment.
+
+If the file doesn't exist, the skill runs the setup prompt on first activation (see [Setup Prompt](#setup-prompt)).
 
 ### `/lognexus models`
 
@@ -52,9 +63,15 @@ Re-runs the setup prompt at any time. Updates `.lognexus/routing.md` with the ne
 When no `.lognexus/routing.md` exists, or when the user runs `/lognexus models`:
 
 > How should I handle model-tier suggestions at phase transitions?
-> - **confirm** (default) — I'll pause and ask before proceeding, so you can switch models if you want.
-> - **warn** — I'll show a banner but keep going.
-> - **off** — No routing prompts. Use this if you run the same model for everything.
+> - **routing: confirm** (default) — Pause and ask before proceeding, allowing model switches.
+> - **routing: warn** — Show a banner but keep going.
+> - **routing: off** — No routing prompts.
+>
+> **Orchestration & Review Gate Options:**
+> - `orchestration: auto | swarm | subagent | off`
+> - `review_gate: auto | cross-vendor | intra-fleet | advisory | off`
+> - `implementer: auto`
+> - `reviewer: auto`
 
 ---
 
@@ -72,17 +89,17 @@ LogNexus is completely model-agnostic. Any model can be mapped to any tier depen
 
 | Tier | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Role |
 |------|------------------|--------|---------------|----------|--------------|
-| **tier-1** (Reasoning) | Claude Opus | o3, o1, GPT-4.5/5 | Gemini 4 Carbon / Argon, Gemini 3.8 Pro | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, cross-model review gates |
-| **tier-2** (Context / Triage) | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Issue-to-branch context loading, discovery triage, knowledge retrieval |
-| **tier-3** (Execution) | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Scoped subtask execution, atomic commits (eat(#N/Tk)), timeline comments |
+| **tier-1** (Reasoning) | Claude Opus 5.5 | OpenAI o3 / GPT-5 | Gemini 4 Neon (`gemini/neon`, `Orchestrator (Neon)`), Gemini 4 Carbon, Gemini 4 Argon | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, independent review gates |
+| **tier-2** (Context / Triage) | Claude Sonnet 5.5 | GPT-4o | Gemini 4 Hydrogen (`google/gemini-4-hydrogen-high (antigravity)`), Gemini 3.8 Flash High | Kimi K3 | Turn-1 exploration probes, complex implementation, issue-to-branch, knowledge retrieval |
+| **tier-3** (Execution) | Claude Haiku | GPT-4o-mini | Gemini 3.8 Flash, `gemini-flash-worker-agy` | DeepSeek V3 | Scoped subtask execution, atomic commits (`feat(#N/Tk)`), timeline comments |
 
 ### Example Multi-Model Deployments
 
 Users choose whatever combination best fits their workflow and tools:
-- **Setup A (Anthropic Stack):** Claude Opus (tier-1) + Claude Sonnet (tier-2) + Claude Haiku (tier-3) inside Claude Code or Cursor.
-- **Setup B (Google + DeepSeek):** Gemini Pro (tier-1/2) in Google Antigravity + DeepSeek Chat (tier-3) in Kimi Code / Cursor.
-- **Setup C (OpenAI + DeepSeek):** OpenAI o3 (tier-1) for planning + DeepSeek Chat (tier-3) for execution.
-- **Setup D (Cross-Model Review):** Any different model pairing satisfying the review gate rule (Authored-by: != Reviewed-by:).
+- **Setup A (Anthropic Stack):** Claude Opus 5.5 (tier-1) + Claude Sonnet 5.5 (tier-2) + Claude Haiku (tier-3) inside Claude Code or Cursor.
+- **Setup B (Google Fleet / Intra-Fleet Review):** Gemini 4 Neon / Carbon / Argon (tier-1 orchestrator/reviewer) + Gemini 4 Hydrogen or Gemini 3.8 Flash (tier-2/tier-3 implementer) in Antigravity (`Orchestrator` reviewing `Hydrogen`/`Flash`).
+- **Setup C (OpenAI + DeepSeek):** OpenAI o3 (tier-1) for planning + DeepSeek V3 / R1 for implementation.
+- **Setup D (Cross-Vendor or Intra-Fleet Distinct-Model Review):** Any valid reviewer pairing satisfying the independent review gate (`Authored-by:` ≠ `Reviewed-by:` across different canonical models or vendors).
 
 ## Default Phase-to-Tier Mapping
 
@@ -167,6 +184,7 @@ Not all tools support agent-initiated mode switching. Where unavailable, mode ro
 
 | Tool | Agent can self-switch? | Activation | Fallback |
 |------|----------------------|------------|----------|
+| **Antigravity** | Yes | Orchestrator runs with native `swarm` (`add`, `post_message`, `read_board`) or `invoke_subagent`. Dynamic runtime model allocation. | N/A — native multi-agent swarm |
 | **Claude Code** | Yes | The agent can invoke `exit_plan_mode` to enter plan-mode workflow. Auto Plan Mode can be configured via `--append-system-prompt`. | N/A — self-switch available |
 | **Codex CLI** | Not yet | Pending [openai/codex#11180](https://github.com/openai/codex/issues/11180). No documented user-initiated mode switch yet. | Advisory prompt — ask the user to switch |
 | **Cursor** | No | User switches with `Shift+Tab`. Plan Mode, Ask Mode, and Agent Mode are user-controlled. | Advisory prompt — ask the user to switch |
@@ -215,15 +233,42 @@ When the recommended mode is `plan then agent`, the plan-mode portion covers con
 
 ---
 
-## Context Handoff Protocol
+## Context Handoff Protocol & Subtask Contract Budget
 
 When work transfers between models or tools — whether prompted by routing or not — a self-contained handoff ensures the receiving model has everything it needs. This protocol is useful independently of routing configuration.
+
+### Subtask Contract Budgets (`CONTEXT_MAX_FILES` & `CONTEXT_MAX_LOC`)
+
+To keep delegated tasks bounded and prevent model context bloat:
+- **`CONTEXT_MAX_FILES = 6`**: maximum allowed implementation files per subtask contract (test files are exempt).
+- **`CONTEXT_MAX_LOC = 1200`**: maximum total lines of code modified/created per subtask contract.
+- Contracts that exceed these limits should be split into discrete subtasks (`T1..Tn`) before dispatch.
+
+### Automated Handoff Prompt Generation
+
+The LogNexus CLI generates compact, structured dispatch prompts from the active contract in `.lognexus/state.json`:
+
+```bash
+# Set bounded contract with assignee, isolation mode, and swarm metrics
+npx @digital-lake/lognexus state set-task <id> "<title>" \
+  --assignee "<canonical-identity>" \
+  --isolation <subagent|swarm|worktree|branch|shared> \
+  --swarm-workers <n> \
+  --swarm-posts <n> \
+  --allowed "<csv-paths>" \
+  --verify "<cmd>"
+
+# Render compact dispatch prompt for the target agent
+npx @digital-lake/lognexus handoff --prompt
+```
+
+Prefer `lognexus handoff --prompt` over manual copy-pasting between agent sessions.
 
 ### When to write a handoff
 
 - Transitioning from a higher tier to a lower tier (the outgoing model writes it)
 - Switching tools (e.g., Claude Code → Cursor)
-- Delegating bounded work to another agent
+- Delegating bounded work to another agent or swarm worker
 - Any time the next model won't have the current conversation context
 
 For N-way dispatch, use this handoff as the per-lane contract and pair it with the fan-out dispatch and collection artifacts from `references/orchestrator-protocol.md`.
@@ -235,6 +280,9 @@ For N-way dispatch, use this handoff as the per-lane contract and pair it with t
 
 **Tier transition:** tier-X → tier-Y
 **Current model:** <family>/<version> (<tool>)
+**Assignee:** <family>/<version> (<client>)
+**Isolation:** subagent | swarm | worktree | branch | shared
+**Swarm metrics:** workers: <n>, posts: <n>
 
 ### What was decided
 - [Decision 1 — concrete, not conceptual]
@@ -245,7 +293,7 @@ For N-way dispatch, use this handoff as the per-lane contract and pair it with t
 2. [Concrete action with file path]
 
 ### Contract
-- **Allowed files:** `path/to/file.ts`, `path/to/other.ts`
+- **Allowed files:** `path/to/file.ts`, `path/to/other.ts` (max 6 implementation files)
 - **Must not change:** [files, APIs, behavior, or decisions out of scope]
 - **Stop and ask if:** [condition requiring widening scope or judgment]
 - **Verification required:** [tests, checks, or evidence required before claiming done]

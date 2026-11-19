@@ -319,6 +319,7 @@ export function saveTelemetry(store: TelemetryStore, targetDir: string = process
       mkdirSync(dirPath, { recursive: true });
     }
 
+    store.schemaVersion = "2.0.0";
     store.lastUpdated = new Date().toISOString();
     store.detectedStacks = detectProjectStacks(targetDir);
 

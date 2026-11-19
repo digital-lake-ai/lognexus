@@ -21,12 +21,13 @@ Use the smallest primitive that accurately matches the runtime and the task.
 
 | Primitive | What it means | Safe for | Not for | Typical examples |
 |-----------|---------------|----------|---------|------------------|
-| **Local parallel tool fan-out** | One orchestrator runs multiple independent tool calls without creating a child agent identity | Read-only gathering, non-overlapping helper checks, parallel status queries | Independent review, code ownership claims, multi-step delegated implementation | Codex `multi_tool_use.parallel` |
-| **Bounded sub-agent** | The orchestrator spawns a child agent with a scoped contract and collects a return artifact | Review, verifier audits, bounded implementation slices, read-only exploration | Open-ended peer swarms, ambiguous ownership, silent long-running work | Codex `spawn_agent`; any runtime that exposes bounded worker agents |
+| **Local parallel tool fan-out** | One orchestrator runs multiple independent tool calls without creating a child agent identity | Read-only gathering (`<= 3` files), non-overlapping helper checks, parallel status queries | Independent review, reading > 3 files into context, code ownership claims, multi-step delegated implementation | Codex `multi_tool_use.parallel` |
+| **Bounded sub-agent** | The orchestrator spawns a child agent with a scoped contract and collects a return artifact | Turn-1 exploration probes (`> 3` files), independent review, verifier audits, bounded implementation slices | Open-ended uncontracted execution, ambiguous ownership, silent long-running work | Antigravity `invoke_subagent`, Codex `spawn_agent`, Claude Code `Agent` |
+| **Native swarm coordination** | The orchestrator coordinates multi-agent workers via a shared message board with discrete task contracts | Multi-subtask execution (`orchestration: auto`), parallel verified slices, bounded worker execution | Unfocused `@all` chatter, uncontracted file writes | Antigravity native `swarm` (`add`, `post_message`, `read_board`) |
 | **External session delegation** | Work is handed to a separate durable session or tool instance outside the current orchestrator | Long-running background work, tmux-backed agents, separate human-visible sessions, explicit worktree ownership | Implicit same-turn completion guarantees | tmux background sessions, separate terminal agents, dedicated worktree workers |
 | **Contract-only fallback** | LogNexus emits the contract but cannot execute the handoff itself in the current runtime | Review requests, verifier contracts, human handoff, later execution in another tool | Claiming parallelism or auto-spawn when none exists | Review contract, bounded handoff comment |
 
-**Selection rule:** Prefer local fan-out for fast sidecar reads, bounded sub-agents for auditable delegated work, external sessions for durable out-of-band work, and contract-only fallback when no execution primitive is available.
+**Selection rule:** For casual/single-scope queries (`<= 3` files), stay direct and non-invasive. For discovery or queries spanning `> 3` files (with or without an active issue), enforce the **Hard Turn-1 Discovery Probe Gate** (auto-dispatch read-only probes pinned to Tier-2/3 models without asking first, zero file writes). Use bounded sub-agents or native swarm for auditable delegated work, external sessions for durable out-of-band work, and contract-only fallback when no execution primitive is available.
 
 ---
 
@@ -51,7 +52,10 @@ LogNexus is capability-neutral. Document the actual primitive exposed by the run
 
 Examples:
 
-- **Codex `multi_tool_use.parallel`** -> local parallel tool fan-out
+- **Antigravity `invoke_subagent`** -> bounded sub-agent probe or reviewer lane
+- **Antigravity native `swarm`** -> multi-worker coordination on shared message board (`add`, `post_message`, `read_board`)
+- **Claude Code `Agent` / `pr-review`** -> bounded sub-agent
+- **Codex `multi_tool_use.parallel`** -> local parallel tool fan-out (`<= 3` files)
 - **Codex `spawn_agent`** -> bounded sub-agent with forked-workspace isolation
 - **tmux background session manager** -> external session delegation, typically paired with a shared JSON/file completion marker or timeout policy
 - **No agent runtime at all** -> contract-only fallback
@@ -144,7 +148,24 @@ Authored-by: <family>/<version> (<tool>, orchestrator)
 
 ## 6. Auto-Dispatch Triggers
 
-### Review gate
+### 1. Turn-1 Discovery Probe Gate (`> 3` files, with or without an active issue)
+
+When code exploration spans more than 3 repository files, a Tier-1 orchestrator (`Neon` / `Carbon` / `Argon` / `Opus`) must **NEVER** read `> 3` files directly into its context. Instead, immediately auto-dispatch read-only exploration probes (`invoke_subagent` or read-only `swarm` probes) without prompting the developer:
+- Pin a Tier-2 or Tier-3 model (e.g. `google/gemini-3.8-flash-high (antigravity)`) whenever the orchestrator is Tier-1 (`Carbon`, `Argon`, `Neon`, `Opus`).
+- Perform zero file writes during discovery probes.
+- Casual / single-scope queries (`<= 3` files) remain conversational and direct without spawning subagents.
+
+### 2. Post-Plan Automatic Native Swarm Execution (`orchestration: auto`)
+
+Before writing code, the Tier-1 orchestrator emits the `T1..Tn` plan with pre-assigned subagents/models (`--assignee`), tier, isolation mode (`--isolation`), and file/LOC budgets, awaiting explicit developer confirmation. Once confirmed under `orchestration: auto`:
+- When Antigravity `Orchestrator` (`Neon` / `Carbon` / `Argon`) with `swarm` is active, launch native `swarm` automatically under LogNexus contracts without asking again.
+- Maintain `<= 4` active swarm workers and use selective `@name` mentions (prohibit `@all` broadcast chatter).
+- Omit `model` (`"auto"`) on implementation workers unless explicitly requested by the developer, allowing Antigravity to allocate runtime capacity dynamically.
+- Sign `--author` with each worker's real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
+- Record `--isolation swarm --swarm-workers <n> --swarm-posts <count>` on subtasks and commits.
+- Bound contracts under `CONTEXT_MAX_FILES = 6` implementation files and `CONTEXT_MAX_LOC = 1200` lines, handing context via `npx @digital-lake/lognexus handoff --prompt`.
+
+### 3. Review gate
 
 At PR time, use the strongest available primitive in this order:
 
@@ -154,7 +175,7 @@ At PR time, use the strongest available primitive in this order:
 
 Local parallel tool fan-out does **not** satisfy independent review because it does not create a separate reviewer identity.
 
-### Closure verifier
+### 4. Closure verifier
 
 When closure evidence is repetitive and well-bounded, dispatch a verifier lane using the same ladder:
 
@@ -164,7 +185,7 @@ When closure evidence is repetitive and well-bounded, dispatch a verifier lane u
 
 The supervising actor still decides whether to close the issue.
 
-### Worktree hygiene
+### 5. Worktree hygiene
 
 After merge, or when resuming a repo with stale worktrees, run a cleanup lane if the check is independent of the critical path. Otherwise execute it locally.
 

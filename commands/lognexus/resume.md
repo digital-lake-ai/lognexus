@@ -7,7 +7,29 @@ Re-orient to the current branch and issue. Load the task list, identify where wo
 
 ## Policy
 
-**Branch detection:** parse the issue number from the current branch name using the `issue/<id>-<slug>` convention. If the current branch does not match, check `git worktree list` for a lognexus branch and offer to switch.
+**Branch detection & Scoped Lanes:** parse the issue number from the current branch name using either `issue/<id>-<slug>` or `security/<id>-<slug>`. Both scoped lanes are recognized and treated identically across the LogNexus engine. If the current branch does not match, check `git worktree list` for a lognexus branch and offer to switch.
+
+**State Sync & Subtask Tracking:**
+Immediately upon resuming, synchronize local state from Git:
+```bash
+npx @digital-lake/lognexus state sync
+```
+Before implementing any subtask, declare the bounded contract:
+```bash
+npx @digital-lake/lognexus state set-task <id> "<title>" \
+  --assignee "<canonical-identity>" \
+  --isolation <subagent|swarm|worktree|branch|shared> \
+  --swarm-workers <n> \
+  --swarm-posts <n> \
+  --allowed "<csv-paths>" \
+  --verify "<cmd>"
+```
+Render the compact dispatch prompt for the next agent or swarm worker:
+```bash
+npx @digital-lake/lognexus handoff --prompt
+```
+- **Context Budgets:** Subtasks must strictly respect `CONTEXT_MAX_FILES = 6` implementation files (test files exempt) and `CONTEXT_MAX_LOC = 1200` lines.
+- **Swarm Attribution Rules:** Under `orchestration: auto`, implementation workers omit `model` (`"auto"`) unless requested, and MUST sign `--author` with their real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
 
 **Session-resume comment:** every resumed session must post a `[lognexus/session-resume]` comment on the issue. This is distinct from `[lognexus/session-start]` — it marks a continuation, not a first start. The comment must include the last commit, uncommitted changes summary, remaining tasks, and where work was left off.
 
@@ -21,7 +43,7 @@ Re-orient to the current branch and issue. Load the task list, identify where wo
 
 ```bash
 git branch --show-current
-# Parse: issue/<N>-<slug>  →  N is the issue number
+# Parse: <issue|security>/<N>-<slug>  →  N is the issue number
 ```
 
 ### Load issue context

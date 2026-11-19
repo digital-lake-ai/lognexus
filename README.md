@@ -36,7 +36,7 @@ As AI coding agents take on complex engineering tasks across different IDEs, the
 
 **LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
 - **Clients:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code, VS Code, Zed.
-- **Models:** Google Gemini (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash High`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
+- **Models:** Google Gemini (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
 - **Supported Platforms:** **Linux**, **macOS**, and **Windows** (`linux`, `darwin`, `win32` — 100% cross-platform Node.js >= 20 & Git >= 2.28, zero native binary dependencies).
 
 ```
@@ -51,10 +51,11 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 
 ## Key Features
 
-- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
+- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Google Gemini** (`Gemini 4 Neon` / `Orchestrator (Neon)`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
 - **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **Google Antigravity**, and **Kimi Code / VS Code**.
+- **Adaptive Ecosystem Routing & Native Swarm Coordination:** Declarative `.lognexus/routing.md` (`orchestration: auto | swarm | subagent | off`, `review_gate: auto | intra-fleet | cross-vendor | advisory | off`, `implementer: auto`, `reviewer: auto`) with Hard Turn-1 Discovery Probes (`> 3` files) and native Swarm contract flags (`--assignee`, `--isolation swarm`, `--swarm-workers`, `--swarm-posts`).
 - **Atomic Commit Engine (`lognexus commit` & MCP `lognexus_commit`):** Validates subtask file contracts, verifies reviewer separation, injects authorship trailers, commits changes, marks subtasks completed, and attaches Git Notes in a single ~0.15s execution.
-- **Cross-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. No model merges its own code without independent verification from another model family.
+- **Cross-Model & Intra-Fleet Distinct-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. Supports both cross-vendor review and intra-fleet distinct-model review (`Neon`/`Carbon`/`Argon` reviewing `Hydrogen`/`Flash`), with strict anti-spoofing and mandatory `--no-ff` merges.
 - **Contract-First Subtasks & Alphanumeric Tickets:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions—supporting both GitHub issues (`feat(#42/T1)`) and Jira/Linear ticket schemes (`feat(SLM-201/T1)`).
 - **Persistent State & Session Recovery:** Local session state engine (`.lognexus/state.json`) prevents amnesia across context compactations and conversation resets, retaining completed subtask metadata through the closing commit.
 - **Automated Context Handoff (`lognexus handoff`):** Regenerates a complete `.lognexus/handoff.md` from local state — cycle state, active subtask contract, live scope-drift report, completed-subtask table and next required action — so a fresh session (or a different model) resumes without re-deriving context. Auto-refreshed on `state set-task` and on every `--finish-task` commit.
@@ -82,20 +83,31 @@ LogNexus organizes development phases into three cognitive tiers. You can assign
 
 | Tier | Cognitive Role | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Activities |
 |---|---|---|---|---|---|---|
-| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x | o3, o1, GPT-5 | Gemini 4 Carbon / Argon, 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model review sign-offs. |
-| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 4 Hydrogen, Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, knowledge retrieval. |
-| **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku | GPT-4o-mini | Gemini Flash | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
+| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x / 5.5 | o3, o1, GPT-5 | Gemini 4 Neon / Carbon / Argon, 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model & intra-fleet review sign-offs. |
+| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 4 Hydrogen, Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, scoped implementation, knowledge retrieval. |
+| **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku | GPT-4o-mini | Gemini 3.8 Flash, `gemini-flash-worker-agy` | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
 
-### Example Deployment Setups
+### Adaptive Routing & Deployment Setups
 
-LogNexus adapts to your existing toolstack. Configure your advisory preferences in `.lognexus/routing.md`:
+LogNexus adapts automatically to single-provider and multi-vendor toolstacks. Configure `.lognexus/routing.md` with linear `O(n)` directives:
+
+```markdown
+routing: confirm
+orchestration: auto
+review_gate: auto
+implementer: auto
+reviewer: auto
+```
+
+- `orchestration`: `auto | swarm | subagent | off` (`auto` activates native `swarm` under Antigravity `Orchestrator` after plan confirmation).
+- `review_gate`: `auto | cross-vendor | intra-fleet | advisory | off` (`auto` resolves to `intra-fleet` distinct-model verification when running in a single-provider fleet).
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                                 POPULAR DEPLOYMENT SETUPS                              │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ Setup A (Anthropic Pure):  Claude Opus (t1) + Claude Sonnet (t2) + Claude Haiku (t3)   │
-│ Setup B (Google + DeepSeek): Gemini Pro (t1/t2) in Antigravity + DeepSeek Chat in Kimi │
+│ Setup B (Antigravity Fleet): Gemini 4 Neon/Carbon/Argon (t1) + Hydrogen/Flash (t2/t3)  │
 │ Setup C (OpenAI + DeepSeek): OpenAI o3 (t1) in Cursor + DeepSeek Chat (t3) for code    │
 │ Setup D (Claude + OpenAI):   Claude Opus (t1) for design + GPT-4o-mini (t3) for tasks  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -150,40 +162,49 @@ npx @digital-lake/lognexus init
 # Optional: scaffold official multi-model context-exclusion rules (zero runtime overhead)
 # to prevent agents from burning tokens on lockfiles or build directories:
 npx @digital-lake/lognexus init --protect-tokens
+
+# Optional: pre-seal local telemetry consent in an interactive human terminal
+npx @digital-lake/lognexus init --enable-telemetry
+npx @digital-lake/lognexus init --no-telemetry
 ```
 
-Verify your environment anytime:
+Verify your environment anytime (including multi-manifest SemVer drift checks):
 ```bash
 npx @digital-lake/lognexus doctor
 ```
 
-Inspect active branch and tier advisory:
+Inspect active branch, ecosystem profile, review gate mode, and tier advisory:
 ```bash
 npx @digital-lake/lognexus status
 ```
 
-Manage persistent agent state (`.lognexus/state.json`) and session recovery:
+Manage persistent agent state (`.lognexus/state.json`), native swarm contracts, and session recovery:
 ```bash
 npx @digital-lake/lognexus state sync
 npx @digital-lake/lognexus state show
-npx @digital-lake/lognexus state set-task T1 "Add user schema"
+npx @digital-lake/lognexus state set-task T1 "Add user schema" \
+  --assignee "google/gemini-4-hydrogen-high (antigravity)" \
+  --isolation swarm --swarm-workers 2 --swarm-posts 4 \
+  --allowed "src/schema.ts,tests/schema.test.ts" \
+  --verify "npm test"
 npx @digital-lake/lognexus state finish-task T1
 ```
 
 Execute an **Atomic Commit** (validates subtask contract, enforces review-gate separation, injects trailers, commits, marks subtask completed, and attaches Git Note in a single ~0.15s call):
 ```bash
 npx @digital-lake/lognexus commit -m "feat(#42/T1): add user schema" \
-  --author "gemini/flash (antigravity)" \
-  --reviewer "gemini/pro (lead-architect)" \
+  --author "google/gemini-4-hydrogen-high (antigravity)" \
+  --stage-allowed \
+  --swarm-workers 2 --swarm-posts 4 \
   --finish-task
 
 # Or read message from file (cross-platform on Linux, macOS, and Windows shells):
-npx @digital-lake/lognexus commit -F commit-msg.txt --finish-task
+npx @digital-lake/lognexus commit -F commit-msg.txt --stage-allowed --finish-task
 ```
 
 Quiet Mode with Git Notes (`refs/notes/lognexus`, standard `git-ai` v3):
 ```bash
-npx @digital-lake/lognexus note attach HEAD
+npx @digital-lake/lognexus note attach HEAD --swarm-workers 2 --swarm-posts 4
 npx @digital-lake/lognexus note show HEAD
 npx @digital-lake/lognexus note push origin
 ```
@@ -197,8 +218,9 @@ npx @digital-lake/lognexus audit main
 
 Session continuity, scope-drift and memory recall:
 ```bash
-# Regenerate .lognexus/handoff.md from live state (--json for machines)
+# Regenerate .lognexus/handoff.md from live state (--json or --prompt for compact agent dispatch)
 npx @digital-lake/lognexus handoff
+npx @digital-lake/lognexus handoff --prompt
 npx @digital-lake/lognexus handoff --json
 
 # Inspect the working tree against the active subtask contract
@@ -212,24 +234,27 @@ npx @digital-lake/lognexus note search --issue 30 --limit 5
 npx @digital-lake/lognexus note search --author "deepseek" --json
 ```
 
-Opt-in Telemetry, Stack Profiling & ROI Cost-Savings Engine (100% local, zero network calls):
+Opt-in Telemetry 2.0, LOC-Weighted ROI & Cohort Benchmarks (100% local, zero network calls):
 ```bash
-# Check telemetry status (disabled by default, 0% overhead)
+# Check telemetry status (disabled by default, 0% overhead; interactive [y/N] Policy v2.0.0 gate on human TTY)
 npx @digital-lake/lognexus telemetry status
 
-# Enable local telemetry (stores metrics only in .lognexus/telemetry.json)
+# Enable or disable local telemetry (stores metrics only in .lognexus/telemetry.json, schemaVersion 2.0.0)
 npx @digital-lake/lognexus telemetry enable
-
-# Generate .lognexus/telemetry.md report with ROI metrics
-npx @digital-lake/lognexus telemetry report
-
-# Inspect the exact local payload structure
-npx @digital-lake/lognexus telemetry inspect
-
-# Disable telemetry immediately
 npx @digital-lake/lognexus telemetry disable
+
+# Generate .lognexus/telemetry.md report with LOC-weighted ROI (optionally scoped in-memory)
+npx @digital-lake/lognexus telemetry report
+npx @digital-lake/lognexus telemetry report --issue 42 --since 2026-11-01T00:00:00Z --branch main
+
+# Inspect the exact Zero-PII payload structure (optionally scoped in-memory)
+npx @digital-lake/lognexus telemetry inspect --issue 42
+
+# Export an offline Zero-PII snapshot and aggregate multi-repo cohort benchmarks locally
+npx @digital-lake/lognexus telemetry snapshot -o .lognexus/snapshot-v2.json --issue 42
+npx @digital-lake/lognexus telemetry benchmark ./snapshots -o .lognexus/cohort.md --json
 ```
-Telemetry is **strictly local-only**: no endpoint, no dispatch, no upload. The retired `--share --accept-terms` flags now fail with an explicit error, and pre-2.0.0 stores in `community` mode are migrated to `local` on read.
+Telemetry 2.0 is **strictly local-only**: zero network egress, zero PII, and `O(1)` fail-silent passive hooks (100% silent in automated agent sessions). Sealed GDPR consent (`Policy v2.0.0`) pauses automatically on material policy bumps until a human re-confirms in an interactive terminal. The retired `--share --accept-terms` flags fail with an explicit error, and pre-2.0.0 stores migrate to `local` / `schemaVersion: "2.0.0"` on save.
 
 *Read our strict Zero-PII, zero-network policy in [`docs/TELEMETRY_PRIVACY.md`](docs/TELEMETRY_PRIVACY.md).*
 
@@ -362,9 +387,9 @@ Every commit carries signed provenance trailers (`Planned-by:` / `Authored-by:` 
 
 | Role | Canonical identity |
 |---|---|
-| Master Architecture & Security Orchestrators | `Gemini 4 Argon` · `Gemini 4 Carbon` |
-| Implementation (VS Code client) | `deepseek/VS Code (kimi-code)` |
-| Cross-model review (Antigravity) | `Gemini 4 Carbon` · `google/gemini-3.8-flash-high (antigravity)` |
+| Master Architecture & Security Orchestrators | `Gemini 4 Neon` (`Orchestrator (Neon)`) · `Gemini 4 Carbon` · `Gemini 4 Argon` |
+| Implementation (Antigravity / VS Code clients) | `google/gemini-4-hydrogen-high (antigravity)` · `google/gemini-3.8-flash-high (antigravity)` · `deepseek/VS Code (kimi-code)` |
+| Independent review (Cross-Vendor & Intra-Fleet) | `Claude Opus 5.5` · `Gemini 4 Neon` · `Gemini 4 Carbon` · `Gemini 4 Argon` |
 
 The `Planned-by:` trailer documents where an externally authored plan came from. It grants no review authority and no merge rights; an author model never writes its own `Reviewed-by:` trailer.
 
@@ -374,10 +399,10 @@ The `Planned-by:` trailer documents where an externally authored plan came from.
 
 **LogNexus** is engineered and maintained by **[HorchataHTML](https://github.com/HorchataHTML)** and **[Digital Lake](https://github.com/digital-lake-ai)**, encompassing:
 - The full TypeScript runtime, repository scaffolding & diagnostic CLI, Persistent Agent State Engine, Atomic Commit Engine, Git Notes memory layer (`refs/notes/lognexus`), local-first FinOps telemetry, Multi-Model Token Shield, and native JSON-RPC 2.0 stdio MCP server (`@digital-lake/lognexus` / `lognexus-mcp`).
-- First-class multi-model tier routing and closed delegation contracts across **Google Gemini** (`Gemini 4 Argon`, `Gemini 4 Carbon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash High`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
+- First-class multi-model tier routing and closed delegation contracts across **Google Gemini** (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
 - The cross-reference CI validation workflow (`.github/workflows/cross-ref-check.yml`), single-source-of-truth review/signing block architecture, and sub-skill anchor normalization authored by **HorchataHTML** (`2026-08-04`, commit `cd0582c1`).
 
-The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Argon`** and **`Gemini 4 Carbon`** (*Master Architecture & Security Orchestrators*).
+The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Neon`**, **`Gemini 4 Carbon`**, and **`Gemini 4 Argon`** (*Master Architecture & Security Orchestrators*).
 
 Additional workflow inspirations and patterns are derived from [OrchestKit](https://github.com/yonatangross/orchestkit) and [Superpowers](https://github.com/obra/superpowers). Detailed license texts and notices are preserved in the [`LICENSES/`](LICENSES/) directory and in [`NOTICE.md`](NOTICE.md).
 

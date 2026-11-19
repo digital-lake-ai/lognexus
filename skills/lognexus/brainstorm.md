@@ -10,7 +10,7 @@ description: "Phase 1: Capture brainstorming output as a GitHub issue with struc
 
 0. **Routing check.** Run the phase entry check from `references/model-routing.md`. On first activation, if `.lognexus/routing.md` is missing, run the setup prompt first.
 
-1. **Run the brainstorm.** Follow `references/brainstorm-workflow.md` for the design exploration process. External skills (`superpowers:brainstorming`, `ork:brainstorming`) may be used for the exploration phase (steps 1-4) but output capture (steps 5-6) follows the internalized workflow.
+1. **Run the brainstorm & Turn-1 Probe Gate.** Follow `references/brainstorm-workflow.md` for the design exploration process. For context exploration across `> 3` files, a Tier-1 orchestrator must never read `> 3` files directly into context; immediately auto-dispatch read-only exploration probes (`invoke_subagent` or read-only `swarm` probes pinned to Tier-2/3, e.g. `google/gemini-3.8-flash-high (antigravity)`) without prompting first, performing zero file writes. Casual queries (`<= 3` files) remain conversational and direct. External skills (`superpowers:brainstorming`, `ork:brainstorming`) may be used for the exploration phase (steps 1-4) but output capture (steps 5-6) follows the internalized workflow.
 
 2. **Capture as GitHub Issue (Full Mode).** Before the first labeled create in a repo, bootstrap the LogNexus labels per `references/labels.md`. Create the issue with `lognexus/plan` already applied using the template below. Sign the issue body per the signing spec — see SKILL.md → "Agent Identity Signing".
 
@@ -76,12 +76,11 @@ this section if it adds no value.
 
 ## Tasks
 
-Each task is self-contained. A tier-3 model should be able to execute any task
-using only the information in that task block, without reading the rest of this issue.
+Each task is self-contained and bounded by contract budgets (`CONTEXT_MAX_FILES = 6` implementation files, `CONTEXT_MAX_LOC = 1200` lines). A tier-3 or tier-2 model should be able to execute any task using only the information in that task block, without reading the rest of this issue.
 
 - [ ] **T1: [Short title]** `[tier-3]`
   - **What:** [1-2 sentences, exactly what to do - no ambiguity]
-  - **Files:** `path/to/file.ts` (create|modify|delete)
+  - **Files:** `path/to/file.ts` (create|modify|delete) (max 6 implementation files)
   - **Allowed to change:** [`path/to/file.ts`; specific symbols or sections if needed]
   - **Must not change:** [files, APIs, behavior, or decisions that are out of scope]
   - **Forbidden judgment calls:** [choices the implementer must not make locally]
@@ -89,6 +88,8 @@ using only the information in that task block, without reading the rest of this 
   - **Verification:** [command, check, or evidence required before claiming completion]
   - **Return artifact:** [diff, comment, checklist update, verification note]
   - **Decision budget:** `none`
+  - **Assignee:** [canonical runtime identity, e.g. `google/gemini-3.8-flash-high (antigravity)`]
+  - **Isolation:** `swarm` | `subagent` | `worktree` | `branch` | `shared`
   - **Accept when:** [concrete, testable acceptance criteria]
   - **Context:** [any non-obvious background the implementer needs]
 
@@ -96,6 +97,8 @@ using only the information in that task block, without reading the rest of this 
   - **What:** [1-2 sentences]
   - **Files:** `path/to/file.ts`
   - **Decision budget:** [what judgment this task is allowed to exercise]
+  - **Assignee:** [canonical identity, e.g. `gemini/carbon` or `claude/opus-5.5 (claude-code)`]
+  - **Isolation:** `subagent` | `swarm` | `worktree`
   - **Accept when:** [criteria]
   - **Why tier-1:** [why this needs reasoning]
 
@@ -115,6 +118,8 @@ Task ID rules:
   tier-3 template above). Compressed or abbreviated formats are acceptable
   only for `[tier-1]` and `[tier-2]` tasks, which carry their own decision
   budgets. If a field is not applicable, write `none` rather than omitting it.
+- **Contract budgets:** Each task contract is strictly bounded by `CONTEXT_MAX_FILES = 6` implementation files (test files exempt) and `CONTEXT_MAX_LOC = 1200` lines.
+- **Post-plan developer confirmation before auto-swarm:** Under `orchestration: auto`, present the complete `T1..Tn` task plan and await explicit developer confirmation before executing writes. Once confirmed, launch native `swarm` or subagents automatically without asking again.
 
 ## Open Questions
 

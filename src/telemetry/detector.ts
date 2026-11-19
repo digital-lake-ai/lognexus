@@ -243,6 +243,11 @@ export function extractCommitDiffStats(
   return Array.from(extensionMap.values());
 }
 
+const CARBON_MARKER_PATTERN = /(?:^|[^a-z0-9])carbon(?:$|[^a-z0-9])/;
+const ARGON_MARKER_PATTERN = /(?:^|[^a-z0-9])argon(?:$|[^a-z0-9])/;
+const NEON_MARKER_PATTERN = /(?:^|[^a-z0-9])neon(?:$|[^a-z0-9])/;
+const HYDROGEN_MARKER_PATTERN = /(?:^|[^a-z0-9])hydrogen(?:$|[^a-z0-9])/;
+
 /**
  * Normalizes author/reviewer strings into generic model family categories (e.g. 'gemini/flash', 'claude/sonnet').
  *
@@ -256,36 +261,41 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   const trimmed = identityStr.trim().toLowerCase();
 
   // Explicit flagship Gemini 4 identities take precedence over generic client-role fallbacks.
-  if (trimmed.includes("gemini") && trimmed.includes("carbon")) return "gemini/carbon";
-  if (trimmed.includes("gemini") && trimmed.includes("argon")) return "gemini/argon";
-  if ((trimmed.includes("gemini") || trimmed.includes("antigravity")) && trimmed.includes("neon")) {
+  if (trimmed.includes("gemini") && CARBON_MARKER_PATTERN.test(trimmed)) return "gemini/carbon";
+  if (trimmed.includes("gemini") && ARGON_MARKER_PATTERN.test(trimmed)) return "gemini/argon";
+  if (
+    (trimmed.includes("gemini") || trimmed.includes("antigravity")) &&
+    NEON_MARKER_PATTERN.test(trimmed)
+  ) {
     return "gemini/neon";
   }
-  if (trimmed.includes("gemini") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
-  if (trimmed.includes("antigravity") && trimmed.includes("carbon")) return "gemini/carbon";
-  if (trimmed.includes("antigravity") && trimmed.includes("argon")) return "gemini/argon";
-  if (trimmed.includes("antigravity") && trimmed.includes("hydrogen")) return "gemini/hydrogen";
+  if (trimmed.includes("gemini") && HYDROGEN_MARKER_PATTERN.test(trimmed)) return "gemini/hydrogen";
+  if (trimmed.includes("antigravity") && CARBON_MARKER_PATTERN.test(trimmed))
+    return "gemini/carbon";
+  if (trimmed.includes("antigravity") && ARGON_MARKER_PATTERN.test(trimmed)) return "gemini/argon";
+  if (trimmed.includes("antigravity") && HYDROGEN_MARKER_PATTERN.test(trimmed))
+    return "gemini/hydrogen";
 
   // Antigravity Orchestrator (Carbon/Argon/Neon) display & slug forms and Flash worker-agy forms.
   if (
     trimmed === "orchestrator (neon)" ||
-    (trimmed.includes("orchestrator") && trimmed.includes("neon")) ||
+    (trimmed.includes("orchestrator") && NEON_MARKER_PATTERN.test(trimmed)) ||
     trimmed.includes("gemini-pro-orchestrator-neon")
   ) {
     return "gemini/neon";
   }
   if (
     trimmed === "orchestrator (carbon)" ||
-    (trimmed.includes("orchestrator") && trimmed.includes("carbon")) ||
+    (trimmed.includes("orchestrator") && CARBON_MARKER_PATTERN.test(trimmed)) ||
     (trimmed.includes("gemini-pro-orchestrator") &&
-      !trimmed.includes("argon") &&
-      !trimmed.includes("neon"))
+      !ARGON_MARKER_PATTERN.test(trimmed) &&
+      !NEON_MARKER_PATTERN.test(trimmed))
   ) {
     return "gemini/carbon";
   }
   if (
     trimmed === "orchestrator (argon)" ||
-    (trimmed.includes("orchestrator") && trimmed.includes("argon")) ||
+    (trimmed.includes("orchestrator") && ARGON_MARKER_PATTERN.test(trimmed)) ||
     trimmed.includes("gemini-pro-orchestrator-argon")
   ) {
     return "gemini/argon";

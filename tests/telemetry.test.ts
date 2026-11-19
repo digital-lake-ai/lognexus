@@ -10,6 +10,7 @@ import {
   declineTelemetry,
   getTelemetryConsentState,
   resolveCommitTier,
+  saveTelemetry,
 } from "../src/telemetry/collector.js";
 import {
   classifyFileCategory,
@@ -294,6 +295,9 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(extractModelFamilyCategory("Neonila Perez <neonila@example.com>")).toBe(
         "unknown/other",
       );
+      expect(extractModelFamilyCategory("Neonila Perez (antigravity)")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Orchestrator (Neonila)")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Ana Carbonell (antigravity)")).toBe("unknown/other");
       expect(inferTierFromAuthor("Qwen Lee")).toBeNull();
       expect(inferTierFromAuthor("Kimi K3")).toBe("tier-3");
       expect(inferTierFromAuthor("moonshot/kimi")).toBe("tier-3");
@@ -772,6 +776,38 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(parsed.summary.swarmCommits).toBe(0);
       expect(parsed.summary.totalSwarmPosts).toBe(0);
       expect(parsed.summary.maxSwarmWorkers).toBe(0);
+    });
+
+    it("upgrades a loaded 1.0.0 store to schemaVersion 2.0.0 on disk when saved", () => {
+      const legacy = {
+        schemaVersion: "1.0.0",
+        mode: "local",
+        anonymousProjectId: "11111111-2222-3333-4444-555555555555",
+        consent: { accepted: false, policyVersion: "1.0.0", acceptedAt: null },
+        detectedStacks: ["nodejs"],
+        taskTimings: {},
+        extensions: { ".ts": { ext: ".ts", commits: 2, linesAdded: 10, linesDeleted: 1 } },
+        models: { "gemini/flash": { family: "gemini/flash", tier: "tier-3", commits: 2 } },
+        summary: { totalCommits: 2, totalLinesAdded: 10, estimatedCostSavingsPct: 96 },
+        lastUpdated: "2025-01-01T00:00:00.000Z",
+      };
+
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      const telemetryPath = getTelemetryPath(tempDir);
+      writeFileSync(telemetryPath, JSON.stringify(legacy, null, 2), "utf8");
+
+      const loaded = loadTelemetry(tempDir);
+      expect(loaded.schemaVersion).toBe("1.0.0");
+
+      saveTelemetry(loaded, tempDir);
+      expect(loaded.schemaVersion).toBe("2.0.0");
+
+      const savedRaw = JSON.parse(readFileSync(telemetryPath, "utf8")) as {
+        schemaVersion: string;
+        summary: { totalCommits: number };
+      };
+      expect(savedRaw.schemaVersion).toBe("2.0.0");
+      expect(savedRaw.summary.totalCommits).toBe(2);
     });
 
     it("parses legacy 2.0.0 stores and snapshots missing swarm metrics with zero defaults", () => {

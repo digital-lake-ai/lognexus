@@ -13,7 +13,7 @@ A **signed lognexus review** is a PR or issue comment whose body contains both:
 
 Formal GitHub `reviews` / `reviewDecision` fields are **advisory only**. GitHub blocks AI agents from self-`APPROVE`, and most AI-operated reviews are posted as comments, not formal review events. Do **not** rely on `reviewDecision` or `reviews` alone to determine whether a PR has been reviewed.
 
-The cross-model gate rule: a review is gate-satisfying only when the reviewer's `<family>/<version>` differs from the `Last-code-by:` (or fallback chain) on the PR branch. See `skills/lognexus/references/closure-and-review.md` §3 ("What constitutes 'different model'") for the full definition.
+The review gate rule: a review is gate-satisfying when it aligns with `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (`auto` defaults to `intra-fleet`), where the reviewer's canonical identity differs from the `Last-code-by:` (or fallback chain) on the PR branch (e.g. Cross-Vendor or Intra-Fleet Distinct-Model Review). See `skills/lognexus/references/closure-and-review.md` §3 ("What constitutes 'different model'") for the full definition.
 
 ## Query / Template
 
@@ -23,15 +23,15 @@ Identify yourself from the system prompt:
 ```
 <family>/<version> (<tool>)
 ```
-Examples: `claude/opus-4.6 (claude-code)`, `openai/gpt-5.4 (codex)`.
+Examples: `claude/opus-5.5 (claude-code)`, `google/gemini-3.8-flash-high (antigravity)`, `gemini/carbon`, `openai/gpt-5.4 (codex)`.
 
 Derive your tier:
 
 | Model profile | Tier |
 |---------------|------|
-| Opus, GPT-5, o3 | tier-1 (reasoning) |
-| Sonnet, GPT-4.1 | tier-2 (capable) |
-| Haiku, GPT-4.1-mini | tier-3 (fast) |
+| `Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Claude Opus 5.5`, `OpenAI o3 / GPT-5`, `DeepSeek R1` | tier-1 (reasoning) |
+| `Gemini 4 Hydrogen`, `Gemini 3.8 Flash High`, `Claude Sonnet 5.5`, `Kimi K3` | tier-2 (capable) |
+| `Gemini 3.8 Flash`, `gemini-flash-worker-agy`, `Claude Haiku`, `DeepSeek V3`, `GPT-4o-mini` | tier-3 (fast) |
 
 If unlisted, default to tier-2. Record both for later steps.
 
@@ -87,6 +87,8 @@ Apply signed-comment review results and last-code-author identity together:
 | `needs-rereview` snapshot | Different model | `needs-rereview + cross-model` — prior review stale |
 | `changes-requested` comment | Any | `changes-requested` — author must address first |
 | Draft | Any | `draft` — still in progress |
+
+*Note on review gating:* Under `review_gate: intra-fleet | cross-vendor | auto`, "Different model" means either a distinct vendor family (Cross-Vendor) or a distinct Tier-1 canonical model family in an independent session (Intra-Fleet Distinct-Model Review). The same canonical model family across any reasoning-effort suffix cannot self-approve.
 
 ### Step 5 — Triage report
 
