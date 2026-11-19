@@ -78,8 +78,12 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
         "CLAUDECODE",
         "CLAUDE_CODE_ENTRYPOINT",
         "CURSOR_TRACE_ID",
+        "CURSOR_AGENT",
         "CODEX_SANDBOX",
         "ANTIGRAVITY_CLI",
+        "ANTIGRAVITY_AGENT",
+        "ANTIGRAVITY_TRAJECTORY_ID",
+        "ANTIGRAVITY_SOURCE_METADATA",
         "GEMINI_CLI",
         "AIDER_MODEL",
       ]) {
@@ -90,6 +94,38 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
         true,
       );
       expect(isAgentEnvironment({ TERM_PROGRAM: "vscode", VSCODE_COPILOT_CHAT: "1" })).toBe(true);
+      expect(isAgentEnvironment({ TERM_PROGRAM: "vscode", ANTIGRAVITY_AGENT_SESSION: "1" })).toBe(
+        true,
+      );
+      expect(isAgentEnvironment({ TERM_PROGRAM: "vscode", CURSOR_AGENT_SESSION: "1" })).toBe(true);
+    });
+
+    it("does not treat benign Antigravity or Cursor integrated terminal variables or blank agent vars as agents", () => {
+      expect(
+        isAgentEnvironment({
+          TERM_PROGRAM: "vscode",
+          ANTIGRAVITY_CLI_ALIAS: "agy",
+          ANTIGRAVITY_APP_DATA_DIR: "/tmp/ag",
+          ANTIGRAVITY_AGENTAPI_EXE: "/opt/antigravity/language_server",
+          VSCODE_IPC_HOOK_CLI: "1",
+        }),
+      ).toBe(false);
+      expect(
+        isAgentEnvironment({
+          TERM_PROGRAM: "vscode",
+          CURSOR_WORKSPACE: "/tmp/ws",
+          VSCODE_IPC_HOOK_CLI: "1",
+        }),
+      ).toBe(false);
+      expect(
+        isAgentEnvironment({
+          TERM_PROGRAM: "vscode",
+          ANTIGRAVITY_AGENT: "   ",
+          CURSOR_AGENT: "",
+        }),
+      ).toBe(false);
+      expect(isAgentEnvironment({ ANTIGRAVITY_TRAJECTORY_ID: "abc" })).toBe(true);
+      expect(isAgentEnvironment({ ANTIGRAVITY_SOURCE_METADATA: "{}" })).toBe(true);
     });
 
     it("detects CI and non-interactive automation environments", () => {
@@ -160,6 +196,78 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
           env: {},
         }),
       ).toBe(true);
+    });
+
+    it("allows human Antigravity and Cursor integrated terminals while blocking agent subshell variables", () => {
+      seedInitializedRepo("routing.md");
+
+      const antigravityHumanEnv: NodeJS.ProcessEnv = {
+        TERM_PROGRAM: "vscode",
+        ANTIGRAVITY_CLI_ALIAS: "agy",
+        ANTIGRAVITY_APP_DATA_DIR: "/tmp/ag",
+        ANTIGRAVITY_AGENTAPI_EXE: "/opt/antigravity/language_server",
+      };
+      expect(isAgentEnvironment(antigravityHumanEnv)).toBe(false);
+      expect(
+        isInteractiveConsentAllowed({
+          command: "status",
+          targetDir: tempDir,
+          stdinIsTTY: true,
+          stdoutIsTTY: true,
+          env: antigravityHumanEnv,
+        }),
+      ).toBe(true);
+
+      const cursorHumanEnv: NodeJS.ProcessEnv = {
+        TERM_PROGRAM: "vscode",
+        CURSOR_WORKSPACE: "/tmp/ws",
+      };
+      expect(isAgentEnvironment(cursorHumanEnv)).toBe(false);
+      expect(
+        isInteractiveConsentAllowed({
+          command: "status",
+          targetDir: tempDir,
+          stdinIsTTY: true,
+          stdoutIsTTY: true,
+          env: cursorHumanEnv,
+        }),
+      ).toBe(true);
+
+      for (const agentEnv of [
+        { ANTIGRAVITY_AGENT: "1" },
+        { ANTIGRAVITY_TRAJECTORY_ID: "abc" },
+        { ANTIGRAVITY_SOURCE_METADATA: "{}" },
+        { CURSOR_AGENT: "1" },
+      ] satisfies NodeJS.ProcessEnv[]) {
+        expect(isAgentEnvironment(agentEnv)).toBe(true);
+        expect(
+          isInteractiveConsentAllowed({
+            command: "status",
+            targetDir: tempDir,
+            stdinIsTTY: true,
+            stdoutIsTTY: true,
+            env: agentEnv,
+          }),
+        ).toBe(false);
+      }
+
+      for (const vscodeAgentEnv of [
+        { TERM_PROGRAM: "vscode", VSCODE_AGENT_SESSION: "active" },
+        { TERM_PROGRAM: "vscode", VSCODE_COPILOT_CHAT: "1" },
+        { TERM_PROGRAM: "vscode", ANTIGRAVITY_AGENT_RUNNER: "1" },
+        { TERM_PROGRAM: "vscode", CURSOR_AGENT_RUNNER: "1" },
+      ] satisfies NodeJS.ProcessEnv[]) {
+        expect(isAgentEnvironment(vscodeAgentEnv)).toBe(true);
+        expect(
+          isInteractiveConsentAllowed({
+            command: "status",
+            targetDir: tempDir,
+            stdinIsTTY: true,
+            stdoutIsTTY: true,
+            env: vscodeAgentEnv,
+          }),
+        ).toBe(false);
+      }
     });
 
     it("skips when DO_NOT_TRACK, non-TTY, agent env, or non-interactive flags are present", () => {
