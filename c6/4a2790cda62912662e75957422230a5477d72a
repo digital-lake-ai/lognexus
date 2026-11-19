@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.3.7",
+  "timestamp": "2026-11-19T00:46:13.303Z",
+  "issue": {
+    "id": 71,
+    "title": "fix: allow human Antigravity and Cursor integrated terminals in telemetry consent prompt",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Narrow agent env detection so human IDE integrated terminals can seal consent",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/consent-prompt.ts",
+        "tests/consent-prompt.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 2,
+    "posts": 97
+  }
+}
