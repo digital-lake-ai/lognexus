@@ -22,16 +22,22 @@ Present the setup prompt:
 
 > How should I handle model-tier suggestions at phase transitions?
 >
-> - **confirm** (default) -- I'll pause and ask before proceeding, so you can switch models if you want.
-> - **warn** -- I'll show a banner but keep going.
-> - **off** -- No routing prompts. Use this if you run the same model for everything.
+> - **routing: confirm** (default) -- Pause and ask before proceeding, allowing model switches.
+> - **routing: warn** -- Show a banner but keep going.
+> - **routing: off** -- No routing prompts.
 >
-> **Tier reference:**
-> | Tier | Use For | Example Phases |
-> |------|---------|----------------|
-> | tier-1 (reasoning) | Creative synthesis, architecture | Brainstorm, PR timeline |
-> | tier-2 (capable) | Context loading, structured docs | Issue-to-branch, retrieval |
-> | tier-3 (fast) | Execution, routine operations | Commits, timeline updates |
+> **Orchestration & Review Gate Options:**
+> - `orchestration: auto | swarm | subagent | off` (`auto` defaults to native swarm under Antigravity Orchestrator or subagent when available)
+> - `review_gate: auto | cross-vendor | intra-fleet | advisory | off` (`auto` defaults to `intra-fleet`)
+> - `implementer: auto`
+> - `reviewer: auto`
+>
+> **Tier reference & Taxonomy:**
+> | Tier | Use For | Recommended Models |
+> |------|---------|--------------------|
+> | tier-1 (reasoning) | Architecture, master planning, independent review | `Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Claude Opus 5.5`, `OpenAI o3 / GPT-5`, `DeepSeek R1` |
+> | tier-2 (capable) | Turn-1 exploration probes, complex implementation | `Gemini 4 Hydrogen`, `Gemini 3.8 Flash High`, `Claude Sonnet 5.5`, `Kimi K3` |
+> | tier-3 (fast) | Scoped execution, commits, timeline updates | `Gemini 3.8 Flash`, `gemini-flash-worker-agy`, `Claude Haiku`, `DeepSeek V3`, `GPT-4o-mini` |
 
 ### Save the Choice
 
@@ -41,6 +47,10 @@ Create `.lognexus/routing.md`:
 # Model Routing
 
 routing: <chosen-mode>
+orchestration: auto
+review_gate: auto
+implementer: auto
+reviewer: auto
 ```
 
 Create the `.lognexus/` directory if it doesn't exist.
@@ -48,3 +58,5 @@ Create the `.lognexus/` directory if it doesn't exist.
 ### Report
 
 Confirm the saved routing mode and explain when it will take effect (at the next phase transition).
+
+Note: Telemetry consent is managed strictly via interactive human TTY (`lognexus init --enable-telemetry` / `--no-telemetry`) and stays 100% silent during agent turns.
