@@ -106,6 +106,7 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
           TERM_PROGRAM: "vscode",
           ANTIGRAVITY_CLI_ALIAS: "agy",
           ANTIGRAVITY_APP_DATA_DIR: "/tmp/ag",
+          ANTIGRAVITY_AGENTAPI_EXE: "/opt/antigravity/language_server",
           VSCODE_IPC_HOOK_CLI: "1",
         }),
       ).toBe(false);
@@ -204,6 +205,7 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
         TERM_PROGRAM: "vscode",
         ANTIGRAVITY_CLI_ALIAS: "agy",
         ANTIGRAVITY_APP_DATA_DIR: "/tmp/ag",
+        ANTIGRAVITY_AGENTAPI_EXE: "/opt/antigravity/language_server",
       };
       expect(isAgentEnvironment(antigravityHumanEnv)).toBe(false);
       expect(

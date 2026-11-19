@@ -90,8 +90,8 @@ export function isAgentEnvironment(env: NodeJS.ProcessEnv = process.env): boolea
       if (
         key.startsWith("VSCODE_AGENT_") ||
         key.startsWith("VSCODE_COPILOT_") ||
-        key.startsWith("ANTIGRAVITY_AGENT") ||
-        key.startsWith("CURSOR_AGENT")
+        key.startsWith("ANTIGRAVITY_AGENT_") ||
+        key.startsWith("CURSOR_AGENT_")
       ) {
         return true;
       }
