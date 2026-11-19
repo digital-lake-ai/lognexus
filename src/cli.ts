@@ -57,13 +57,15 @@ import {
   UPGRADE_COMMAND,
 } from "./update/gate.js";
 
-const __cliDir = dirname(fileURLToPath(import.meta.url));
+function getCliDir(): string {
+  return dirname(fileURLToPath(import.meta.url));
+}
 
 export { type ParsedCommitArgs, parseCommitArgs } from "./commit.js";
 
 export function getCliVersion(): string {
   try {
-    const pkgPath = join(__cliDir, "..", "package.json");
+    const pkgPath = join(getCliDir(), "..", "package.json");
     if (existsSync(pkgPath)) {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
       if (pkg.version) return pkg.version;
@@ -71,7 +73,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.3.7";
+  return "1.4.0";
 }
 
 function printHeader() {
@@ -136,7 +138,7 @@ async function handleTerms(args: string[]): Promise<void> {
 
 function readLocalTermsVersion(): string {
   try {
-    const pkgPath = join(__cliDir, "..", "package.json");
+    const pkgPath = join(getCliDir(), "..", "package.json");
     if (existsSync(pkgPath)) {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
       const version = pkg?.lognexusPolicy?.termsVersion;
@@ -174,7 +176,6 @@ Commands:
 Telemetry Subcommands:
   lognexus telemetry [status]       Show current telemetry mode and project metrics
   lognexus telemetry enable         Enable local telemetry (zero network calls, strictly local storage)
-  lognexus telemetry inspect        Inspect the exact Zero-PII payload before sending
   lognexus telemetry report [-o f] [--issue <id>] [--since <iso>] [--branch <ref>]
                                     Generate .lognexus/telemetry.md report with ROI metrics
   lognexus telemetry inspect [--issue <id>] [--since <iso>] [--branch <ref>]
@@ -205,14 +206,18 @@ State Subcommands:
   lognexus state [show]             Display current active issue and task state
   lognexus state sync               Sync state from current Git branch & GitHub
   lognexus state set-task <id> [t]  Set active subtask (e.g. lognexus state set-task T1 "Add schema")
-                                    [--assignee "<identity>"] [--isolation <subagent|swarm|worktree|shared>]
+                                    [--assignee "<identity>"] [--tier <tier-1|tier-2|tier-3>]
+                                    [--isolation <subagent|swarm|worktree|branch|shared>]
                                     [--swarm-workers <n>] [--swarm-posts <n>]
+                                    [--allowed <csv>] [--forbidden <csv>]
+                                    [--budget <none|low|medium|high>] [--verify "<cmd>"]
   lognexus state finish-task <id>   Mark subtask as completed (e.g. lognexus state finish-task T1)
   lognexus state clear              Reset persistent state to empty
 
 Note Subcommands:
   lognexus note [show] [commit]     Display LogNexus Git Note for commit (default: HEAD)
   lognexus note attach [commit]     Attach current session state as Git Note to commit
+                                    [--swarm-workers <n>] [--swarm-posts <n>]
   lognexus note list                List all commits with LogNexus Git Notes
   lognexus note search [query]      Recall past decisions stored in refs/notes/lognexus
                                     [--file <path>] [--author <model>] [--issue <num>]
