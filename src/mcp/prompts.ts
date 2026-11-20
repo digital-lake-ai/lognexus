@@ -82,9 +82,9 @@ const CONTRACT_FORMAT = `### Contract
 
 const TIER_TABLE = `| Tier | Role | Example models | Typical work |
 | --- | --- | --- | --- |
-| tier-1 | Reasoning, architecture, review | Claude Opus, OpenAI o3, Gemini 4 Carbon / Argon / Neon (Gemini Pro), DeepSeek R1 | Issue decomposition, architectural decisions, review gate |
-| tier-2 | Large-context discovery and triage | Claude Sonnet, GPT-4.1, Gemini Pro (1M), DeepSeek V3 | Repository exploration, discovery triage |
-| tier-3 | Scoped execution | Claude Haiku, GPT-4o-mini, Gemini Flash, DeepSeek Chat | Single-contract subtasks, atomic commits |`;
+| tier-1 | Reasoning, architecture, review | Claude Fable 5.2 / Opus 5.5, OpenAI GPT-6.2 Astra / o3, Gemini 4 Carbon / Argon / Neon (Gemini Pro), DeepSeek R1 | Issue decomposition, architectural decisions, review gate |
+| tier-2 | Large-context discovery and triage | Claude Sonnet 5.5, OpenAI GPT-6.2 Sol / GPT-5.4, Gemini 4 Hydrogen / Pro (1M), DeepSeek V3 | Repository exploration, discovery triage |
+| tier-3 | Scoped execution | Claude Haiku 5.5, OpenAI GPT-6 Luna / codex-mini / GPT-4o-mini, Gemini Flash, DeepSeek Chat | Single-contract subtasks, atomic commits |`;
 
 export function listMcpPrompts(): PromptDefinition[] {
   return PROMPT_DEFINITIONS;
@@ -112,7 +112,7 @@ ${issueLine}
 ${contextBlock}
 ## Rules
 
-1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files, with or without an active issue), NEVER read \`> 3\` codebase files directly in the orchestrator; immediately auto-dispatch read-only discovery probes (zero writes) to \`tier-2\`/\`tier-3\` subagents without asking first — pin a fast \`tier-2\`/\`tier-3\` model (e.g. \`flash\`) whenever the orchestrator is \`tier-1\` (\`Neon\`/\`Carbon\`/\`Argon\`/\`Opus\`), and omit \`model\` only when the coordinator itself is \`tier-2\`/\`tier-3\`.
+1. Stay conversational on trivial/single-file queries (\`<= 3\` files). For deep multi-module discovery (\`> 3\` files, with or without an active issue), NEVER read \`> 3\` codebase files directly in the orchestrator; immediately auto-dispatch read-only discovery probes (zero writes) to \`tier-2\`/\`tier-3\` subagents without asking first — pin a fast \`tier-2\`/\`tier-3\` model (e.g. \`flash\`) whenever the orchestrator is \`tier-1\` (\`Neon\`/\`Carbon\`/\`Argon\`/\`Opus\`) (including \`Claude Fable 5.2\` / \`GPT-6.2 Astra\`), and omit \`model\` only when the coordinator itself is \`tier-2\`/\`tier-3\`.
 2. Decompose the work into ordered subtasks, each named \`[tier-X]\` according to the model tier suited to it, with pre-delimited subagent/isolation assignments awaiting developer confirmation before executing writes. Once the developer confirms the plan, when \`orchestration: auto\` and Antigravity \`Orchestrator\` (\`swarm\` tool) are active, launch native \`swarm\` execution automatically without asking again, omitting \`model\` (\`"auto"\`) on implementation workers unless a specific model is requested.
 3. Every subtask must carry a closed delegation contract. Never leave a subtask open-ended.
 4. Subtasks must not overlap in the files they touch. If they would, split further or sequence them.
@@ -163,7 +163,7 @@ ${diffBlock}
 3. **Scope**: no unrelated refactor, no unrequested dependency in \`package.json\`, no dead code or commented-out blocks.
 4. **Correctness**: edge cases, error paths, encoding/line-ending handling and platform differences (Windows vs POSIX) are addressed.
 5. **Traceability**: commits follow \`feat(#N/Tk)\` / \`fix(#N/Tk)\`, and the PR links the issue and the subtask contracts.
-6. **Attribution**: authorship trailers (\`Authored-by\`, \`Reviewed-by\`, \`Last-code-by\`) are present, reject placeholder identities (\`auto\`, bare \`orchestrator\`, \`unknown/other\`, \`<provider>/<model>\`), enforce strict anti-spoofing (an author never writes \`Reviewed-by:\` or merges its own PR), and ensure the reviewer uses a distinct model per \`.lognexus/routing.md\` (\`cross-vendor\` or distinct \`intra-fleet\` model; identical-model self-approval is strictly rejected).
+6. **Attribution**: authorship trailers (\`Authored-by\`, \`Reviewed-by\`, \`Last-code-by\`) are present, reject placeholder identities (\`auto\`, bare \`orchestrator\`, \`unknown/other\`, \`<provider>/<model>\`), enforce strict anti-spoofing (an author never writes \`Reviewed-by:\` or merges its own PR), and ensure the reviewer uses a distinct model honoring \`.lognexus/routing.md\` (\`cross-vendor\`, \`intra-fleet\` — default under \`auto\` — or \`advisory\` / \`off\` for single-session ChatGPT/solo environments where cross-model review is not required; identical-model self-approval is strictly rejected).
 7. **Tests**: new behaviour is covered by tests that fail when the behaviour is reverted. Tests must not be weakened to make them pass.
 8. **Telemetry silence**: keep local telemetry \`100%\` silent in the background during review and never output telemetry notices unless explicitly requested.
 

@@ -59,9 +59,55 @@ describe("getProjectStatus", () => {
       expect(status.ecosystemProfile).toBe("single-client (claude-code)");
       expect(status.reviewGateMode).toBe("intra-fleet");
       expect(status.recommendedTier).toContain("Claude Opus");
+      expect(status.recommendedTier).toContain("Claude Fable 5.2");
+      expect(status.recommendedTier).toContain("Mythos 5.2");
       expect(status.recommendedTier).not.toContain("Gemini");
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports 2026 model recommendations for codex, copilot, cursor, and active issue branches", () => {
+    const codexDir = mkdtempSync(join(tmpdir(), "lognexus-status-codex-"));
+    const copilotDir = mkdtempSync(join(tmpdir(), "lognexus-status-copilot-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: codexDir, stdio: "ignore", shell: false });
+      mkdirSync(join(codexDir, ".codex"));
+      const codexMain = getProjectStatus(codexDir);
+      expect(codexMain.ecosystemProfile).toBe("single-client (codex)");
+      expect(codexMain.recommendedTier).toContain("OpenAI GPT-6.2 Astra");
+
+      execFileSync("git", ["checkout", "-b", "issue/76-codex"], {
+        cwd: codexDir,
+        stdio: "ignore",
+        shell: false,
+      });
+      const codexIssue = getProjectStatus(codexDir);
+      expect(codexIssue.recommendedTier).toContain("GPT-6 Luna");
+      expect(codexIssue.recommendedTier).toContain("codex-mini");
+
+      execFileSync("git", ["init", "-b", "main"], {
+        cwd: copilotDir,
+        stdio: "ignore",
+        shell: false,
+      });
+      mkdirSync(join(copilotDir, ".github"), { recursive: true });
+      writeFileSync(join(copilotDir, ".github", "copilot-instructions.md"), "# Copilot\n", "utf8");
+      const copilotMain = getProjectStatus(copilotDir);
+      expect(copilotMain.ecosystemProfile).toBe("single-client (copilot)");
+      expect(copilotMain.recommendedTier).toContain("Claude Fable 5.2 / GPT-6.2 Astra");
+
+      execFileSync("git", ["checkout", "-b", "issue/76-copilot"], {
+        cwd: copilotDir,
+        stdio: "ignore",
+        shell: false,
+      });
+      const copilotIssue = getProjectStatus(copilotDir);
+      expect(copilotIssue.recommendedTier).toContain("Claude Haiku 5.5");
+      expect(copilotIssue.recommendedTier).toContain("GPT-6 Luna");
+    } finally {
+      rmSync(codexDir, { recursive: true, force: true });
+      rmSync(copilotDir, { recursive: true, force: true });
     }
   });
 

@@ -20,12 +20,12 @@ review_gate: auto
 implementer: auto
 reviewer: auto
 
-# Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Opus -> Sonnet, Argon/Carbon/Neon -> Hydrogen/Flash) works out of the box for single-provider teams.
+# Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Fable/Opus -> Sonnet, GPT-6.2 Astra -> Sol/Luna in ChatGPT/Codex, Argon/Carbon/Neon -> Hydrogen/Flash) works out of the box for single-provider teams. Cross-vendor review is never forced: review_gate: auto uses intra-fleet, and single-session ChatGPT/solo workflows may set review_gate: advisory or off.
 
-# Operational Tier Taxonomy (Empirical recommendations across Gemini, Claude, OpenAI, DeepSeek, Kimi)
-# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Gemini 4 Neon, Claude Opus, OpenAI o3/GPT-5, DeepSeek R1
-# tier-2 (Orchestration / Large Context >500 lines): Gemini 4 Hydrogen, Gemini 3.8 Flash High, Claude Sonnet, Kimi K3 / K2.7 Code
-# tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini Flash, DeepSeek V3 (Chat), Kimi Code, Claude Haiku, GPT-4o-mini
+# Operational Tier Taxonomy (Empirical recommendations across Gemini, Claude, OpenAI, DeepSeek, Kimi — Nov 2026)
+# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Gemini 4 Neon, Claude Fable 5.2 / Mythos 5.2 / Opus 5.5, OpenAI GPT-6.2 Astra / o3, DeepSeek R1
+# tier-2 (Orchestration / Large Context >500 lines): Gemini 4 Hydrogen, Gemini 3.8 Flash High, Claude Sonnet 5.5, OpenAI GPT-6.2 Sol / GPT-5.4 / Codex, Kimi K3 / K2.7 Code
+# tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini Flash, DeepSeek V3 (Chat), Kimi Code, Claude Haiku 5.5, OpenAI GPT-6 Luna / codex-mini / GPT-4o-mini
 
 # Native Assistant Autonomy & Contract Execution Governance
 # max_subtask_files: 6
@@ -79,14 +79,21 @@ export const CLAUDE_DENY_RULES = [
   "Read(./node_modules/**)",
   "Read(./package-lock.json)",
   "Grep(./package-lock.json)",
+  "Read(./npm-shrinkwrap.json)",
   "Read(./pnpm-lock.yaml)",
   "Read(./yarn.lock)",
+  "Read(./bun.lockb)",
   "Read(./Cargo.lock)",
   "Read(./poetry.lock)",
   "Read(./uv.lock)",
+  "Read(./.venv/**)",
+  "Read(./venv/**)",
+  "Read(./__pycache__/**)",
   "Read(./dist/**)",
+  "Read(./dist-pypi/**)",
   "Read(./build/**)",
   "Read(./coverage/**)",
+  "Read(./.next/**)",
 ] as const;
 
 function ensureGitignore(targetDir: string, result: InitResult): void {
