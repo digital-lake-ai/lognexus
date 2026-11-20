@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.0",
+  "timestamp": "2026-11-20T01:46:09.058Z",
+  "issue": {
+    "id": 76,
+    "title": "release: publish LogNexus v1.4.1 (Claude 5.2, GPT-6.2/Codex, CLI --help & Swarm UX)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Codify Swarm UI handoff, ChatGPT/Codex review flexibility, and 2026 models",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "AGENTS.md",
+        "GEMINI.md",
+        "skills/lognexus/SKILL.md",
+        "skills/lognexus/references/orchestrator-protocol.md",
+        "skills/lognexus/references/model-routing.md",
+        "skills/lognexus/references/closure-and-review.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npx vitest run tests/packaging.test.ts",
+      "assignee": "google/gemini-flash-worker-agy (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 141
+  }
+}
