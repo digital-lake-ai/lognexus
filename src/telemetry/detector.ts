@@ -170,6 +170,15 @@ export function detectProjectStacks(targetDir: string = process.cwd()): string[]
       stacks.add("c/cpp");
     }
 
+    if (
+      existsSync(join(targetDir, "astro.config.mjs")) ||
+      existsSync(join(targetDir, "astro.config.ts")) ||
+      existsSync(join(targetDir, "astro.config.js")) ||
+      existsSync(join(targetDir, "astro.config.cjs"))
+    ) {
+      stacks.add("astro");
+    }
+
     detectShellStacks(targetDir, stacks);
   } catch {
     // Ignore read errors
@@ -248,6 +257,29 @@ const ARGON_MARKER_PATTERN = /(?:^|[^a-z0-9])argon(?:$|[^a-z0-9])/;
 const NEON_MARKER_PATTERN = /(?:^|[^a-z0-9])neon(?:$|[^a-z0-9])/;
 const HYDROGEN_MARKER_PATTERN = /(?:^|[^a-z0-9])hydrogen(?:$|[^a-z0-9])/;
 
+function isLowerAlphaNum(code: number): boolean {
+  return (code >= 48 && code <= 57) || (code >= 97 && code <= 122);
+}
+
+/**
+ * Matches `marker` only when bounded by start/end or non-alphanumeric delimiters in O(n),
+ * preventing substring false positives such as `"console"` or `"solver"` matching `"sol"`.
+ */
+function hasDelimitedMarker(lowerText: string, marker: string): boolean {
+  let pos = 0;
+  while (pos <= lowerText.length - marker.length) {
+    const idx = lowerText.indexOf(marker, pos);
+    if (idx === -1) return false;
+    const beforeOk = idx === 0 || !isLowerAlphaNum(lowerText.charCodeAt(idx - 1));
+    const afterIdx = idx + marker.length;
+    const afterOk =
+      afterIdx === lowerText.length || !isLowerAlphaNum(lowerText.charCodeAt(afterIdx));
+    if (beforeOk && afterOk) return true;
+    pos = idx + 1;
+  }
+  return false;
+}
+
 /**
  * Normalizes author/reviewer strings into generic model family categories (e.g. 'gemini/flash', 'claude/sonnet').
  *
@@ -258,7 +290,11 @@ const HYDROGEN_MARKER_PATTERN = /(?:^|[^a-z0-9])hydrogen(?:$|[^a-z0-9])/;
 export function extractModelFamilyCategory(identityStr: string | null | undefined): string {
   if (!identityStr) return "unknown/other";
 
-  const trimmed = identityStr.trim().toLowerCase();
+  const cleaned = stripAngleBracketEmails(identityStr);
+  if (cleaned === "") return "unknown/other";
+
+  const trimmed = cleaned.trim().toLowerCase();
+  const headBeforeParens = trimmed.split("(")[0].trim();
 
   // Explicit flagship Gemini 4 identities take precedence over generic client-role fallbacks.
   if (trimmed.includes("gemini") && CARBON_MARKER_PATTERN.test(trimmed)) return "gemini/carbon";
@@ -320,14 +356,31 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   }
   if (trimmed.includes("gemini") && trimmed.includes("flash")) return "gemini/flash";
   if (trimmed.includes("gemini")) return "gemini/generic";
-  if (trimmed.includes("claude") && trimmed.includes("sonnet")) return "claude/sonnet";
-  if (trimmed.includes("claude") && trimmed.includes("haiku")) return "claude/haiku";
-  if (trimmed.includes("claude") && trimmed.includes("opus")) return "claude/opus";
+  if (hasDelimitedMarker(trimmed, "fable")) return "claude/fable";
+  if (hasDelimitedMarker(trimmed, "mythos")) return "claude/mythos";
+  if (
+    (trimmed.includes("claude") || trimmed.includes("anthropic/")) &&
+    trimmed.includes("sonnet")
+  ) {
+    return "claude/sonnet";
+  }
+  if ((trimmed.includes("claude") || trimmed.includes("anthropic/")) && trimmed.includes("haiku")) {
+    return "claude/haiku";
+  }
+  if ((trimmed.includes("claude") || trimmed.includes("anthropic/")) && trimmed.includes("opus")) {
+    return "claude/opus";
+  }
+  if (hasDelimitedMarker(trimmed, "astra")) return "openai/astra";
+  if (hasDelimitedMarker(trimmed, "sol")) return "openai/sol";
+  if (hasDelimitedMarker(trimmed, "luna")) return "openai/luna";
+  if (hasDelimitedMarker(trimmed, "gpt-oss")) return "openai/gpt-oss";
+  if (hasDelimitedMarker(headBeforeParens, "codex")) return "openai/codex";
   if (
     trimmed.includes("gpt") ||
     trimmed.includes("openai") ||
-    trimmed.includes("o1") ||
-    trimmed.includes("o3")
+    hasDelimitedMarker(trimmed, "o1") ||
+    hasDelimitedMarker(trimmed, "o3") ||
+    hasDelimitedMarker(trimmed, "o4")
   ) {
     return "openai/gpt";
   }
@@ -430,13 +483,20 @@ const TIER_1_MARKERS = [
   "lead/orchestrator",
   "orchestrator",
   "antigravity/lead",
+  "claude/fable",
+  "fable",
+  "claude/mythos",
+  "mythos",
   "claude/opus",
   "opus",
+  "openai/astra",
+  "astra",
   "openai/o1",
   "openai/o3",
+  "openai/o4",
 ];
 
-const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "qwen", "flash/lite"];
+const TIER_3_MARKERS = ["deepseek", "kimi", "moonshot", "haiku", "luna", "qwen", "flash/lite"];
 
 const BARE_AMBIGUOUS_TIER_3_MARKERS = new Set(["kimi", "qwen"]);
 
@@ -458,21 +518,36 @@ const TIER_2_MARKERS = [
   "hydrogen",
   "claude/sonnet",
   "sonnet",
+  "openai/sol",
+  "sol",
   "gpt-4o",
   "openai/gpt",
 ];
 
 const EFFORT_SUFFIXES = [
   "-extra-high",
+  "-ultrafast",
   "-xtrahigh",
-  "-xhigh",
-  "-extra",
   "-minimal",
   "-medium",
+  "-xhigh",
+  "-extra",
+  "-light",
   "-high",
-  "-low",
+  "-fast",
   "-none",
+  "-low",
+  "-max",
 ] as const;
+
+const GPT_MINI_NANO_PATTERN = /(?:^|[\s/_-])gpt[\s_-]\d+(?:\.\d+)?[\s_-](?:mini|nano)(?:$|[\s/_-])/;
+const GPT_DASH_MINI_NANO_PATTERN = /(?:^|[\s/_-])gpt[\s_-]\d+-\d+[\s_-](?:mini|nano)(?:$|[\s/_-])/;
+const GPT_5_PATTERN = /(?:^|[\s/_-])gpt[\s_-]5(?:\.\d+)?(?:$|[\s/_-])/;
+
+function shouldSkipEffortSuffix(head: string, suffix: string): boolean {
+  if (suffix !== "-max") return false;
+  return head.startsWith("qwen/") || head === "qwen-max" || head.endsWith("-codex-max");
+}
 
 function matchesBoundaryMarker(
   paddedNormalized: string,
@@ -508,25 +583,57 @@ export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | n
   const rawHead = cleaned.split("(")[0].trim().toLowerCase();
   let head = rawHead;
   for (let i = 0; i < 2; i++) {
-    const suffix = EFFORT_SUFFIXES.find((candidate) => head.endsWith(candidate));
+    const suffix = EFFORT_SUFFIXES.find(
+      (candidate) => head.endsWith(candidate) && !shouldSkipEffortSuffix(head, candidate),
+    );
     if (!suffix) break;
     head = head.slice(0, -suffix.length);
   }
 
+  // Tier-3 fast checks must run before Tier-1 gpt-5/o4 and generic Tier-2 openai/gpt.
   if (head.includes("flash-worker-agy") || head.includes("worker-agy")) {
     return "tier-3";
   }
-  if (/(?:^|[\s/_-])(?:gpt-4o-mini|flash-lite)(?:$|[\s/_-])/.test(head)) {
+  if (
+    GPT_MINI_NANO_PATTERN.test(head) ||
+    GPT_DASH_MINI_NANO_PATTERN.test(head) ||
+    hasDelimitedMarker(head, "gpt-4o-mini") ||
+    hasDelimitedMarker(head, "codex-mini") ||
+    hasDelimitedMarker(head, "o4-mini") ||
+    hasDelimitedMarker(head, "flash-lite") ||
+    hasDelimitedMarker(head, "luna") ||
+    hasDelimitedMarker(head, "haiku")
+  ) {
     return "tier-3";
   }
-  if (/(?:^|[\s/_-])(?:o1-mini|o3-mini|o4-mini|gpt-4o)(?:$|[\s/_-])/.test(head)) {
+
+  // Tier-1 fast checks must precede Tier-2 (e.g. astra/gpt-5 before generic openai/gpt).
+  const hasO1Mini = hasDelimitedMarker(head, "o1-mini");
+  const hasO3Mini = hasDelimitedMarker(head, "o3-mini");
+  if (
+    hasDelimitedMarker(head, "fable") ||
+    hasDelimitedMarker(head, "mythos") ||
+    hasDelimitedMarker(head, "astra") ||
+    (!hasO1Mini && hasDelimitedMarker(head, "o1")) ||
+    (!hasO3Mini && hasDelimitedMarker(head, "o3")) ||
+    hasDelimitedMarker(head, "o4") ||
+    GPT_5_PATTERN.test(head) ||
+    (head.includes("deepseek") &&
+      (hasDelimitedMarker(head, "r1") || hasDelimitedMarker(head, "reasoner")))
+  ) {
+    return "tier-1";
+  }
+
+  // Tier-2 fast checks before generic normalized marker matching.
+  if (
+    hasO1Mini ||
+    hasO3Mini ||
+    hasDelimitedMarker(head, "gpt-4o") ||
+    hasDelimitedMarker(head, "sol") ||
+    hasDelimitedMarker(head, "gpt-oss") ||
+    hasDelimitedMarker(head, "codex")
+  ) {
     return "tier-2";
-  }
-  if (/(?:^|[\s/_-])(?:o1|o3|o4|gpt-5(?:\.\d+)?)(?:$|[\s/_-])/.test(head)) {
-    return "tier-1";
-  }
-  if (head.includes("deepseek") && /(?:^|[\s/_-])(?:r1|reasoner)(?:$|[\s/_-])/.test(head)) {
-    return "tier-1";
   }
 
   // Collapse slug separators so 'gemini-3.8-pro' matches the '/gemini/pro/' boundary.
