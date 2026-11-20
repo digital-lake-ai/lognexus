@@ -144,9 +144,14 @@ Every PR merge requires a positive review from a model different from the author
 
 Configured via `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (`auto` defaults to `intra-fleet`).
 
+**Zero Forced Cross-Vendor Review (ChatGPT / OpenAI Codex):**
+- **ChatGPT / OpenAI Codex environments NEVER force cross-vendor review.**
+- `review_gate: auto` defaults to `intra-fleet` within OpenAI (`GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`).
+- Single-session or solo ChatGPT / Codex workflows where cross-model review is unnecessary or unavailable can configure `review_gate: advisory` (warns without blocking) or `review_gate: off` in `.lognexus/routing.md`.
+
 Two independent review modes are supported:
 1. **Cross-Vendor Review** *(recommended best practice for milestone releases)*: The reviewer belongs to a different provider family than the author (e.g., `gemini/*` reviewed by `claude/*`, `openai/*`, or `deepseek/*`).
-2. **Intra-Fleet Distinct-Model Review** *(supported for single-provider workflows such as Antigravity or Claude Code)*: The reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Neon`, `Gemini 4 Carbon`, or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5` or `Claude Haiku`).
+2. **Intra-Fleet Distinct-Model Review** *(supported for single-provider workflows such as Antigravity, Claude Code, or Codex / ChatGPT)*: The reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Neon`, `Gemini 4 Carbon`, or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Fable 5.2` / `Opus 5.5` reviewing `Claude Sonnet 5.5` or `Claude Haiku 5.5`; `OpenAI GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`).
 
 ### Anti-Spoofing Rule (Non-Negotiable)
 
@@ -158,8 +163,9 @@ Two independent review modes are supported:
 ### What constitutes "different model"
 
 - **Cross-vendor pairing:** Different provider families (e.g., Claude vs Gemini, OpenAI vs DeepSeek).
-- **Intra-fleet distinct-model pairing:** Distinct canonical models within the same provider family (e.g., `Gemini 4 Neon` / `Carbon` / `Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5`).
-- **Strictly blocked:** Identical canonical model family across any reasoning-effort suffix (`-none | -minimal | -low | -medium | -high | -extra | -xhigh | -xtrahigh | -extra-high`) is strictly blocked from self-approving.
+- **Intra-fleet distinct-model pairing:** Distinct canonical models within the same provider family (e.g., `Gemini 4 Neon` / `Carbon` / `Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Fable 5.2` / `Mythos 5.2` / `Opus 5.5` reviewing `Claude Sonnet 5.5` / `Haiku 5.5`; `OpenAI GPT-6.2 Astra` reviewing `GPT-6.2 Sol` / `GPT-6 Luna`).
+- **Shared-weights equivalence (`Fable <-> Mythos` blocked):** `Claude Fable 5.2` (`claude/fable-5.2`) and `Claude Mythos 5.2` (`claude/mythos-5.2`) share identical base model weights, so `Fable <-> Mythos` cross-review is blocked as self-approval (`error`) in `intra-fleet` and `cross-vendor` modes.
+- **Strictly blocked:** Identical canonical model family across any reasoning-effort/speed suffix (`-none | -minimal | -low | -medium | -high | -extra | -xhigh | -xtrahigh | -extra-high | -light | -fast | -ultrafast | -max`) or `codex/* -> openai/*` / dash-version alias (`claude/fable-5-2` == `claude/fable-5.2`, `openai/gpt-6-2-astra` == `openai/gpt-6.2-astra`) is strictly blocked from self-approving.
 - **Strictly prohibited:** Literal placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`) are invalid.
 - Human review always counts as independent.
 
@@ -214,7 +220,7 @@ For the full review execution runbook — bounded reviewer lane dispatch, review
 
 A PR may be merged when:
 
-1. At least one independent review with `Disposition: approve` or `Disposition: approve-with-follow-ups` exists (satisfying `review_gate`).
+1. At least one independent review with `Disposition: approve` or `Disposition: approve-with-follow-ups` exists (satisfying `review_gate`; single-session or solo ChatGPT / Codex workflows configured with `review_gate: advisory` or `off` in `.lognexus/routing.md` honor that configured mode without forcing cross-vendor review).
 2. All `request-changes` reviews have been addressed (new review cycle or author response).
 3. If any approving review uses `approve-with-follow-ups`, the `Follow-ups:` field must reference a valid open issue containing the non-blocking findings. Do not merge until this issue exists.
 4. The PR body includes `Closes #<N>` linking to the tracking issue.

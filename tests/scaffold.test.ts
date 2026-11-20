@@ -83,6 +83,14 @@ describe("initProject", () => {
     expect(content).toContain("Cross-family review is recommended");
     expect(content).toContain("Gemini 4 Neon");
     expect(content).toContain("Argon/Carbon/Neon -> Hydrogen/Flash");
+    expect(content).toContain("Claude Fable 5.2 / Mythos 5.2 / Opus 5.5");
+    expect(content).toContain("GPT-6.2 Astra");
+    expect(content).toContain("GPT-6.2 Sol");
+    expect(content).toContain("GPT-6 Luna");
+    expect(content).toContain("Cross-vendor review is never forced");
+    expect(content).toContain(
+      "single-session ChatGPT/solo workflows may set review_gate: advisory or off",
+    );
 
     const parsed = parseRoutingConfigContent(content);
     expect(parsed.routingMode).toBe("confirm");
@@ -136,6 +144,17 @@ describe("initProject token shield (--protect-tokens)", () => {
     };
     expect(settings.permissions.deny).toContain("Read(./package-lock.json)");
     expect(settings.permissions.deny).toContain("Read(./node_modules/**)");
+    for (const rule of [
+      "Read(./dist-pypi/**)",
+      "Read(./.next/**)",
+      "Read(./bun.lockb)",
+      "Read(./npm-shrinkwrap.json)",
+      "Read(./.venv/**)",
+      "Read(./venv/**)",
+      "Read(./__pycache__/**)",
+    ]) {
+      expect(settings.permissions.deny).toContain(rule);
+    }
   });
 
   it("is idempotent on a second run", () => {

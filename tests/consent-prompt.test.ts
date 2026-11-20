@@ -80,6 +80,8 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
         "CURSOR_TRACE_ID",
         "CURSOR_AGENT",
         "CODEX_SANDBOX",
+        "CODEX_CI",
+        "CODEX_SANDBOX_NETWORK_DISABLED",
         "ANTIGRAVITY_CLI",
         "ANTIGRAVITY_AGENT",
         "ANTIGRAVITY_TRAJECTORY_ID",
@@ -126,6 +128,38 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
       ).toBe(false);
       expect(isAgentEnvironment({ ANTIGRAVITY_TRAJECTORY_ID: "abc" })).toBe(true);
       expect(isAgentEnvironment({ ANTIGRAVITY_SOURCE_METADATA: "{}" })).toBe(true);
+    });
+
+    it("suppresses interactive consent for CODEX_CI and CODEX_SANDBOX_NETWORK_DISABLED but allows CODEX_HOME alone", () => {
+      seedInitializedRepo("routing.md");
+
+      expect(isAgentEnvironment({ CODEX_HOME: "/home/dev/.codex" })).toBe(false);
+      expect(isAgentOrAutomationEnv({ CODEX_HOME: "/home/dev/.codex" })).toBe(false);
+      expect(
+        isInteractiveConsentAllowed({
+          command: "status",
+          targetDir: tempDir,
+          stdinIsTTY: true,
+          stdoutIsTTY: true,
+          env: { CODEX_HOME: "/home/dev/.codex", TERM_PROGRAM: "vscode" },
+        }),
+      ).toBe(true);
+
+      for (const codexEnv of [
+        { CODEX_CI: "1" },
+        { CODEX_SANDBOX_NETWORK_DISABLED: "1" },
+      ] satisfies NodeJS.ProcessEnv[]) {
+        expect(isAgentEnvironment(codexEnv)).toBe(true);
+        expect(
+          isInteractiveConsentAllowed({
+            command: "status",
+            targetDir: tempDir,
+            stdinIsTTY: true,
+            stdoutIsTTY: true,
+            env: codexEnv,
+          }),
+        ).toBe(false);
+      }
     });
 
     it("detects CI and non-interactive automation environments", () => {

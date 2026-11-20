@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkRulesConfig } from "../src/doctor.js";
 import {
@@ -49,6 +49,7 @@ describe("detectAgentEcosystems", () => {
       { id: "claude-code", marker: ".claude", isDir: true },
       { id: "cursor", marker: ".cursorrules" },
       { id: "codex", marker: ".codex", isDir: true },
+      { id: "copilot", marker: ".github/copilot-instructions.md" },
       { id: "kimi", marker: ".kimi", isDir: true },
       { id: "zed", marker: ".zed", isDir: true },
       { id: "windsurf", marker: ".windsurf", isDir: true },
@@ -60,8 +61,12 @@ describe("detectAgentEcosystems", () => {
       const dir = mkdtempSync(join(tmpdir(), "lognexus-eco-case-"));
       try {
         const target = join(dir, entry.marker);
-        if (entry.isDir) mkdirSync(target);
-        else writeFileSync(target, "", "utf8");
+        if (entry.isDir) {
+          mkdirSync(target, { recursive: true });
+        } else {
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, "", "utf8");
+        }
 
         const res = detectAgentEcosystems(dir);
         expect(res.strong).toEqual([entry.id]);

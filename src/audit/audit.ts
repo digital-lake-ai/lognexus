@@ -188,18 +188,23 @@ function extractFamily(value: string): string | null {
  */
 const EFFORT_VARIANT_SUFFIXES = [
   "-extra-high",
+  "-ultrafast",
   "-xtrahigh",
-  "-xhigh",
-  "-extra",
   "-minimal",
   "-medium",
+  "-xhigh",
+  "-extra",
+  "-light",
   "-high",
-  "-low",
+  "-fast",
   "-none",
+  "-low",
+  "-max",
 ] as const;
 const PROVIDER_ALIASES: ReadonlyArray<readonly [readonly string[], string]> = [
   [["google/", "vertex/", "vertexai/"], "gemini"],
   [["anthropic/"], "claude"],
+  [["codex/"], "openai"],
 ];
 
 function isAsciiDigits(value: string): boolean {
@@ -211,36 +216,65 @@ function isAsciiDigits(value: string): boolean {
   return true;
 }
 
-function isLowerAlnumOrDash(value: string): boolean {
-  if (value.length === 0) return false;
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    const isLower = code >= 97 && code <= 122;
-    const isDigit = code >= 48 && code <= 57;
-    if (!isLower && !isDigit && code !== 45) return false;
-  }
-  return true;
+function isVersionDigitSegment(value: string): boolean {
+  return (
+    value.length >= 1 &&
+    value.length <= 2 &&
+    isAsciiDigits(value) &&
+    !(value.length > 1 && value.startsWith("0"))
+  );
 }
 
-/** Converts trailing `-<major>-<minor>` dash pairs on `claude/` slugs to `.<minor>` in O(n). */
-function normalizeClaudeTrailingVersion(slug: string): string {
-  if (!slug.startsWith("claude/")) return slug;
-  const rest = slug.slice("claude/".length);
+function shouldSkipEffortSuffix(slug: string, suffix: string): boolean {
+  if (suffix !== "-max") return false;
+  return slug.startsWith("qwen/") || slug === "qwen-max" || slug.endsWith("-codex-max");
+}
+
+/**
+ * Linearly normalizes `<major>-<minor>` dash pairs on `claude/` and `openai/` slugs
+ * (e.g. `claude/fable-5-2` -> `claude/fable-5.2`, `openai/gpt-6-2-astra` -> `openai/gpt-6.2-astra`)
+ * in O(n) without regex backtracking.
+ */
+function normalizeProviderDashVersions(slug: string): string {
+  const prefix = slug.startsWith("claude/")
+    ? "claude/"
+    : slug.startsWith("openai/")
+      ? "openai/"
+      : null;
+  if (prefix === null) return slug;
+
+  const rest = slug.slice(prefix.length);
   const parts = rest.split("-");
-  if (parts.length < 3) return slug;
-  const minor = parts[parts.length - 1];
-  const major = parts[parts.length - 2];
-  const prefix = parts.slice(0, -2).join("-");
-  if (!isLowerAlnumOrDash(prefix) || !isAsciiDigits(major) || !isAsciiDigits(minor)) {
-    return slug;
+  if (parts.length < 2) return slug;
+
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    const cur = parts[i];
+    const next = i + 1 < parts.length ? parts[i + 1] : undefined;
+    const prevIsNonEmpty = i > 0 ? parts[i - 1] !== "" : false;
+    const nextAfterIsNotVersion = i + 2 >= parts.length || !isVersionDigitSegment(parts[i + 2]);
+    if (
+      next !== undefined &&
+      (i === 0 || prevIsNonEmpty) &&
+      isVersionDigitSegment(cur) &&
+      isVersionDigitSegment(next) &&
+      nextAfterIsNotVersion
+    ) {
+      out.push(`${cur}.${next}`);
+      i += 1;
+    } else {
+      out.push(cur);
+    }
   }
-  return `claude/${prefix}-${major}.${minor}`;
+  return `${prefix}${out.join("-")}`;
 }
 
 function stripCanonicalDecorations(collapsed: string): string {
   let slug = collapsed;
   for (let i = 0; i < 2; i++) {
-    const suffix = EFFORT_VARIANT_SUFFIXES.find((candidate) => slug.endsWith(candidate));
+    const suffix = EFFORT_VARIANT_SUFFIXES.find(
+      (candidate) => slug.endsWith(candidate) && !shouldSkipEffortSuffix(slug, candidate),
+    );
     if (!suffix) break;
     slug = slug.slice(0, -suffix.length);
   }
@@ -253,9 +287,31 @@ function stripCanonicalDecorations(collapsed: string): string {
     else slug = rest.startsWith(`${target}/`) ? rest : `${target}/${rest}`;
     break;
   }
+  if (slug.startsWith("anthropic-")) {
+    const rest = slug.slice("anthropic-".length);
+    slug = rest.startsWith("claude-") ? `claude/${rest.slice("claude-".length)}` : `claude/${rest}`;
+  }
+  if (slug.startsWith("openai-")) {
+    const rest = slug.slice("openai-".length);
+    slug = rest.startsWith("openai-") ? `openai/${rest.slice("openai-".length)}` : `openai/${rest}`;
+  }
   if (slug.startsWith("gemini-")) slug = `gemini/${slug.slice("gemini-".length)}`;
   if (slug.startsWith("claude-")) slug = `claude/${slug.slice("claude-".length)}`;
-  slug = normalizeClaudeTrailingVersion(slug);
+  if (slug === "fable" || slug.startsWith("fable-")) slug = `claude/${slug}`;
+  if (slug === "mythos" || slug.startsWith("mythos-")) slug = `claude/${slug}`;
+  if (
+    slug.startsWith("gpt-") ||
+    slug === "o1" ||
+    slug.startsWith("o1-") ||
+    slug === "o3" ||
+    slug.startsWith("o3-") ||
+    slug === "o4" ||
+    slug.startsWith("o4-") ||
+    slug.startsWith("codex-")
+  ) {
+    slug = `openai/${slug}`;
+  }
+  slug = normalizeProviderDashVersions(slug);
   return slug;
 }
 
@@ -395,6 +451,10 @@ export function extractVendor(identity: Identity): string {
   return identity.family.split("/")[0];
 }
 
+function isClaudeFableOrMythos(family: string): boolean {
+  return family.startsWith("claude/fable") || family.startsWith("claude/mythos");
+}
+
 /**
  * Evaluates review-gate separation under the resolved `review_gate` mode.
  * Identical full identity (`author.full === reviewer.full`) is an unbreakable error floor in all modes.
@@ -444,6 +504,14 @@ export function checkReviewGate(
       violated: true,
       severity: mode === "advisory" ? "warn" : "error",
       message: `Self-approval detected: author '${authorStr}' and reviewer '${reviewerStr}' share the same model family ('${author.family}')${mode === "advisory" ? " (advisory review_gate mode)" : ""}.`,
+    };
+  }
+
+  if (isClaudeFableOrMythos(author.family) && isClaudeFableOrMythos(reviewer.family)) {
+    return {
+      violated: true,
+      severity: mode === "advisory" ? "warn" : "error",
+      message: `Self-approval detected: Claude Fable and Claude Mythos share identical base model weights ('${author.family}' vs '${reviewer.family}')${mode === "advisory" ? " (advisory review_gate mode)" : ""}.`,
     };
   }
 

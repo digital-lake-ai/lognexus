@@ -625,6 +625,20 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
       ["anthropic/claude-sonnet-4-6-high", "claude/sonnet-4.6"],
       ["claude/opus-4-5", "claude/opus-4.5"],
       ["claude-opus-5-5-medium", "claude/opus-5.5"],
+      ["claude/fable-5-2", "claude/fable-5.2"],
+      ["Claude Fable 5.2", "claude/fable-5.2"],
+      ["anthropic/claude-fable-5-2-max", "claude/fable-5.2"],
+      ["claude/mythos-5-2-ultrafast", "claude/mythos-5.2"],
+      ["openai/gpt-6-2-astra", "openai/gpt-6.2-astra"],
+      ["gpt-6-2-astra", "openai/gpt-6.2-astra"],
+      ["gpt-6.2-astra-fast", "openai/gpt-6.2-astra"],
+      ["codex/gpt-6-2-astra-ultrafast", "openai/gpt-6.2-astra"],
+      ["openai/gpt-6-luna-light", "openai/gpt-6-luna"],
+      ["codex-mini", "openai/codex-mini"],
+      ["o4-mini", "openai/o4-mini"],
+      ["o4", "openai/o4"],
+      ["o1", "openai/o1"],
+      ["o3-xhigh", "openai/o3"],
       ["deepseek/VS Code (kimi-code)", "deepseek/vs-code"],
     ])("normalizes %s to %s", (input, expected) => {
       expect(parseIdentity(input)?.family).toBe(expected);
@@ -699,6 +713,50 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
         "off",
       );
       expect(off.violated).toBe(false);
+    });
+
+    it("blocks Fable <-> Mythos cross-review as shared-weights self-approval while allowing Opus/Sonnet/Haiku and OpenAI 6.2 peers", () => {
+      for (const mode of ["intra-fleet", "cross-vendor"] as const) {
+        const fableToMythos = checkReviewGate("Claude Fable 5.2", "Claude Mythos 5.2", mode);
+        expect(fableToMythos.violated).toBe(true);
+        expect(fableToMythos.severity).toBe("error");
+        expect(fableToMythos.message).toContain("Claude Fable and Claude Mythos");
+
+        const mythosToFable = checkReviewGate(
+          "anthropic/claude-mythos-5-2-ultrafast",
+          "claude/fable-5.2-max",
+          mode,
+        );
+        expect(mythosToFable.violated).toBe(true);
+        expect(mythosToFable.severity).toBe("error");
+      }
+
+      const fableAdvisory = checkReviewGate("Claude Fable 5.2", "Claude Mythos 5.2", "advisory");
+      expect(fableAdvisory.violated).toBe(true);
+      expect(fableAdvisory.severity).toBe("warn");
+
+      const fableOff = checkReviewGate("Claude Fable 5.2", "Claude Mythos 5.2", "off");
+      expect(fableOff.violated).toBe(false);
+
+      expect(checkReviewGate("Claude Fable 5.2", "claude/sonnet-4.6", "intra-fleet").violated).toBe(
+        false,
+      );
+      expect(checkReviewGate("Claude Mythos 5.2", "claude/opus-4.6", "intra-fleet").violated).toBe(
+        false,
+      );
+
+      expect(checkReviewGate("openai/gpt-6.2-astra", "gpt-6-2-astra", "intra-fleet").violated).toBe(
+        true,
+      );
+      expect(
+        checkReviewGate("openai/gpt-6.2-astra", "openai/gpt-6.2-sol", "intra-fleet").violated,
+      ).toBe(false);
+      expect(checkReviewGate("openai/gpt-6.2-astra", "gpt-6-luna", "intra-fleet").violated).toBe(
+        false,
+      );
+      expect(
+        checkReviewGate("openai/gpt-6.2-astra", "openai/gpt-6.2-sol", "cross-vendor").violated,
+      ).toBe(true);
     });
   });
 

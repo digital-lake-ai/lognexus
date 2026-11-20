@@ -73,7 +73,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.4.0";
+  return "1.4.1";
 }
 
 function printHeader() {
@@ -1131,9 +1131,59 @@ async function handleTelemetry(args: string[]) {
   }
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+const VALUE_TAKING_FLAGS = new Set([
+  "-m",
+  "--message",
+  "-F",
+  "--file",
+  "--author",
+  "--reviewer",
+  "--title",
+  "--allowed",
+  "--forbidden",
+  "--budget",
+  "--verify",
+  "-o",
+  "--output",
+  "--issue",
+  "--since",
+  "--branch",
+  "--tier",
+  "--isolation",
+  "--assignee",
+  "--swarm-workers",
+  "--swarm-posts",
+  "--limit",
+]);
+
+/**
+ * Detects standalone `--help` / `-h` flags linearly while skipping values consumed
+ * by value-taking flags (so `commit -m "--help"` is treated as a commit message)
+ * and stopping at the `--` end-of-options marker.
+ */
+export function hasStandaloneHelpFlag(args: readonly string[]): boolean {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--") {
+      return false;
+    }
+    if (arg === "--help" || arg === "-h") {
+      return true;
+    }
+    if (VALUE_TAKING_FLAGS.has(arg)) {
+      i += 1;
+    }
+  }
+  return false;
+}
+
+export async function main(args: string[] = process.argv.slice(2)): Promise<number> {
   const command = args[0]?.toLowerCase();
+
+  if (command !== "mcp" && hasStandaloneHelpFlag(args)) {
+    printUsage();
+    return 0;
+  }
 
   runStartupGate(command);
 
@@ -1201,6 +1251,8 @@ async function main() {
       printUsage();
       process.exit(1);
   }
+
+  return 0;
 }
 
 /**

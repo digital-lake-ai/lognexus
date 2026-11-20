@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.1] - 2026-11-20
+
+### Summary
+A frontier-model parity, CLI usability, and Swarm UX maintenance release (`#75`, `#76`). Adds full November 2026 recognition across **Anthropic Claude** (`Claude Fable 5.2`, `Claude Mythos 5.2` with shared-weights self-approval blocking, and `Claude 5.5` parity), **OpenAI / Codex** (`GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o4` / `o4-mini`, `gpt-oss`, `codex/*` alias normalization, `-ultrafast` / `-fast` / `-light` / `-max` suffix stripping, and `CODEX_CI` / `CODEX_SANDBOX_NETWORK_DISABLED` environment guards), **GitHub Copilot** (`.github/copilot-instructions.md`), and **Astro** stack detection. Clarifies unambiguously across all skills, templates, and routing references that **ChatGPT / OpenAI Codex workflows never force cross-vendor review** (`review_gate: auto` defaults to `intra-fleet`, and single-session / solo workflows support `advisory` or `off`). Fixes universal `--help` / `-h` subcommand interception across the CLI and codifies immediate Swarm UI handoff and right-sized effort routing (`#75`), while preserving **TDQS Grade A in Security & Schema Integrity** with `0` changes to `src/mcp/tools.ts` and `"minCriticalVersion": "0.0.0"`.
+
+### Added
+- **November 2026 Claude & OpenAI Model Parity (`src/telemetry/detector.ts`, `src/audit/audit.ts`):**
+  - `Claude Fable 5.2` (`claude/fable-5.2`, `tier-1`), `Claude Mythos 5.2` (`claude/mythos-5.2`, `tier-1`), and `anthropic/claude-{opus,sonnet,haiku}*` normalization, plus a shared-weights equivalence check in `checkReviewGate()` blocking `Fable <-> Mythos` cross-review as self-approval while permitting `Fable`/`Mythos` <-> `Opus`/`Sonnet`/`Haiku` under `intra-fleet`.
+  - `OpenAI GPT-6.2 Astra` (`openai/astra`, `tier-1`), `GPT-6.2 Sol` (`openai/sol`, `tier-2`), `GPT-6 Luna` (`openai/luna`, `tier-3`), `gpt-oss` (`openai/gpt-oss`, `tier-2`), `codex` / `codex-mini` (`openai/codex`, `tier-2`/`tier-3`), `o4` (`tier-1`), `o4-mini` (`tier-3`), and `gpt-<N>(.<M>)?-(mini|nano)` (`tier-3`) with linear word-boundary matching (preventing `"console"` or `"solver"` false positives on `"sol"`).
+  - Effort/speed suffix stripping (`-ultrafast`, `-fast`, `-light`, `-max`), `codex/` -> `openai/` provider alias normalization, bare `gpt-*` / `o1*` / `o3*` / `o4*` / `codex-*` promotion, and linear `O(n)` `<major>-<minor>` dash-version normalization across `claude/` and `openai/` slugs (`claude/fable-5-2` == `claude/fable-5.2`, `openai/gpt-6-2-astra` == `openai/gpt-6.2-astra`).
+- **Ecosystem, Stack & Token Shield Expansion (`src/routing/profile.ts`, `src/telemetry/detector.ts`, `src/telemetry/consent-prompt.ts`, `src/scaffold.ts`):**
+  - `copilot` ecosystem marker (`.github/copilot-instructions.md`) and `astro` stack detection (`astro.config.{mjs,ts,js,cjs}`).
+  - `CODEX_CI` and `CODEX_SANDBOX_NETWORK_DISABLED` added to `AGENT_ENV_KEYS` (leaving `CODEX_HOME` human-safe so interactive terminals are not suppressed).
+  - Expanded `CLAUDE_DENY_RULES` in `.claude/settings.json` to block `dist-pypi/**`, `.next/**`, `bun.lockb`, `npm-shrinkwrap.json`, `.venv/**`, `venv/**`, and `__pycache__/**`.
+
+### Changed
+- **Non-Forced Cross-Vendor Review for ChatGPT / OpenAI Codex:** Updated `.lognexus/routing.md` scaffold templates, `src/mcp/prompts.ts`, `commands/lognexus/models.md`, `skills/lognexus/SKILL.md`, `references/model-routing.md`, and `references/closure-and-review.md` to confirm `review_gate: auto` uses `intra-fleet` (`GPT-6.2 Astra` -> `Sol`/`Luna`) and single-session / solo workflows may use `review_gate: advisory` or `off`.
+- **Swarm UX & Effort Routing (`#75`):** Documented immediate Swarm UI link emission (`[Open the Swarm UI](sidecar://swarm/swarm_board/?auto_open=false)`) before `swarm_wait`, `@coordinator` model-sync behavior (`swarm{action: "model"}`), direct native `swarm` invocation by standard Tier-1 models, and right-sized effort (`Medium` for status/reviews vs. `XHigh`/`Max` for architectural planning).
+- **2026 Status Labels & Version Contract (`1.4.1`):** Refreshed `src/status.ts` ecosystem tier labels (`claude-code`, `codex`, `copilot`, `cursor`, `windsurf`, `zed`, `roo`, `aider`), `docs/TELEMETRY_PRIVACY.md` examples, `.github/ISSUE_TEMPLATE/diagnostic-report.yml`, and all 7 version surfaces to `1.4.1`.
+
+### Fixed
+- **Universal CLI `--help` / `-h` Handling (`src/cli.ts`):** Added linear `hasStandaloneHelpFlag(args)` that skips values after value-taking flags (`-m`, `--message`, `-F`, `--file`, `--author`, `--title`, etc.) and stops at `--`, printing usage and exiting `0` without running `runStartupGate()` or writing `.lognexus/` across all non-`mcp` commands (`init --help`, `commit -h`, `telemetry --help`, `state --help`, `note --help`).
+
+### Security
+- **TDQS Grade A in Security & Schema Integrity:** `0` changes to `src/mcp/tools.ts`, `"lognexusPolicy.minCriticalVersion"` stays `"0.0.0"`, `0` network calls in telemetry, and `0` polynomial/backtracking regexes across new identity and version parsers.
+
+---
+
 ## [1.4.0] - 2026-11-19
 
 ### Summary

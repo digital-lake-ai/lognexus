@@ -374,6 +374,84 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(stacks).not.toContain("powershell");
       expect(stacks).not.toContain("batch");
     });
+
+    it.each(["astro.config.mjs", "astro.config.ts", "astro.config.js", "astro.config.cjs"])(
+      "detects astro stack when %s exists",
+      (configFile) => {
+        writeFileSync(join(tempDir, configFile), "export default {};\n", "utf8");
+        const stacks = detectProjectStacks(tempDir);
+        expect(stacks).toContain("astro");
+      },
+    );
+
+    it("classifies Claude 5.2 (Fable/Mythos), anthropic/claude-*, and OpenAI GPT-6.2/Codex/o4 families and tiers", () => {
+      expect(extractModelFamilyCategory("Claude Fable 5.2")).toBe("claude/fable");
+      expect(extractModelFamilyCategory("claude/fable-5-2")).toBe("claude/fable");
+      expect(extractModelFamilyCategory("anthropic/claude-fable-5.2")).toBe("claude/fable");
+      expect(inferTierFromAuthor("Claude Fable 5.2")).toBe("tier-1");
+      expect(inferTierFromAuthor("claude/fable-5-2")).toBe("tier-1");
+
+      expect(extractModelFamilyCategory("Claude Mythos 5.2")).toBe("claude/mythos");
+      expect(extractModelFamilyCategory("claude/mythos-5-2")).toBe("claude/mythos");
+      expect(inferTierFromAuthor("Claude Mythos 5.2")).toBe("tier-1");
+      expect(inferTierFromAuthor("claude/mythos-5-2")).toBe("tier-1");
+
+      expect(extractModelFamilyCategory("anthropic/claude-opus-4-6")).toBe("claude/opus");
+      expect(extractModelFamilyCategory("anthropic/claude-sonnet-4-6-high")).toBe("claude/sonnet");
+      expect(extractModelFamilyCategory("anthropic/claude-haiku-4-5")).toBe("claude/haiku");
+      expect(inferTierFromAuthor("anthropic/claude-opus-4-6")).toBe("tier-1");
+      expect(inferTierFromAuthor("anthropic/claude-sonnet-4-6-high")).toBe("tier-2");
+      expect(inferTierFromAuthor("anthropic/claude-haiku-4-5")).toBe("tier-3");
+
+      expect(extractModelFamilyCategory("OpenAI GPT-6.2 Astra")).toBe("openai/astra");
+      expect(extractModelFamilyCategory("openai/gpt-6.2-astra")).toBe("openai/astra");
+      expect(extractModelFamilyCategory("gpt-6-astra")).toBe("openai/astra");
+      expect(inferTierFromAuthor("OpenAI GPT-6.2 Astra")).toBe("tier-1");
+      expect(inferTierFromAuthor("openai/gpt-6.2-astra")).toBe("tier-1");
+      expect(inferTierFromAuthor("gpt-6-astra")).toBe("tier-1");
+      expect(inferTierFromAuthor("openai/astra")).toBe("tier-1");
+
+      expect(extractModelFamilyCategory("OpenAI GPT-6.2 Sol")).toBe("openai/sol");
+      expect(extractModelFamilyCategory("openai/gpt-6.1-sol")).toBe("openai/sol");
+      expect(extractModelFamilyCategory("gpt-6-sol")).toBe("openai/sol");
+      expect(inferTierFromAuthor("OpenAI GPT-6.2 Sol")).toBe("tier-2");
+      expect(inferTierFromAuthor("gpt-6.1-sol")).toBe("tier-2");
+      expect(inferTierFromAuthor("gpt-6-sol")).toBe("tier-2");
+      expect(inferTierFromAuthor("openai/sol")).toBe("tier-2");
+
+      expect(extractModelFamilyCategory("OpenAI GPT-6 Luna")).toBe("openai/luna");
+      expect(extractModelFamilyCategory("gpt-6-luna")).toBe("openai/luna");
+      expect(extractModelFamilyCategory("openai/luna")).toBe("openai/luna");
+      expect(inferTierFromAuthor("OpenAI GPT-6 Luna")).toBe("tier-3");
+      expect(inferTierFromAuthor("gpt-6-luna")).toBe("tier-3");
+      expect(inferTierFromAuthor("openai/luna")).toBe("tier-3");
+
+      expect(extractModelFamilyCategory("openai/gpt-oss-120b")).toBe("openai/gpt-oss");
+      expect(inferTierFromAuthor("openai/gpt-oss-120b")).toBe("tier-2");
+
+      expect(extractModelFamilyCategory("codex-mini")).toBe("openai/codex");
+      expect(inferTierFromAuthor("codex-mini")).toBe("tier-3");
+      expect(extractModelFamilyCategory("openai/codex")).toBe("openai/codex");
+      expect(inferTierFromAuthor("openai/codex")).toBe("tier-2");
+      expect(extractModelFamilyCategory("openai/gpt-5.4 (codex)")).toBe("openai/gpt");
+      expect(inferTierFromAuthor("openai/gpt-5.4 (codex)")).toBe("tier-1");
+
+      expect(extractModelFamilyCategory("openai/o4")).toBe("openai/gpt");
+      expect(inferTierFromAuthor("openai/o4")).toBe("tier-1");
+      expect(extractModelFamilyCategory("openai/o4-mini")).toBe("openai/gpt");
+      expect(inferTierFromAuthor("openai/o4-mini")).toBe("tier-3");
+      expect(extractModelFamilyCategory("gpt-6.2-mini")).toBe("openai/gpt");
+      expect(inferTierFromAuthor("gpt-6.2-mini")).toBe("tier-3");
+      expect(inferTierFromAuthor("openai/gpt-5.2-nano")).toBe("tier-3");
+
+      // Ensure word-boundary checks do not false-match substrings or email domains.
+      expect(extractModelFamilyCategory("console")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("solver")).toBe("unknown/other");
+      expect(extractModelFamilyCategory("Jane Doe <jane@sol.example.com>")).toBe("unknown/other");
+      expect(inferTierFromAuthor("console")).toBeNull();
+      expect(inferTierFromAuthor("solver")).toBeNull();
+      expect(inferTierFromAuthor("Jane Doe <jane@sol.example.com>")).toBeNull();
+    });
   });
 
   describe("Zero-PII Metric Collection & ROI Calculation", () => {

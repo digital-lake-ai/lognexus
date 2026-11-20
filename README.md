@@ -35,8 +35,8 @@
 As AI coding agents take on complex engineering tasks across different IDEs, they suffer from a fundamental failure mode: **cognitive amnesia**. Between conversation resets, context compactations, model handoffs, and unexpected bugs, the *why* behind design decisions, discarded alternatives, and technical discoveries vanishes.
 
 **LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
-- **Clients:** Claude Code, Cursor, Codex, Google Antigravity, Kimi Code, VS Code, Zed.
-- **Models:** Google Gemini (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`), Anthropic Claude, OpenAI.
+- **Clients:** Claude Code, Cursor, Codex, GitHub Copilot, Google Antigravity, Kimi Code, VS Code, Zed.
+- **Models:** Anthropic Claude (`Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude Opus / Sonnet / Haiku 5.5`), OpenAI (`GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), Google Gemini (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`).
 - **Supported Platforms:** **Linux**, **macOS**, and **Windows** (`linux`, `darwin`, `win32` — 100% cross-platform Node.js >= 20 & Git >= 2.28, zero native binary dependencies).
 
 ```
@@ -51,11 +51,11 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 
 ## Key Features
 
-- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Google Gemini** (`Gemini 4 Neon` / `Orchestrator (Neon)`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
-- **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **Google Antigravity**, and **Kimi Code / VS Code**.
-- **Adaptive Ecosystem Routing & Native Swarm Coordination:** Declarative `.lognexus/routing.md` (`orchestration: auto | swarm | subagent | off`, `review_gate: auto | intra-fleet | cross-vendor | advisory | off`, `implementer: auto`, `reviewer: auto`) with Hard Turn-1 Discovery Probes (`> 3` files) and native Swarm contract flags (`--assignee`, `--isolation swarm`, `--swarm-workers`, `--swarm-posts`).
+- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Anthropic Claude** (`Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude 5.5`), **OpenAI** (`GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), **Google Gemini** (`Gemini 4 Neon` / `Orchestrator (Neon)`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), and **DeepSeek** (`R1`, `V3`, `Chat`).
+- **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **GitHub Copilot** (`.github/copilot-instructions.md`), **Google Antigravity**, and **Kimi Code / VS Code**.
+- **Adaptive Ecosystem Routing & Native Swarm Coordination:** Declarative `.lognexus/routing.md` (`orchestration: auto | swarm | subagent | off`, `review_gate: auto | intra-fleet | cross-vendor | advisory | off`, `implementer: auto`, `reviewer: auto`) with Hard Turn-1 Discovery Probes (`> 3` files), immediate Swarm UI handoff, and native Swarm contract flags (`--assignee`, `--isolation swarm`, `--swarm-workers`, `--swarm-posts`).
 - **Atomic Commit Engine (`lognexus commit` & MCP `lognexus_commit`):** Validates subtask file contracts, verifies reviewer separation, injects authorship trailers, commits changes, marks subtasks completed, and attaches Git Notes in a single ~0.15s execution.
-- **Cross-Model & Intra-Fleet Distinct-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. Supports both cross-vendor review and intra-fleet distinct-model review (`Neon`/`Carbon`/`Argon` reviewing `Hydrogen`/`Flash`), with strict anti-spoofing and mandatory `--no-ff` merges.
+- **Cross-Model & Intra-Fleet Distinct-Model Review Gates:** Non-negotiable review separation (`Authored-by:` vs `Reviewed-by:`) enforced both at pre-flight note attachment time and during branch audits. Supports cross-vendor review, intra-fleet distinct-model review (`Neon`/`Carbon`/`Argon` reviewing `Hydrogen`/`Flash`; `GPT-6.2 Astra` reviewing `Sol`/`Luna`; `Fable`/`Opus` reviewing `Sonnet`), shared-weights blocking (`Fable <-> Mythos`), and `advisory` / `off` modes for single-session ChatGPT or solo workflows—never forcing cross-vendor review—with strict anti-spoofing and mandatory `--no-ff` merges.
 - **Contract-First Subtasks & Alphanumeric Tickets:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions—supporting both GitHub issues (`feat(#42/T1)`) and Jira/Linear ticket schemes (`feat(SLM-201/T1)`).
 - **Persistent State & Session Recovery:** Local session state engine (`.lognexus/state.json`) prevents amnesia across context compactations and conversation resets, retaining completed subtask metadata through the closing commit.
 - **Automated Context Handoff (`lognexus handoff`):** Regenerates a complete `.lognexus/handoff.md` from local state — cycle state, active subtask contract, live scope-drift report, completed-subtask table and next required action — so a fresh session (or a different model) resumes without re-deriving context. Auto-refreshed on `state set-task` and on every `--finish-task` commit.
@@ -67,7 +67,7 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 - **Journey Timeline & Review Gate Audit:** Reconstructs the complete branch journey into structured PR descriptions (`lognexus timeline --pr-body`) and programmatically audits review gate separation (`lognexus audit`).
 - **Hidden Metadata Envelopes:** HTML comments preserve machine-parseable state (`<!-- lognexus: kind: state ... -->`) without cluttering human-readable markdown.
 - **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Lightweight CLI for repository scaffolding (`init`), health diagnostics (`doctor`), and real-time status inspection (`status`).
-- **Optional Multi-Model Token Shield (`init --protect-tokens`):** Opt-in, zero-runtime-overhead workspace hygiene flag that scaffolds official context-exclusion and read-deny rules (`.geminiignore`, `.aiexclude`, `.cursorignore`, `.claude/settings.json`, `.rooignore`, `.codeiumignore`, `.aiderignore`) tailored to the agent ecosystems detected in your repository—preventing accidental token leakage on lockfiles and build artifacts, translating directly into lower context costs without touching the MCP server.
+- **Optional Multi-Model Token Shield (`init --protect-tokens`):** Opt-in, zero-runtime-overhead workspace hygiene flag that scaffolds official context-exclusion and read-deny rules (`.geminiignore`, `.aiexclude`, `.cursorignore`, `.claude/settings.json` covering `node_modules/**`, lockfiles, `dist/**`, `dist-pypi/**`, `.next/**`, `.venv/**`, `__pycache__/**`, `.rooignore`, `.codeiumignore`, `.aiderignore`) tailored to the agent ecosystems detected in your repository—preventing accidental token leakage on lockfiles and build artifacts, translating directly into lower context costs without touching the MCP server.
 
 ---
 
@@ -83,9 +83,9 @@ LogNexus organizes development phases into three cognitive tiers. You can assign
 
 | Tier | Cognitive Role | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Activities |
 |---|---|---|---|---|---|---|
-| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Opus 3.7 / 4.x / 5.5 | o3, o1, GPT-5 | Gemini 4 Neon / Carbon / Argon, 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model & intra-fleet review sign-offs. |
-| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet | GPT-4.1, GPT-4o | Gemini 4 Hydrogen, Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, scoped implementation, knowledge retrieval. |
-| **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku | GPT-4o-mini | Gemini 3.8 Flash, `gemini-flash-worker-agy` | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
+| **tier-1 (Reasoning)** | Deep synthesis, architectural design, narrative review | Claude Fable 5.2 / Mythos 5.2 / Opus 5.5 | GPT-6.2 Astra, o3, o4, GPT-5 | Gemini 4 Neon / Carbon / Argon, 3.8 Pro | DeepSeek R1 | Brainstorming-to-issue planning, PR journey timeline synthesis, cross-model & intra-fleet review sign-offs. |
+| **tier-2 (Context & Triage)** | Long context ingestion, discovery triage, structured mapping | Claude Sonnet 5.5 | GPT-6.2 Sol, Codex, gpt-oss, GPT-4o | Gemini 4 Hydrogen, Gemini 3.8 Flash High / Pro (1M) | DeepSeek V3 | Large codebase exploration, discovery classification, scoped implementation, knowledge retrieval. |
+| **tier-3 (Execution)** | Surgical implementation, template filling, fast execution | Claude Haiku 5.5 | GPT-6 Luna, codex-mini, o4-mini, GPT-4o-mini | Gemini 3.8 Flash, `gemini-flash-worker-agy` | DeepSeek Chat (V3) | Subtask commits (`feat(#N/Tk)`), atomic code changes under closed contracts, timeline logging. |
 
 ### Adaptive Routing & Deployment Setups
 
@@ -100,17 +100,17 @@ reviewer: auto
 ```
 
 - `orchestration`: `auto | swarm | subagent | off` (`auto` activates native `swarm` under Antigravity `Orchestrator` after plan confirmation).
-- `review_gate`: `auto | cross-vendor | intra-fleet | advisory | off` (`auto` resolves to `intra-fleet` distinct-model verification when running in a single-provider fleet).
+- `review_gate`: `auto | cross-vendor | intra-fleet | advisory | off` (`auto` resolves to `intra-fleet` distinct-model verification when running in a single-provider fleet; ChatGPT / OpenAI Codex workflows never force cross-vendor review, and single-session solo workflows may use `advisory` or `off`).
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 POPULAR DEPLOYMENT SETUPS                              │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Setup A (Anthropic Pure):  Claude Opus (t1) + Claude Sonnet (t2) + Claude Haiku (t3)   │
-│ Setup B (Antigravity Fleet): Gemini 4 Neon/Carbon/Argon (t1) + Hydrogen/Flash (t2/t3)  │
-│ Setup C (OpenAI + DeepSeek): OpenAI o3 (t1) in Cursor + DeepSeek Chat (t3) for code    │
-│ Setup D (Claude + OpenAI):   Claude Opus (t1) for design + GPT-4o-mini (t3) for tasks  │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 POPULAR DEPLOYMENT SETUPS                                │
+├──────────────────────────────────────────────────────────────────────────────────────────┤
+│ Setup A (Claude Code):       Claude Fable 5.2 / Opus 5.5 (t1) + Sonnet (t2) + Haiku (t3) │
+│ Setup B (Antigravity Fleet): Gemini 4 Neon/Carbon/Argon (t1) + Hydrogen/Flash (t2/t3)    │
+│ Setup C (ChatGPT / Codex):   GPT-6.2 Astra (t1) + GPT-6.2 Sol (t2) + GPT-6 Luna (t3)     │
+│ Setup D (Cross-Vendor):      Claude Fable 5.2 / Opus (t1) + GPT-6 Luna / DeepSeek (t3)   │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -309,7 +309,7 @@ pip install lognexus-mcp
   npx skills add digital-lake-ai/lognexus
   ```
 - **Google Antigravity:** Active automatically via `skills/lognexus/SKILL.md` or workspace skills.
-- **Kimi Code / VS Code:** Active via `.lognexus/` workspace instructions and prompts.
+- **GitHub Copilot / VS Code / Kimi Code:** Active via `.github/copilot-instructions.md` and `.lognexus/` workspace instructions and prompts.
 
 ---
 
@@ -389,7 +389,7 @@ Every commit carries signed provenance trailers (`Planned-by:` / `Authored-by:` 
 |---|---|
 | Master Architecture & Security Orchestrators | `Gemini 4 Neon` (`Orchestrator (Neon)`) · `Gemini 4 Carbon` · `Gemini 4 Argon` |
 | Implementation (Antigravity / VS Code clients) | `google/gemini-4-hydrogen-high (antigravity)` · `google/gemini-3.8-flash-high (antigravity)` · `deepseek/VS Code (kimi-code)` |
-| Independent review (Cross-Vendor & Intra-Fleet) | `Claude Opus 5.5` · `Gemini 4 Neon` · `Gemini 4 Carbon` · `Gemini 4 Argon` |
+| Independent review (Cross-Vendor & Intra-Fleet) | `Claude Fable 5.2` · `Claude Opus 5.5` · `OpenAI GPT-6.2 Astra` · `Gemini 4 Neon` · `Gemini 4 Carbon` · `Gemini 4 Argon` |
 
 The `Planned-by:` trailer documents where an externally authored plan came from. It grants no review authority and no merge rights; an author model never writes its own `Reviewed-by:` trailer.
 
@@ -399,7 +399,7 @@ The `Planned-by:` trailer documents where an externally authored plan came from.
 
 **LogNexus** is engineered and maintained by **[HorchataHTML](https://github.com/HorchataHTML)** and **[Digital Lake](https://github.com/digital-lake-ai)**, encompassing:
 - The full TypeScript runtime, repository scaffolding & diagnostic CLI, Persistent Agent State Engine, Atomic Commit Engine, Git Notes memory layer (`refs/notes/lognexus`), local-first FinOps telemetry, Multi-Model Token Shield, and native JSON-RPC 2.0 stdio MCP server (`@digital-lake/lognexus` / `lognexus-mcp`).
-- First-class multi-model tier routing and closed delegation contracts across **Google Gemini** (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), **DeepSeek** (`R1`, `V3`, `Chat`), **Anthropic Claude**, and **OpenAI**.
+- First-class multi-model tier routing and closed delegation contracts across **Anthropic Claude** (`Fable 5.2`, `Mythos 5.2`, `Opus / Sonnet / Haiku 5.5`), **OpenAI** (`GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), **Google Gemini** (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), and **DeepSeek** (`R1`, `V3`, `Chat`).
 - The cross-reference CI validation workflow (`.github/workflows/cross-ref-check.yml`), single-source-of-truth review/signing block architecture, and sub-skill anchor normalization authored by **HorchataHTML** (`2026-08-04`, commit `cd0582c1`).
 
 The **Master Architecture & Security Plan** governing frontier-model support, supply-chain hardening, and cross-model review governance is authored and signed by **`Gemini 4 Neon`**, **`Gemini 4 Carbon`**, and **`Gemini 4 Argon`** (*Master Architecture & Security Orchestrators*).

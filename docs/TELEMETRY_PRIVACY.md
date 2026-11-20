@@ -62,7 +62,7 @@ LogNexus treats local performance recording as an explicit, human-confirmed opt-
 1. **One-Time Interactive Prompt (`[y/N]`):** On interactive human TTY runs of `lognexus init`, `lognexus status`, or `lognexus doctor` inside an initialized repository (`.lognexus/routing.md` or `.lognexus/state.json`), LogNexus displays a concise 3-line disclosure on `stderr` and asks once: `Enable local-only telemetry (Policy v2.0.0)? [y/N]:`. Pressing Enter (`""`) or `n` defaults to **No**; EOF, Ctrl+C, or a 60-second timeout persists nothing (`unanswered`).
 2. **Sealed Refusal & Silent Execution:** Declining seals `mode: "off"`, `consent.accepted: false`, `consent.policyVersion: "2.0.0"`, and a `consent.declinedAt` timestamp. Once a choice is sealed (`accepted` or `declined`), subsequent runs execute **100% silently** with zero re-prompting.
 3. **Automatic Pause & Re-Consent on Policy Updates:** Whenever `TELEMETRY_POLICY_VERSION` increases (for example from `1.0.0` to `2.0.0` due to expanded data-scope fields), existing stores enter the `outdated` state (`Paused — Re-consent Required`). Passive metric hooks pause immediately until a human confirms the updated policy.
-4. **Non-Blocking Agent & CI Guard:** AI agent runtimes (`LOGNEXUS_AUTHOR`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_TRACE_ID`, `CODEX_SANDBOX`, `ANTIGRAVITY_CLI`, `GEMINI_CLI`, `AIDER_MODEL`, or VS Code agent environments), CI/non-TTY pipelines (`CI`, `GITHUB_ACTIONS`, `VITEST`, `NODE_ENV=test`, `TERM=dumb`, `LOGNEXUS_NO_PROMPT=1`, `LOGNEXUS_NO_UPDATE_CHECK=1`), and non-interactive flags (`--json`, `--prompt`, `--compact-prompt`, `--pr-body`, `--help`, `--version`, etc.) are never prompted. Calling `lognexus_telemetry` (`action: "enable"`) via MCP or invoking `telemetry enable` / `init --enable-telemetry` from an agent environment cannot seal human GDPR consent without interactive human confirmation.
+4. **Non-Blocking Agent & CI Guard:** AI agent runtimes (`LOGNEXUS_AUTHOR`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CURSOR_TRACE_ID`, `CODEX_SANDBOX`, `CODEX_CI`, `CODEX_SANDBOX_NETWORK_DISABLED`, `ANTIGRAVITY_CLI`, `GEMINI_CLI`, `AIDER_MODEL`, or VS Code agent environments), CI/non-TTY pipelines (`CI`, `GITHUB_ACTIONS`, `VITEST`, `NODE_ENV=test`, `TERM=dumb`, `LOGNEXUS_NO_PROMPT=1`, `LOGNEXUS_NO_UPDATE_CHECK=1`), and non-interactive flags (`--json`, `--prompt`, `--compact-prompt`, `--pr-body`, `--help`, `--version`, etc.) are never prompted. Calling `lognexus_telemetry` (`action: "enable"`) via MCP or invoking `telemetry enable` / `init --enable-telemetry` from an agent environment cannot seal human GDPR consent without interactive human confirmation.
 5. **Withdrawal & Erasure:**
    - **Withdrawal (`lognexus telemetry disable` / `lognexus init --no-telemetry` / `--disable-telemetry`):** Immediately switches `mode` to `"off"`, clears `accepted`, and stamps `declinedAt`.
    - **Erasure (`lognexus telemetry clear`):** Erases all accumulated metrics and rotates `anonymousProjectId` to a new random UUID while preserving your sealed refusal metadata (`declinedAt` and `policyVersion`) so clearing data never re-triggers first-run prompts.
@@ -75,7 +75,7 @@ LogNexus treats local performance recording as an explicit, human-confirmed opt-
 | Category | ✅ What Is Stored Locally (`local` mode only) | ❌ What Is Never Stored (Forbidden) |
 | :--- | :--- | :--- |
 | **Identity** | An anonymous, randomly generated `UUIDv4` (`anonymousProjectId`) scoped to the project. Diagnostic reports (`.lognexus/telemetry.md`) display **only** this `anonymousProjectId`, and `redactLocalProjectMetadata()` automatically strips the local repository folder name and absolute paths from custom notes when the report is regenerated. | Usernames, real names, email addresses, GitHub handles, hostnames, IP addresses, repository names, project codenames. |
-| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.4.0`). | Absolute file system paths, home directories, environment variable values. |
+| **System** | OS platform (`win32`, `darwin`, `linux`), Node.js version (`v22.11.0`), LogNexus version (`1.4.1`). | Absolute file system paths, home directories, environment variable values. |
 | **Project Stack** | Detected stack categories (e.g. `["typescript", "nodejs"]`) and file-extension counters (`.ts`, `.py`, `.ps1`). | Source code, file names, directory names, package names, internal library names. |
 | **AI Models** | Model family (`gemini`, `claude`, `deepseek`, `openai`, `kimi`) and operational tier (`tier-1`, `tier-2`, `tier-3`), derived from commit trailers. | Prompts, completions, reasoning tokens, system instructions, API keys. |
 | **Metrics** | Numeric counters: lines added, lines deleted, subtask duration in seconds, blocked review gate count, estimated % cost saved. | Commit subjects, commit bodies, diff contents, git branches, PR descriptions, secrets. |
@@ -104,7 +104,7 @@ Example payload:
   "environment": {
     "os": "win32",
     "nodeVersion": "v22.11.0",
-    "lognexusVersion": "1.4.0",
+    "lognexusVersion": "1.4.1",
     "detectedStacks": ["typescript", "nodejs"]
   },
   "summary": {

@@ -281,36 +281,43 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
     issue: "tier-3 (Scoped Execution: Gemini 3.8 Flash / Gemini 4 Hydrogen)",
   },
   "claude-code": {
-    base: "tier-1 (Reasoning / Planning: Claude Opus)",
-    issue: "tier-3 (Scoped Execution: Claude Haiku / Claude Sonnet)",
+    base: "tier-1 (Reasoning / Planning: Claude Fable 5.2 / Mythos 5.2 / Claude Opus 5.5)",
+    issue: "tier-3 (Scoped Execution: Claude Haiku 5.5 / Claude Sonnet 5.5)",
   },
   cursor: {
-    base: "tier-1 (Reasoning / Planning: Cursor Frontier / Tier-1)",
-    issue: "tier-3 (Scoped Execution: Cursor Fast / Tier-3)",
+    base: "tier-1 (Reasoning / Planning: Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon / Cursor Frontier)",
+    issue:
+      "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash / Cursor Fast)",
   },
   codex: {
-    base: "tier-1 (Reasoning / Planning: OpenAI o3 / GPT-5)",
-    issue: "tier-3 (Scoped Execution: OpenAI GPT-4o-mini / o3-mini)",
+    base: "tier-1 (Reasoning / Planning: OpenAI GPT-6.2 Astra / o3)",
+    issue: "tier-3 (Scoped Execution: OpenAI GPT-6 Luna / codex-mini / GPT-6.2 Sol)",
+  },
+  copilot: {
+    base: "tier-1 (Reasoning / Planning: Claude Fable 5.2 / GPT-6.2 Astra)",
+    issue:
+      "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna / Claude Sonnet 5.5 / GPT-6.2 Sol)",
   },
   kimi: {
     base: "tier-1 (Reasoning / Planning: Kimi K3 Thinking / Tier-1)",
     issue: "tier-3 (Scoped Execution: Kimi Code / Tier-3)",
   },
   zed: {
-    base: "tier-1 (Reasoning / Planning: Zed Configured Tier-1 Model)",
-    issue: "tier-3 (Scoped Execution: Zed Configured Tier-3 Model)",
+    base: "tier-1 (Reasoning / Planning: Zed — Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon)",
+    issue: "tier-3 (Scoped Execution: Zed — Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash)",
   },
   windsurf: {
-    base: "tier-1 (Reasoning / Planning: Windsurf Configured Tier-1 Model)",
-    issue: "tier-3 (Scoped Execution: Windsurf Configured Tier-3 Model)",
+    base: "tier-1 (Reasoning / Planning: Windsurf — Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon)",
+    issue: "tier-3 (Scoped Execution: Windsurf — Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash)",
   },
   roo: {
-    base: "tier-1 (Reasoning / Planning: Roo Code Configured Tier-1 Model)",
-    issue: "tier-3 (Scoped Execution: Roo Code Configured Tier-3 Model)",
+    base: "tier-1 (Reasoning / Planning: Roo Code — Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon)",
+    issue: "tier-3 (Scoped Execution: Roo Code — Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash)",
   },
   aider: {
-    base: "tier-1 (Reasoning / Planning: Aider Architect Model)",
-    issue: "tier-3 (Scoped Execution: Aider Editor Model)",
+    base: "tier-1 (Reasoning / Planning: Aider Architect — Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon)",
+    issue:
+      "tier-3 (Scoped Execution: Aider Editor — Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash)",
   },
 };
 
@@ -354,9 +361,9 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
   const singleLabels = singleEcosystem ? SINGLE_ECOSYSTEM_TIER_LABELS[singleEcosystem] : undefined;
   const recommendedTier = activeIssue
     ? (singleLabels?.issue ??
-      "tier-3 (Scoped Execution: Claude Haiku, GPT-4o-mini, DeepSeek Chat, Gemini Flash)")
+      "tier-3 (Scoped Execution: Claude Haiku 5.5, GPT-6 Luna / GPT-4o-mini, DeepSeek Chat, Gemini Flash)")
     : (singleLabels?.base ??
-      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Opus, OpenAI o3, DeepSeek R1)");
+      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Fable 5.2 / Claude Opus 5.5, OpenAI GPT-6.2 Astra / o3, DeepSeek R1)");
 
   return {
     branch,

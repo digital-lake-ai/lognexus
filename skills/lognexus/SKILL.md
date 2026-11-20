@@ -180,9 +180,9 @@ gh issue edit 999 --remove-label "lognexus/in-progress" --add-label "lognexus/ne
 
 ### Step 5 — Independent Review (`/lognexus review`)
 
-Review gating is controlled by `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (where `auto` resolves to `intra-fleet` distinct-model review).
+Review gating is controlled by `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (where `auto` resolves to `intra-fleet` distinct-model review). **ChatGPT / OpenAI Codex environments NEVER force cross-vendor review**: `review_gate: auto` uses `intra-fleet` within OpenAI (`GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`), and single-session or solo ChatGPT / Codex workflows where cross-model review is unnecessary or unavailable can set `review_gate: advisory` or `review_gate: off`.
 
-An independent reviewer model (e.g., `openai/gpt-5.4 (codex)` under cross-vendor review, or a distinct Tier-1 model like `Gemini 4 Argon` or `Gemini 4 Neon` under intra-fleet review) loads `commands/lognexus/review.md`, reads the diff, and posts the signed review comment on the PR:
+An independent reviewer model (e.g., `openai/gpt-6.2-astra (codex)` or `openai/gpt-5.4 (codex)` under cross-vendor review, or a distinct Tier-1 model like `Gemini 4 Argon`, `Gemini 4 Neon`, or `GPT-6.2 Astra` reviewing `GPT-6.2 Sol`/`GPT-6 Luna` under intra-fleet review) loads `commands/lognexus/review.md`, reads the diff, and posts the signed review comment on the PR:
 
 ```
 [lognexus/review-handoff] #999: Review of PR #<PR>
@@ -397,8 +397,8 @@ Every lognexus artifact (comments, PR bodies, review sign-offs) must carry a pro
 |-------|--------|---------|
 | `role` | `Authored-by`, `Updated-by`, `Reviewed-by`, `Last-code-by`, or `Planned-by` | — |
 | `family` | Provider name, lowercase | `claude`, `openai`, `google`, `deepseek` |
-| `version` | Model identifier | `opus-5.5`, `sonnet-5.5`, `gpt-5.4`, `carbon`, `argon`, `neon`, `hydrogen` |
-| `tool` | Runtime environment, lowercase | `claude-code`, `codex`, `cursor`, `antigravity`, `kimi-code` |
+| `version` | Model identifier | `fable-5.2`, `mythos-5.2`, `opus-5.5`, `sonnet-5.5`, `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6-luna`, `gpt-5.4`, `carbon`, `argon`, `neon`, `hydrogen` |
+| `tool` | Runtime environment, lowercase | `claude-code`, `codex`, `copilot`, `cursor`, `antigravity`, `kimi-code` |
 | `qualifier` | Optional metadata string; may be compound when needed | `effort: high`, `orchestrator`, `sub-agent: reviewer`, `effort: high; orchestrator` |
 
 **Searching:** `Planned-by:` → external master plan provenance. `Authored-by:` → original authorship. `Updated-by:` → later material editors. `Reviewed-by:` → review artifacts. `Last-code-by:` → most recent code author on a PR branch. `claude/` → all Claude artifacts. `(codex` → all Codex artifacts.
@@ -407,13 +407,19 @@ Every lognexus artifact (comments, PR bodies, review sign-offs) must carry a pro
 
 | Tool | Source | Example signature |
 |------|--------|-------------------|
-| Claude Code | System prompt model name | `claude/opus-5.5 (claude-code)`, `claude/sonnet-5.5 (claude-code)` |
-| Codex | `~/.codex/config.toml` `model` + `model_reasoning_effort` | `openai/gpt-5.4 (codex, effort: high)` |
+| Claude Code | System prompt model name | `claude/fable-5.2 (claude-code)`, `claude/mythos-5.2 (claude-code)`, `claude/opus-5.5 (claude-code)`, `claude/sonnet-5.5 (claude-code)`, `claude/haiku-5.5 (claude-code)` |
+| Codex CLI / App / Cloud | `~/.codex/config.toml` `model` + effort (`CODEX_CI` / `CODEX_SANDBOX_NETWORK_DISABLED`) | `openai/gpt-6.2-astra (codex)`, `openai/gpt-6.2-sol (codex)`, `openai/gpt-6-luna (codex)`, `openai/codex-mini (codex)` |
+| GitHub Copilot | `.github/copilot-instructions.md` (`copilot` ecosystem) | `claude/fable-5.2 (copilot)`, `openai/gpt-6.2-astra (copilot)` |
 | Cursor | System prompt model identifier | `claude/opus-5.5 (cursor)` |
 | Antigravity (Tier-1 Orchestrators) | Workspace agent configuration | **`Gemini 4 Neon`** (`gemini/neon`, `Orchestrator (Neon)` / `gemini-pro-orchestrator-neon`), `Gemini 4 Carbon` (`gemini/carbon`), `Gemini 4 Argon` (`gemini/argon`) |
 | Antigravity (Tier-2/3 Workers) | Runtime subagent or swarm worker | `google/gemini-4-hydrogen-high (antigravity)`, `google/gemini-3.8-flash-high (antigravity)`, `gemini-flash-worker-agy` |
 | Kimi Code | Active model identifier in editor | `deepseek/VS Code (kimi-code)` |
 | Other | Best available model identifier | `<family>/<version> (<tool>)` |
+
+**November 2026 Normalization & Shared-Weights Gate:**
+- Effort/speed suffixes (`-ultrafast`, `-fast`, `-light`, `-max`, `-extra-high`, `-xhigh`, `-high`, `-medium`, `-low`, `-minimal`, `-none`) and `codex/* -> openai/*` provider aliases strip cleanly during family normalization (`claude/fable-5-2` == `claude/fable-5.2`, `openai/gpt-6-2-astra` == `openai/gpt-6.2-astra`).
+- `Claude Fable 5.2` (`claude/fable-5.2`) and `Claude Mythos 5.2` (`claude/mythos-5.2`) share identical underlying base weights: `Fable <-> Mythos` cross-review is blocked as self-approval, while `Fable`/`Mythos` may review `Opus 5.5`, `Sonnet 5.5`, or `Haiku 5.5` under `intra-fleet`.
+- In `CODEX_CI` or `CODEX_SANDBOX_NETWORK_DISABLED` agent subshells, interactive telemetry prompts stay suppressed (`CODEX_HOME` alone does not suppress human TTY prompts).
 
 ### Master Plan Provenance: `Planned-by:`
 
@@ -690,7 +696,10 @@ When exploring code across more than 3 files (with or without an active issue), 
 
 ##### Automatic Post-Plan Native Swarm (`orchestration: auto`)
 Before implementation writes begin, the Tier-1 orchestrator emits the `T1..Tn` plan with pre-assigned subagents/models (`--assignee`), tier, isolation mode (`--isolation`), and file/LOC budgets, awaiting explicit developer confirmation. Once confirmed under `orchestration: auto`:
-- When Antigravity `Orchestrator` (`Neon` / `Carbon` / `Argon`) with `swarm` is active, launch native `swarm` automatically under LogNexus contracts without asking again.
+- When Antigravity `Orchestrator` (`Neon` / `Carbon` / `Argon`) or a standard Tier-1 model with native `swarm` is active, launch native `swarm` automatically under LogNexus contracts without asking again (standard Tier-1 models can invoke `swarm` directly without stacking conflicting IDE Orchestrator wrapper prompts).
+- **Immediate Swarm UI Handoff:** Immediately after initial `swarm add` calls, emit a brief progress turn ending with `[Open the Swarm UI](sidecar://swarm/swarm_board/?auto_open=false)` on its own line BEFORE entering `swarm_wait`, so the UI button renders live instead of stalling until workers finish.
+- **Coordinator Model Sync:** Switching the IDE model selector mid-conversation changes which model answers turns while the Swarm roster keeps `@coordinator` labeled with its initial model unless `swarm{action: "model"}` is called.
+- **Right-Sized Effort:** Reserve `XHigh` / `Max` reasoning effort for deep architectural planning; use `Medium` Tier-1 or Tier-2/Tier-3 for routine status queries, visual reviews, and focused checks.
 - Maintain `<= 4` active swarm workers and use selective `@name` mentions (no `@all` broadcast chatter).
 - Omit `model` (`"auto"`) on implementation workers unless explicitly requested by the developer, allowing Antigravity to allocate runtime capacity dynamically.
 - Sign `--author` with each worker's real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).

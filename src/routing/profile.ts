@@ -14,6 +14,7 @@ export type AgentEcosystemId =
   | "claude-code"
   | "cursor"
   | "codex"
+  | "copilot"
   | "kimi"
   | "vscode"
   | "zed"
@@ -48,6 +49,7 @@ const ECOSYSTEM_ORDER: readonly AgentEcosystemId[] = [
   "claude-code",
   "cursor",
   "codex",
+  "copilot",
   "kimi",
   "vscode",
   "zed",
@@ -75,6 +77,10 @@ export const ECOSYSTEM_MARKERS: Record<
   codex: {
     strong: [".codex"],
     weak: ["AGENTS.md"],
+  },
+  copilot: {
+    strong: [".github/copilot-instructions.md"],
+    weak: [],
   },
   kimi: {
     strong: [".kimi"],
