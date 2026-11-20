@@ -158,7 +158,10 @@ When code exploration spans more than 3 repository files, a Tier-1 orchestrator 
 ### 2. Post-Plan Automatic Native Swarm Execution (`orchestration: auto`)
 
 Before writing code, the Tier-1 orchestrator emits the `T1..Tn` plan with pre-assigned subagents/models (`--assignee`), tier, isolation mode (`--isolation`), and file/LOC budgets, awaiting explicit developer confirmation. Once confirmed under `orchestration: auto`:
-- When Antigravity `Orchestrator` (`Neon` / `Carbon` / `Argon`) with `swarm` is active, launch native `swarm` automatically under LogNexus contracts without asking again.
+- When Antigravity `Orchestrator` (`Neon` / `Carbon` / `Argon`) or a standard Tier-1 model with `swarm` is active, launch native `swarm` automatically under LogNexus contracts without asking again (standard Tier-1 models can invoke `swarm` directly without stacking conflicting IDE Orchestrator wrapper prompts).
+- **Immediate Swarm UI Handoff:** Immediately after initial `swarm add` calls, emit a brief progress turn ending with `[Open the Swarm UI](sidecar://swarm/swarm_board/?auto_open=false)` on its own line BEFORE entering `swarm_wait`, so the UI button appears live instead of stalling until workers finish.
+- **Coordinator Model Sync:** Switching the IDE model selector mid-conversation changes which model answers turns while the Swarm roster keeps `@coordinator` labeled with its initial model unless `swarm{action: "model"}` is called.
+- **Right-Sized Effort:** Reserve `XHigh` / `Max` reasoning effort for deep architectural planning; use `Medium` Tier-1 or Tier-2/Tier-3 for routine status queries, visual reviews, and focused checks.
 - Maintain `<= 4` active swarm workers and use selective `@name` mentions (prohibit `@all` broadcast chatter).
 - Omit `model` (`"auto"`) on implementation workers unless explicitly requested by the developer, allowing Antigravity to allocate runtime capacity dynamically.
 - Sign `--author` with each worker's real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).

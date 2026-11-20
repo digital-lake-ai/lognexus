@@ -83,22 +83,28 @@ When no `.lognexus/routing.md` exists, or when the user runs `/lognexus models`:
 | **tier-2** (capable) | Context loading, scope judgment, structured documentation | Issue-to-branch, discovery protocol, knowledge retrieval |
 | **tier-3** (fast) | Execution speed, template filling, routine operations | Commits, simple implementations, timeline checkpoints |
 
-### Model-Tier Taxonomy (Multi-Model Support)
+### Model-Tier Taxonomy (Multi-Model Support — November 2026)
 
 LogNexus is completely model-agnostic. Any model can be mapped to any tier depending on your stack. The default taxonomy across major provider families is:
 
-| Tier | Anthropic Claude | OpenAI | Google Gemini | DeepSeek | Primary Role |
-|------|------------------|--------|---------------|----------|--------------|
-| **tier-1** (Reasoning) | Claude Opus 5.5 | OpenAI o3 / GPT-5 | Gemini 4 Neon (`gemini/neon`, `Orchestrator (Neon)`), Gemini 4 Carbon, Gemini 4 Argon | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, independent review gates |
-| **tier-2** (Context / Triage) | Claude Sonnet 5.5 | GPT-4o | Gemini 4 Hydrogen (`google/gemini-4-hydrogen-high (antigravity)`), Gemini 3.8 Flash High | Kimi K3 | Turn-1 exploration probes, complex implementation, issue-to-branch, knowledge retrieval |
-| **tier-3** (Execution) | Claude Haiku | GPT-4o-mini | Gemini 3.8 Flash, `gemini-flash-worker-agy` | DeepSeek V3 | Scoped subtask execution, atomic commits (`feat(#N/Tk)`), timeline comments |
+| Tier | Anthropic Claude (`Claude Code`) | OpenAI (`Codex CLI` / App / Cloud) | Google Gemini (`Antigravity`) | DeepSeek | Primary Role |
+|------|----------------------------------|------------------------------------|-------------------------------|----------|--------------|
+| **tier-1** (Reasoning) | `Claude Fable 5.2` (`claude/fable-5.2`), `Claude Mythos 5.2` (`claude/mythos-5.2`), `Claude Opus 5.5` (`-max`) | `GPT-6.2 Astra`, `o3` / `o4` / `GPT-5(.N)` | Gemini 4 Neon (`gemini/neon`, `Orchestrator (Neon)`), Gemini 4 Carbon, Gemini 4 Argon | DeepSeek R1 | Brainstorming, architectural design, PR timeline synthesis, independent review gates |
+| **tier-2** (Context / Triage) | `Claude Sonnet 5.5` | `GPT-6.2 Sol`, `Codex` (non-mini), `gpt-oss`, `o1-mini` / `o3-mini`, `GPT-4o` | Gemini 4 Hydrogen (`google/gemini-4-hydrogen-high (antigravity)`), Gemini 3.8 Flash High | Kimi K3 | Turn-1 exploration probes, complex implementation, issue-to-branch, knowledge retrieval |
+| **tier-3** (Execution) | `Claude Haiku 5.5` | `GPT-6 Luna`, `codex-mini`, `o4-mini`, `gpt-<N>-mini` / `nano`, `GPT-4o-mini` | Gemini 3.8 Flash (`flash-lite`), `gemini-flash-worker-agy` | DeepSeek V3 | Scoped subtask execution, atomic commits (`feat(#N/Tk)`), timeline comments |
+
+**2026 Provider Normalization, Ecosystem & Effort Rules:**
+- **Shared-Weights Gate (`Fable <-> Mythos`):** `Claude Fable 5.2` and `Claude Mythos 5.2` share identical underlying base weights, so `Fable <-> Mythos` cross-review is blocked as self-approval (`error`). Both may still review `Opus 5.5`, `Sonnet 5.5`, or `Haiku 5.5` under `intra-fleet`.
+- **OpenAI / Codex & Copilot Detection:** `codex/*` aliases normalize onto `openai/*`, speed/effort suffixes (`-ultrafast`, `-fast`, `-light`, `-max`) strip cleanly before family comparison, `CODEX_CI` and `CODEX_SANDBOX_NETWORK_DISABLED` suppress non-TTY consent prompts (leaving `CODEX_HOME` safe for human shells), and `.github/copilot-instructions.md` registers the `copilot` ecosystem.
+- **Zero Forced Cross-Vendor Review in ChatGPT / OpenAI Codex:** **ChatGPT / OpenAI Codex environments NEVER force cross-vendor review.** `review_gate: auto` defaults to `intra-fleet` within OpenAI (`GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`), while single-session or solo ChatGPT / Codex workflows where cross-model review is unnecessary or unavailable can configure `review_gate: advisory` or `review_gate: off` in `.lognexus/routing.md`.
+- **Swarm UX & Right-Sized Effort:** Emit `[Open the Swarm UI](sidecar://swarm/swarm_board/?auto_open=false)` on its own line immediately after initial `swarm add` calls before entering `swarm_wait`. Switching the IDE model selector mid-conversation changes which model answers turns while `@coordinator` keeps its initial Swarm roster label unless `swarm{action: "model"}` is called, and standard Tier-1 models can invoke native `swarm` directly without stacking conflicting IDE Orchestrator wrapper prompts. Reserve `XHigh` / `Max` effort for deep architectural planning; use `Medium` Tier-1 or Tier-2/Tier-3 for routine status queries, visual reviews, and focused checks.
 
 ### Example Multi-Model Deployments
 
 Users choose whatever combination best fits their workflow and tools:
-- **Setup A (Anthropic Stack):** Claude Opus 5.5 (tier-1) + Claude Sonnet 5.5 (tier-2) + Claude Haiku (tier-3) inside Claude Code or Cursor.
+- **Setup A (Anthropic Stack):** `Claude Fable 5.2` or `Claude Opus 5.5` (tier-1) + `Claude Sonnet 5.5` (tier-2) + `Claude Haiku 5.5` (tier-3) inside Claude Code or Cursor (`Fable` reviewing `Sonnet`/`Opus`, never `Mythos`).
 - **Setup B (Google Fleet / Intra-Fleet Review):** Gemini 4 Neon / Carbon / Argon (tier-1 orchestrator/reviewer) + Gemini 4 Hydrogen or Gemini 3.8 Flash (tier-2/tier-3 implementer) in Antigravity (`Orchestrator` reviewing `Hydrogen`/`Flash`).
-- **Setup C (OpenAI + DeepSeek):** OpenAI o3 (tier-1) for planning + DeepSeek V3 / R1 for implementation.
+- **Setup C (ChatGPT / OpenAI Codex Stack):** `GPT-6.2 Astra` (tier-1) reviewing `GPT-6.2 Sol` (tier-2) or `GPT-6 Luna` / `codex-mini` (tier-3) under `review_gate: auto` (`intra-fleet`), or single-session solo work with `review_gate: advisory` / `off`.
 - **Setup D (Cross-Vendor or Intra-Fleet Distinct-Model Review):** Any valid reviewer pairing satisfying the independent review gate (`Authored-by:` ≠ `Reviewed-by:` across different canonical models or vendors).
 
 ## Default Phase-to-Tier Mapping
