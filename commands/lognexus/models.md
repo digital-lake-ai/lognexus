@@ -28,16 +28,18 @@ Present the setup prompt:
 >
 > **Orchestration & Review Gate Options:**
 > - `orchestration: auto | swarm | subagent | off` (`auto` defaults to native swarm under Antigravity Orchestrator or subagent when available)
-> - `review_gate: auto | cross-vendor | intra-fleet | advisory | off` (`auto` defaults to `intra-fleet`)
+> - `review_gate: auto | cross-vendor | intra-fleet | advisory | off` (`auto` defaults to `intra-fleet`; ChatGPT / OpenAI Codex workflows never force cross-vendor review, and single-session solo workflows may use `advisory` or `off`)
 > - `implementer: auto`
 > - `reviewer: auto`
 >
-> **Tier reference & Taxonomy:**
+> **Tier reference & Taxonomy (November 2026):**
 > | Tier | Use For | Recommended Models |
 > |------|---------|--------------------|
-> | tier-1 (reasoning) | Architecture, master planning, independent review | `Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Claude Opus 5.5`, `OpenAI o3 / GPT-5`, `DeepSeek R1` |
-> | tier-2 (capable) | Turn-1 exploration probes, complex implementation | `Gemini 4 Hydrogen`, `Gemini 3.8 Flash High`, `Claude Sonnet 5.5`, `Kimi K3` |
-> | tier-3 (fast) | Scoped execution, commits, timeline updates | `Gemini 3.8 Flash`, `gemini-flash-worker-agy`, `Claude Haiku`, `DeepSeek V3`, `GPT-4o-mini` |
+> | tier-1 (reasoning) | Architecture, master planning, independent review | `Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude Opus 5.5`, `OpenAI GPT-6.2 Astra`, `o3 / o4 / GPT-5(.N)`, `DeepSeek R1` |
+> | tier-2 (capable) | Turn-1 exploration probes, complex implementation | `Gemini 4 Hydrogen`, `Gemini 3.8 Flash High`, `Claude Sonnet 5.5`, `OpenAI GPT-6.2 Sol`, `Codex`, `gpt-oss`, `Kimi K3` |
+> | tier-3 (fast) | Scoped execution, commits, timeline updates | `Gemini 3.8 Flash`, `gemini-flash-worker-agy`, `Claude Haiku 5.5`, `OpenAI GPT-6 Luna`, `codex-mini`, `o4-mini`, `DeepSeek V3` |
+>
+> *Gate & Normalization Notes:* `Claude Fable 5.2` and `Claude Mythos 5.2` share identical base model weights, so `Fable <-> Mythos` cross-review is blocked as self-approval while both may review `Opus 5.5` / `Sonnet 5.5` / `Haiku 5.5` under `intra-fleet`. Speed/effort suffixes (`-ultrafast`, `-fast`, `-light`, `-max`) and `codex/* -> openai/*` aliases normalize cleanly (`gpt-6-2-astra` == `gpt-6.2-astra`).
 
 ### Save the Choice
 
