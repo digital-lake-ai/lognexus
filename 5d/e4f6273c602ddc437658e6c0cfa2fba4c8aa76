@@ -1,0 +1,38 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.0",
+  "timestamp": "2026-11-20T01:48:42.927Z",
+  "issue": {
+    "id": 76,
+    "title": "release: publish LogNexus v1.4.1 (Claude 5.2, GPT-6.2/Codex, CLI --help & Swarm UX)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Publish v1.4.1 changelog, README, models command, and privacy examples",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "commands/lognexus/models.md",
+        "CHANGELOG.md",
+        "README.md",
+        "docs/TELEMETRY_PRIVACY.md",
+        ".github/ISSUE_TEMPLATE/diagnostic-report.yml"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint",
+      "assignee": "google/gemini-flash-worker-agy (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 145
+  }
+}
