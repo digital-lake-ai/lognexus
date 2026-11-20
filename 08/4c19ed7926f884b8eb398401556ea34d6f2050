@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.0",
+  "timestamp": "2026-11-20T01:42:50.381Z",
+  "issue": {
+    "id": 76,
+    "title": "release: publish LogNexus v1.4.1 (Claude 5.2, GPT-6.2/Codex, CLI --help & Swarm UX)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Update 2026 ecosystem profiles, ChatGPT/Claude routing, and universal CLI --help",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/routing/profile.ts",
+        "src/status.ts",
+        "src/scaffold.ts",
+        "src/mcp/prompts.ts",
+        "src/cli.ts",
+        "tests/routing-profile.test.ts",
+        "tests/status.test.ts",
+        "tests/scaffold.test.ts",
+        "tests/cli-help.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npx vitest run tests/routing-profile.test.ts tests/status.test.ts tests/scaffold.test.ts tests/cli-help.test.ts tests/mcp.test.ts",
+      "assignee": "google/gemini-flash-worker-agy (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 135
+  }
+}
