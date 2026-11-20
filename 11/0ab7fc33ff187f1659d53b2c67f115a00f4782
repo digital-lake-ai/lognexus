@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.0",
+  "timestamp": "2026-11-20T01:36:10.972Z",
+  "issue": {
+    "id": 76,
+    "title": "release: publish LogNexus v1.4.1 (Claude 5.2, GPT-6.2/Codex, CLI --help & Swarm UX)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Support Claude 5.2, GPT-6.2/Codex tiers, Fable/Mythos gate, and Astro stack",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/detector.ts",
+        "src/telemetry/consent-prompt.ts",
+        "src/audit/audit.ts",
+        "tests/telemetry.test.ts",
+        "tests/consent-prompt.test.ts",
+        "tests/audit.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npx vitest run tests/telemetry.test.ts tests/consent-prompt.test.ts tests/audit.test.ts",
+      "assignee": "google/gemini-flash-worker-agy (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 3,
+    "posts": 131
+  }
+}
