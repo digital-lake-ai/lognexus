@@ -1,0 +1,41 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-20T01:53:10.459Z",
+  "issue": {
+    "id": 76,
+    "title": "release: publish LogNexus v1.4.1 (Claude 5.2, GPT-6.2/Codex, CLI --help & Swarm UX)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T5",
+    "title": "Bump all 7 manifest surfaces and version tests to v1.4.1",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml",
+        "python/lognexus_mcp/__init__.py",
+        "tests/e2e.test.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue; npm run lint && npm test && npm run build",
+      "assignee": "google/gemini-flash-worker-agy (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 3
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 3,
+    "posts": 149
+  }
+}
