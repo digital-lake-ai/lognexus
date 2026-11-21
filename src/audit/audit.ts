@@ -8,21 +8,40 @@ import {
 } from "../routing/profile.js";
 import { inferTierFromAuthor, isGovernanceOrConfigSurface } from "../telemetry/detector.js";
 import { getJourneyTimeline, type TimelineItem } from "../timeline/timeline.js";
+import {
+  type AuditPolicyConfig,
+  AuditPolicySchema,
+  type AuditProfileName,
+  AuditProfileNameSchema,
+  type AuditRuleName,
+  type AuditSeverity,
+  AuditSeveritySchema,
+  type LoadedAuditPolicy,
+  loadAuditPolicy,
+  NON_OVERRIDABLE_AUDIT_RULES,
+  resolveAuditRuleSeverity,
+} from "./policy.js";
+
+export type AuditRule = AuditRuleName;
+export {
+  type AuditPolicyConfig,
+  AuditPolicySchema,
+  type AuditProfileName,
+  AuditProfileNameSchema,
+  type AuditSeverity,
+  AuditSeveritySchema,
+  type LoadedAuditPolicy,
+  loadAuditPolicy,
+  NON_OVERRIDABLE_AUDIT_RULES,
+  resolveAuditRuleSeverity,
+};
 
 export interface AuditViolation {
   commitSha: string;
   shortSha: string;
-  rule:
-    | "commit-format"
-    | "authored-by-trailer"
-    | "invalid-identity"
-    | "git-note-presence"
-    | "contract-files"
-    | "review-gate-separation"
-    | "base-branch-range"
-    | "tier-routing-violation";
+  rule: AuditRule;
   message: string;
-  severity: "error" | "warn";
+  severity: AuditSeverity;
 }
 
 export interface AuditResult {
@@ -722,6 +741,7 @@ function auditCommit(
   item: TimelineItem,
   targetDir: string,
   gateMode: EffectiveReviewGateMode,
+  policy: LoadedAuditPolicy,
 ): AuditViolation[] {
   const violations: AuditViolation[] = [];
   const base = { commitSha: item.sha, shortSha: item.shortSha };
@@ -858,13 +878,16 @@ function auditCommit(
     }
   }
 
-  return violations;
+  return violations.map((violation) => ({
+    ...violation,
+    severity: resolveAuditRuleSeverity(violation.rule, violation.severity, policy),
+  }));
 }
 
 export function auditBranch(
   baseBranch: string = "main",
   targetDir: string = process.cwd(),
-  options?: { reviewGateMode?: EffectiveReviewGateMode },
+  options?: { reviewGateMode?: EffectiveReviewGateMode; policy?: LoadedAuditPolicy },
 ): AuditResult {
   const safeBase = rejectNotesReference(baseBranch, "audit base branch");
   const baseRoutingRaw = readGitFileAtRef(safeBase, ".lognexus/routing.md", targetDir);
@@ -874,8 +897,33 @@ export function auditBranch(
       ? parseEffectiveGate(baseRoutingRaw)
       : resolveRoutingProfile(targetDir).effectiveReviewGate);
 
+  const loadedPolicy = options?.policy ?? loadAuditPolicy(targetDir);
+  const effectivePolicy: LoadedAuditPolicy = loadedPolicy.valid
+    ? loadedPolicy
+    : {
+        exists: loadedPolicy.exists,
+        valid: true,
+        profile: "default",
+        rules: {},
+        errors: [],
+      };
+
   const timeline = getJourneyTimeline(safeBase, targetDir);
-  const violations = timeline.items.flatMap((item) => auditCommit(item, targetDir, gateMode));
+  const violations: AuditViolation[] = [];
+
+  if (!loadedPolicy.valid) {
+    violations.push({
+      commitSha: "policy",
+      shortSha: "policy",
+      rule: "invalid-policy",
+      message: `Invalid .lognexus/policy.json: ${loadedPolicy.errors.join("; ")}`,
+      severity: resolveAuditRuleSeverity("invalid-policy", "error", effectivePolicy),
+    });
+  }
+
+  violations.push(
+    ...timeline.items.flatMap((item) => auditCommit(item, targetDir, gateMode, effectivePolicy)),
+  );
 
   const normalizedCurrent = timeline.branch.replace(/^refs\/heads\//, "");
   const normalizedBase = safeBase.replace(/^refs\/heads\//, "").replace(/^origin\//, "");
@@ -885,7 +933,7 @@ export function auditBranch(
       shortSha: "HEAD",
       rule: "base-branch-range",
       message: `Auditing base branch '${safeBase}' directly: 0 commits in range ${safeBase}..${timeline.branch}. Run from a feature branch or specify a base commit/range.`,
-      severity: "error",
+      severity: resolveAuditRuleSeverity("base-branch-range", "error", effectivePolicy),
     });
   }
 

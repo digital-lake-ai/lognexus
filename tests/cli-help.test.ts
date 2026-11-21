@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,15 +7,18 @@ import { hasStandaloneHelpFlag, main } from "../src/cli.js";
 describe("Universal CLI --help handling", () => {
   let tempDir: string;
   let originalCwd: string;
+  let originalExitCode: typeof process.exitCode;
 
   beforeEach(() => {
     originalCwd = process.cwd();
+    originalExitCode = process.exitCode;
     tempDir = mkdtempSync(join(tmpdir(), "lognexus-cli-help-"));
     process.chdir(tempDir);
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
+    process.exitCode = originalExitCode;
     vi.restoreAllMocks();
     rmSync(tempDir, { recursive: true, force: true });
   });
@@ -87,5 +90,114 @@ describe("Universal CLI --help handling", () => {
     await expect(main(["commit", "-m", "fix --help"])).rejects.toThrow("EXIT:1");
     expect(logs.join("\n")).not.toContain("Usage:");
     expect(errors.join("\n")).toContain("Commit failed:");
+  });
+
+  it("exits cleanly with code 0 on doctor --help without running diagnostics", async () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("unexpected process.exit");
+    }) as never);
+
+    const code = await main(["doctor", "--help"]);
+
+    expect(code).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(errors).toEqual([]);
+    expect(logs.join("\n")).toContain("Usage:");
+    expect(logs.join("\n")).toContain("doctor [--mcp]");
+    expect(logs.join("\n")).not.toContain("Running diagnostics");
+  });
+
+  it("fails with process.exitCode = 1 when unknown option is passed to doctor", async () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("unexpected process.exit");
+    }) as never);
+
+    await main(["doctor", "--unknown-flag"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(errors.join("\n")).toContain("[ERROR] Unknown doctor option: --unknown-flag");
+    expect(logs.join("\n")).toContain("Usage:");
+    expect(logs.join("\n")).not.toContain("Running diagnostics");
+  });
+
+  it("completes cleanly on doctor --mcp", async () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("unexpected process.exit");
+    }) as never);
+
+    const code = await main(["doctor", "--mcp"]);
+
+    expect(code).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(originalExitCode);
+    expect(errors).toEqual([]);
+    expect(logs.join("\n")).toContain("Running diagnostics...\n");
+    expect(logs.join("\n")).toContain("Diagnostic complete.\n");
+    expect(logs.join("\n")).toContain("MCP Client Configs");
+  });
+
+  it("sets process.exitCode = 1 on doctor --mcp when a diagnostic check fails", async () => {
+    const logDir = join(tempDir, ".lognexus");
+    mkdirSync(logDir);
+    writeFileSync(join(logDir, "policy.json"), "{ invalid-json", "utf8");
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+
+    await main(["doctor", "--mcp"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(logs.join("\n")).toContain("[FAIL] LogNexus Rules:");
+  });
+
+  it("preserves exit behavior (does not set exitCode) on doctor without --mcp even when a check fails", async () => {
+    const logDir = join(tempDir, ".lognexus");
+    mkdirSync(logDir);
+    writeFileSync(join(logDir, "policy.json"), "{ invalid-json", "utf8");
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+
+    await main(["doctor"]);
+
+    expect(process.exitCode).toBe(originalExitCode);
+    expect(logs.join("\n")).toContain("[FAIL] LogNexus Rules:");
   });
 });

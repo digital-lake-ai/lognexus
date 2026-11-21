@@ -1,5 +1,7 @@
 export {
   type AuditResult,
+  type AuditRule,
+  type AuditSeverity,
   type AuditViolation,
   auditBranch,
   COMMIT_FORMAT_PATTERN,
@@ -10,6 +12,15 @@ export {
   parseIdentity,
   SUBJECT_TASK_PATTERN,
 } from "./audit/audit.js";
+export {
+  type AuditPolicyConfig,
+  AuditPolicySchema,
+  type AuditProfileName,
+  type LoadedAuditPolicy,
+  loadAuditPolicy,
+  NON_OVERRIDABLE_AUDIT_RULES,
+  resolveAuditRuleSeverity,
+} from "./audit/policy.js";
 export {
   getCliVersion,
   isDirectCliExecution,
@@ -25,9 +36,12 @@ export {
   checkAgentEcosystem,
   checkGit,
   checkGitHubCli,
+  checkMcpClientConfigs,
   checkRulesConfig,
   checkScopeDrift,
   checkVersionMaturity,
+  type DiagnosticCheck,
+  type DoctorOptions,
   runDiagnostics,
 } from "./doctor.js";
 export { fetchNpmPackagePolicy, type NpmPackagePolicy, resolveNpmCliScript } from "./git/safe.js";

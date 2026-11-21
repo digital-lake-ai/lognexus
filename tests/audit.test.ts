@@ -10,8 +10,11 @@ import {
   extractTrailers,
   extractVendor,
   isInvalidPlaceholderIdentity,
+  loadAuditPolicy,
   matchesPath,
+  NON_OVERRIDABLE_AUDIT_RULES,
   parseIdentity,
+  resolveAuditRuleSeverity,
   unwrapOuterBalancedParens,
 } from "../src/audit/audit.js";
 import { executeAtomicCommit } from "../src/commit.js";
@@ -1091,6 +1094,272 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe(".lognexus/policy.json audit severity profiles (#42)", () => {
+    let tempDir: string;
+    let baseBranch: string;
+
+    beforeEach(() => {
+      tempDir = mkdtempSync(join(tmpdir(), "lognexus-audit-policy-test-"));
+      execSync("git init", { cwd: tempDir, stdio: "ignore" });
+      execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+      execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+      execSync('git config commit.gpgsign "false"', { cwd: tempDir, stdio: "ignore" });
+      commitFile(tempDir, "file.txt", "hello world", "chore: initial commit");
+      baseBranch = git("branch --show-current", tempDir) || "main";
+      execSync("git checkout -b issue/42-audit-policy", { cwd: tempDir, stdio: "ignore" });
+    });
+
+    afterEach(() => {
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it("keeps current strict defaults when .lognexus/policy.json is missing", () => {
+      const loaded = loadAuditPolicy(tempDir);
+      expect(loaded).toEqual({
+        exists: false,
+        valid: true,
+        profile: "default",
+        rules: {},
+        errors: [],
+      });
+      expect(NON_OVERRIDABLE_AUDIT_RULES).toEqual([
+        "invalid-identity",
+        "review-gate-separation",
+        "base-branch-range",
+      ]);
+
+      commitFile(
+        tempDir,
+        "legacy.ts",
+        "export const legacy = true;\n",
+        "legacy commit without trailer or note",
+      );
+
+      const result = auditBranch(baseBranch, tempDir);
+      const authoredViolation = result.violations.find((v) => v.rule === "authored-by-trailer");
+      const noteViolation = result.violations.find((v) => v.rule === "git-note-presence");
+      const formatViolation = result.violations.find((v) => v.rule === "commit-format");
+
+      expect(authoredViolation?.severity).toBe("error");
+      expect(noteViolation?.severity).toBe("warn");
+      expect(formatViolation?.severity).toBe("warn");
+      expect(result.passed).toBe(false);
+      expect(result.summary).toEqual({ errors: 1, warnings: 2 });
+    });
+
+    it("downgrades missing Authored-by and contract-files violations to warn under profile 'incremental'", () => {
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".lognexus", "policy.json"),
+        JSON.stringify({ profile: "incremental" }, null, 2),
+        "utf8",
+      );
+
+      // Legacy commit missing Authored-by, note, and conventional subject
+      commitFile(tempDir, "legacy.ts", "export const a = 1;\n", "legacy cleanup");
+
+      // Contracted commit touching an outside file
+      commitFile(
+        tempDir,
+        "allowed.ts",
+        "export const ok = true;\n",
+        "feat(#42/T1): contract test\n\nAuthored-by: google/gemini-4-hydrogen-high (antigravity)\n",
+      );
+      commitFile(
+        tempDir,
+        "outside.ts",
+        "export const outside = true;\n",
+        "feat(#42/T1): contract test\n\nAuthored-by: google/gemini-4-hydrogen-high (antigravity)\n",
+      );
+      attachNote(
+        JSON.stringify({
+          subtask: { id: "T1", contract: { allowedFiles: ["allowed.ts"] } },
+          tier: "tier-2",
+        }),
+        "HEAD",
+        { cwd: tempDir },
+      );
+
+      const result = auditBranch(baseBranch, tempDir);
+      const authored = result.violations.find((v) => v.rule === "authored-by-trailer");
+      const contract = result.violations.find((v) => v.rule === "contract-files");
+
+      expect(authored?.severity).toBe("warn");
+      expect(contract?.severity).toBe("warn");
+      expect(result.summary.errors).toBe(0);
+      expect(result.summary.warnings).toBeGreaterThan(0);
+      expect(result.passed).toBe(true);
+    });
+
+    it("promotes missing Git Notes, commit-format, tier-routing-violation, and routing-weakening warn to error under profile 'strict'", () => {
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".lognexus", "policy.json"),
+        JSON.stringify({ profile: "strict" }, null, 2),
+        "utf8",
+      );
+
+      commitFile(
+        tempDir,
+        "feature.ts",
+        "export const ok = true;\n",
+        "non conventional subject\n\nAuthored-by: google/gemini-4-hydrogen-high (antigravity)\n",
+      );
+
+      const result = auditBranch(baseBranch, tempDir);
+      const noteViolation = result.violations.find((v) => v.rule === "git-note-presence");
+      const formatViolation = result.violations.find((v) => v.rule === "commit-format");
+
+      expect(noteViolation?.severity).toBe("error");
+      expect(formatViolation?.severity).toBe("error");
+      expect(result.passed).toBe(false);
+      expect(result.summary.errors).toBe(2);
+
+      // Also verify direct resolution for tier-routing-violation and advisory/routing-weakening review-gate-separation
+      const loaded = loadAuditPolicy(tempDir);
+      expect(resolveAuditRuleSeverity("tier-routing-violation", "warn", loaded)).toBe("error");
+      expect(resolveAuditRuleSeverity("review-gate-separation", "warn", loaded)).toBe("error");
+    });
+
+    it("applies per-rule overrides on top of a profile preset", () => {
+      mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".lognexus", "policy.json"),
+        JSON.stringify(
+          {
+            profile: "incremental",
+            rules: {
+              "contract-files": "error",
+            },
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+
+      commitFile(tempDir, "legacy.ts", "export const a = 1;\n", "legacy change");
+      commitFile(
+        tempDir,
+        "outside.ts",
+        "export const outside = true;\n",
+        "feat(#42/T2): strict contract override\n\nAuthored-by: google/gemini-4-hydrogen-high (antigravity)\n",
+      );
+      attachNote(
+        JSON.stringify({
+          subtask: { id: "T2", contract: { allowedFiles: ["allowed.ts"] } },
+          tier: "tier-2",
+        }),
+        "HEAD",
+        { cwd: tempDir },
+      );
+
+      const result = auditBranch(baseBranch, tempDir);
+      const authored = result.violations.find((v) => v.rule === "authored-by-trailer");
+      const contract = result.violations.find((v) => v.rule === "contract-files");
+
+      expect(authored?.severity).toBe("warn");
+      expect(contract?.severity).toBe("error");
+      expect(result.passed).toBe(false);
+      expect(result.summary.errors).toBe(1);
+    });
+
+    it.each([
+      {
+        label: "downgrading review-gate-separation to warn",
+        raw: JSON.stringify({
+          profile: "incremental",
+          rules: { "review-gate-separation": "warn" },
+        }),
+      },
+      {
+        label: "downgrading invalid-identity to warn",
+        raw: JSON.stringify({
+          rules: { "invalid-identity": "warn" },
+        }),
+      },
+      {
+        label: "unknown top-level key",
+        raw: JSON.stringify({
+          profile: "incremental",
+          unknownKey: true,
+        }),
+      },
+      {
+        label: "invalid JSON syntax",
+        raw: "{ profile: incremental",
+      },
+    ])(
+      "flags invalid-policy error and falls back to strict defaults on $label while keeping self-approval error",
+      ({ raw }) => {
+        mkdirSync(join(tempDir, ".lognexus"), { recursive: true });
+        writeFileSync(join(tempDir, ".lognexus", "policy.json"), raw, "utf8");
+
+        const loaded = loadAuditPolicy(tempDir);
+        expect(loaded.exists).toBe(true);
+        expect(loaded.valid).toBe(false);
+        expect(loaded.errors.length).toBeGreaterThan(0);
+
+        commitFile(
+          tempDir,
+          "feature.ts",
+          "export const ok = true;\n",
+          "feat(#42/T3): self-approved commit\n\nAuthored-by: google/gemini-4-hydrogen-high (antigravity)\nReviewed-by: google/gemini-4-hydrogen-high (antigravity)\n",
+        );
+        attachNote(JSON.stringify({}), "HEAD", { cwd: tempDir });
+
+        commitFile(
+          tempDir,
+          "legacy.ts",
+          "export const legacy = true;\n",
+          "feat(#42/T3): missing author",
+        );
+        attachNote(JSON.stringify({}), "HEAD", { cwd: tempDir });
+
+        const result = auditBranch(baseBranch, tempDir);
+        const policyViolation = result.violations.find((v) => v.rule === "invalid-policy");
+        const reviewGateViolation = result.violations.find(
+          (v) => v.rule === "review-gate-separation",
+        );
+        const authoredViolation = result.violations.find((v) => v.rule === "authored-by-trailer");
+
+        expect(policyViolation).toBeDefined();
+        expect(policyViolation?.severity).toBe("error");
+        expect(policyViolation?.shortSha).toBe("policy");
+        expect(reviewGateViolation).toBeDefined();
+        expect(reviewGateViolation?.severity).toBe("error");
+        expect(authoredViolation?.severity).toBe("error");
+        expect(result.passed).toBe(false);
+      },
+    );
+
+    it("enforces non-overridable error floor even if a forged policy object is passed programmatically", () => {
+      const forgedPolicy = {
+        exists: true,
+        valid: true,
+        profile: "incremental" as const,
+        rules: {
+          "invalid-identity": "warn",
+          "review-gate-separation": "warn",
+          "base-branch-range": "warn",
+        } as Partial<
+          Record<
+            "invalid-identity" | "review-gate-separation" | "base-branch-range",
+            "error" | "warn"
+          >
+        >,
+        errors: [],
+      };
+
+      expect(resolveAuditRuleSeverity("invalid-identity", "error", forgedPolicy)).toBe("error");
+      expect(resolveAuditRuleSeverity("review-gate-separation", "error", forgedPolicy)).toBe(
+        "error",
+      );
+      expect(resolveAuditRuleSeverity("base-branch-range", "error", forgedPolicy)).toBe("error");
+      expect(resolveAuditRuleSeverity("invalid-policy", "error", forgedPolicy)).toBe("error");
     });
   });
 });

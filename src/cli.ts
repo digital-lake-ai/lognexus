@@ -159,7 +159,7 @@ Commands:
   init         Scaffold .lognexus/ configuration and rules in current repository
                (--protect-tokens) also writes multi-model token-ignore files
                (--enable-telemetry | --no-telemetry | --disable-telemetry) set local telemetry choice
-  doctor       Check Git, GitHub CLI authentication, and repository rules health
+  doctor [--mcp]  Check Git, GitHub CLI, rules/policy health, and optional --mcp client configs
   status       Inspect current branch, active issue, and recommended tier
   commit       Atomic commit with trailers, contract validation, and Git Note
   state        Manage persistent agent state (.lognexus/state.json)
@@ -337,10 +337,23 @@ async function handleInit(args: string[] = []) {
   }
 }
 
-async function handleDoctor() {
+async function handleDoctor(args: string[] = []) {
+  let mcp = false;
+
+  for (const arg of args) {
+    if (arg === "--mcp") {
+      mcp = true;
+    } else if (arg.startsWith("-")) {
+      console.error(`[ERROR] Unknown doctor option: ${arg}\n`);
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   printHeader();
   console.log("Running diagnostics...\n");
-  const checks = runDiagnostics();
+  const checks = runDiagnostics(process.cwd(), { mcp });
 
   for (const c of checks) {
     const tag = c.status === "pass" ? "[PASS]" : c.status === "warn" ? "[WARN]" : "[FAIL]";
@@ -348,6 +361,10 @@ async function handleDoctor() {
   }
 
   console.log("\nDiagnostic complete.\n");
+
+  if (mcp && checks.some((check) => check.status === "fail")) {
+    process.exitCode = 1;
+  }
 }
 
 export async function handleStatus(targetDir: string = process.cwd()) {
@@ -1203,7 +1220,7 @@ export async function main(args: string[] = process.argv.slice(2)): Promise<numb
         args: args.slice(1),
         targetDir: process.cwd(),
       });
-      await handleDoctor();
+      await handleDoctor(args.slice(1));
       break;
     case "status":
       await maybePromptTelemetryConsent({
