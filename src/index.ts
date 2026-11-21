@@ -53,10 +53,13 @@ export {
   type PromptResult,
 } from "./mcp/prompts.js";
 export {
+  HANDOFF_RESOURCE_URI,
   listMcpResources,
   MCP_RESOURCE_PREFIX,
   type ResourceDefinition,
+  ROUTING_RESOURCE_URI,
   readMcpResource,
+  STATE_RESOURCE_URI,
 } from "./mcp/resources.js";
 export {
   MCP_PROTOCOL_VERSION,
@@ -80,9 +83,13 @@ export {
   attachNote,
   DEFAULT_NOTES_REF,
   DEFAULT_SEARCH_LIMIT,
+  type ExportedNoteRecord,
+  exportNotesJsonl,
   fetchNotes,
   getNote,
   listNotes,
+  type NoteExportOptions,
+  type NoteExportResult,
   type NoteOptions,
   type NoteSearchFilter,
   type NoteSearchResult,

@@ -1,10 +1,17 @@
 import { execFileSync, execSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attachCurrentStateToCommit } from "../src/notes/attach.js";
-import { attachNote, getNote, listNotes, searchNotesMemory } from "../src/notes/notes.js";
+import {
+  attachNote,
+  type ExportedNoteRecord,
+  exportNotesJsonl,
+  getNote,
+  listNotes,
+  searchNotesMemory,
+} from "../src/notes/notes.js";
 import { saveState } from "../src/state/manager.js";
 
 describe("Git Notes (Quiet Mode)", () => {
@@ -438,5 +445,247 @@ describe("Memory Recall (Git Notes search)", () => {
 
     const [entry] = searchNotesMemory(tempDir, { issue: 30, query: "identity trailers" });
     expect(entry.author).toBe("deepseek/VS Code (kimi-code)");
+  });
+});
+
+describe("Git Notes JSONL Export (exportNotesJsonl)", () => {
+  let tempDir: string;
+  let shaInitial: string;
+  let shaFirstNoted: string;
+  let shaUnnoted: string;
+  let shaSecondNoted: string;
+  let shaLegacyNoted: string;
+
+  function git(args: string[], dateIso?: string): string {
+    const env = dateIso
+      ? { ...process.env, GIT_AUTHOR_DATE: dateIso, GIT_COMMITTER_DATE: dateIso }
+      : process.env;
+    return execFileSync("git", args, {
+      cwd: tempDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+      env,
+    }).trim();
+  }
+
+  function commitFile(file: string, content: string, message: string, dateIso: string): string {
+    const target = join(tempDir, file);
+    mkdirSync(join(target, ".."), { recursive: true });
+    writeFileSync(target, content, "utf8");
+    git(["add", "-A"]);
+    git(["commit", "-m", message], dateIso);
+    return git(["rev-parse", "HEAD"]);
+  }
+
+  function jsonNote(issueId: number | string, subtaskId: string, title: string): string {
+    return JSON.stringify({
+      $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+      generator: "LogNexus",
+      version: "1.4.1",
+      timestamp: "2026-11-21T10:00:00Z",
+      issue: { id: issueId, title: `Issue ${issueId}` },
+      subtask: { id: subtaskId, title, status: "completed" },
+      tier: "tier-2",
+    });
+  }
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "lognexus-export-test-"));
+    git(["init"]);
+    git(["config", "user.name", "Test Runner"]);
+    git(["config", "user.email", "test@example.com"]);
+
+    shaInitial = commitFile(
+      "README.md",
+      "# fixture\n",
+      "chore: initial fixture",
+      "2026-11-20T10:00:00Z",
+    );
+
+    shaFirstNoted = commitFile(
+      "src/export.ts",
+      "export const v = 1;\n",
+      "feat(#40/T1): implement initial exporter",
+      "2026-11-20T10:01:00Z",
+    );
+    attachNote(jsonNote(40, "T1", "Implement initial exporter"), shaFirstNoted, { cwd: tempDir });
+    git(["tag", "v0.1.0", shaFirstNoted]);
+
+    shaUnnoted = commitFile(
+      "src/unnoted.ts",
+      "export const plain = true;\n",
+      "chore(#40/T2): unnoted intermediate commit",
+      "2026-11-20T10:02:00Z",
+    );
+
+    shaSecondNoted = commitFile(
+      "src/jira.ts",
+      "export const jira = true;\n",
+      "fix(PROJ-12/T1): handle alphanumeric ticket",
+      "2026-11-20T10:03:00Z",
+    );
+    attachNote(jsonNote("PROJ-12", "T1", "Handle alphanumeric ticket"), shaSecondNoted, {
+      cwd: tempDir,
+    });
+
+    shaLegacyNoted = commitFile(
+      "src/legacy.ts",
+      "export const legacy = true;\n",
+      "docs: legacy plain text note\n\nRefs #40",
+      "2026-11-20T10:04:00Z",
+    );
+    attachNote("Reviewed-by: claude/sonnet (cursor)\nLegacy plain-text note", shaLegacyNoted, {
+      cwd: tempDir,
+    });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("exports noted commits in oldest-to-newest topological order and skips unnoted commits", () => {
+    const result = exportNotesJsonl(tempDir);
+
+    expect(result.count).toBe(3);
+    expect(result.outputPath).toBeNull();
+    expect(result.jsonl.endsWith("\n")).toBe(true);
+
+    const lines = result.jsonl.trimEnd().split("\n");
+    expect(lines).toHaveLength(3);
+
+    const records = lines.map((line) => JSON.parse(line) as ExportedNoteRecord);
+    expect(records.map((r) => r.sha)).toEqual([shaFirstNoted, shaSecondNoted, shaLegacyNoted]);
+    expect(records.some((r) => r.sha === shaInitial || r.sha === shaUnnoted)).toBe(false);
+
+    expect(records[0]).toMatchObject({
+      sha: shaFirstNoted,
+      subject: "feat(#40/T1): implement initial exporter",
+    });
+    expect(typeof records[0].timestamp).toBe("string");
+    expect(records[0].timestamp).toContain("2026-11-20");
+    expect(typeof records[0].note).toBe("object");
+    expect((records[0].note as { issue: { id: number } }).issue.id).toBe(40);
+  });
+
+  it("preserves plain-text legacy and non-object JSON notes as trimmed strings", () => {
+    const arrayCommit = commitFile(
+      "src/array-note.ts",
+      "export const arr = [];\n",
+      "chore: json array note",
+      "2026-11-20T10:05:00Z",
+    );
+    attachNote("  [1, 2, 3]  ", arrayCommit, { cwd: tempDir });
+
+    const result = exportNotesJsonl(tempDir);
+    const records = result.jsonl
+      .trimEnd()
+      .split("\n")
+      .map((line) => JSON.parse(line) as ExportedNoteRecord);
+
+    const legacyRecord = records.find((r) => r.sha === shaLegacyNoted);
+    expect(legacyRecord?.note).toBe("Reviewed-by: claude/sonnet (cursor)\nLegacy plain-text note");
+
+    const arrayRecord = records.find((r) => r.sha === arrayCommit);
+    expect(arrayRecord?.note).toBe("[1, 2, 3]");
+  });
+
+  it("filters commits by valid since tag or SHA and rejects unsafe or missing since refs", () => {
+    const byTag = exportNotesJsonl(tempDir, { since: "v0.1.0" });
+    expect(byTag.count).toBe(2);
+    const tagShas = byTag.jsonl
+      .trimEnd()
+      .split("\n")
+      .map((line) => (JSON.parse(line) as ExportedNoteRecord).sha);
+    expect(tagShas).toEqual([shaSecondNoted, shaLegacyNoted]);
+
+    const bySha = exportNotesJsonl(tempDir, { since: shaSecondNoted.slice(0, 7) });
+    expect(bySha.count).toBe(1);
+    expect((JSON.parse(bySha.jsonl.trim()) as ExportedNoteRecord).sha).toBe(shaLegacyNoted);
+
+    expect(() => exportNotesJsonl(tempDir, { since: "--bad" })).toThrow(/Governance violation/);
+    expect(() => exportNotesJsonl(tempDir, { since: "refs/notes/lognexus" })).toThrow(
+      /Governance violation/,
+    );
+    expect(() => exportNotesJsonl(tempDir, { since: "nonexistent-ref" })).toThrow(
+      /Governance violation/,
+    );
+  });
+
+  it("filters by numeric (#40, 40) and alphanumeric (PROJ-12) issue identifiers without prefix collisions", () => {
+    const sha400 = commitFile(
+      "src/issue400.ts",
+      "export const other = 400;\n",
+      "feat(#400/T1): unrelated issue mentioning 40 items",
+      "2026-11-20T10:05:00Z",
+    );
+    attachNote(jsonNote(400, "T1", "Unrelated 400"), sha400, { cwd: tempDir });
+
+    const byNumber = exportNotesJsonl(tempDir, { issue: "40" });
+    expect(byNumber.count).toBe(2);
+    const shas40 = byNumber.jsonl
+      .trimEnd()
+      .split("\n")
+      .map((line) => (JSON.parse(line) as ExportedNoteRecord).sha);
+    expect(shas40).toEqual([shaFirstNoted, shaLegacyNoted]);
+
+    const byHash = exportNotesJsonl(tempDir, { issue: "#40" });
+    expect(byHash.count).toBe(2);
+    expect(byHash.jsonl).toBe(byNumber.jsonl);
+
+    const byJira = exportNotesJsonl(tempDir, { issue: "PROJ-12" });
+    expect(byJira.count).toBe(1);
+    expect((JSON.parse(byJira.jsonl.trim()) as ExportedNoteRecord).sha).toBe(shaSecondNoted);
+  });
+
+  it("confines outputPath inside targetDir and rejects path traversal even with zero notes", () => {
+    const nestedRel = ".lognexus/exports/notes-archive.jsonl";
+    const result = exportNotesJsonl(tempDir, { outputPath: nestedRel });
+    const expectedPath = resolve(tempDir, nestedRel);
+
+    expect(result.outputPath).toBe(expectedPath);
+    expect(existsSync(expectedPath)).toBe(true);
+    expect(readFileSync(expectedPath, "utf8")).toBe(result.jsonl);
+
+    expect(() => exportNotesJsonl(tempDir, { outputPath: "../outside.jsonl" })).toThrow(
+      /Governance violation: Path traversal detected/,
+    );
+
+    const outsideAbsolute = resolve(tempDir, "..", "outside-abs.jsonl");
+    expect(() => exportNotesJsonl(tempDir, { outputPath: outsideAbsolute })).toThrow(
+      /Governance violation: Path traversal detected/,
+    );
+
+    const emptyDir = mkdtempSync(join(tmpdir(), "lognexus-export-empty-"));
+    try {
+      execFileSync("git", ["init"], { cwd: emptyDir, stdio: "ignore", shell: false });
+      expect(() => exportNotesJsonl(emptyDir, { outputPath: "../outside.jsonl" })).toThrow(
+        /Governance violation: Path traversal detected/,
+      );
+
+      const emptyOut = exportNotesJsonl(emptyDir, { outputPath: ".lognexus/empty.jsonl" });
+      expect(emptyOut).toEqual({
+        count: 0,
+        jsonl: "",
+        outputPath: resolve(emptyDir, ".lognexus/empty.jsonl"),
+      });
+      expect(readFileSync(emptyOut.outputPath as string, "utf8")).toBe("");
+    } finally {
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  it("handles zero matching notes and custom notes refs cleanly", () => {
+    const noMatch = exportNotesJsonl(tempDir, { issue: "9999" });
+    expect(noMatch).toEqual({ count: 0, jsonl: "", outputPath: null });
+
+    attachNote('{"custom":true}', shaUnnoted, { cwd: tempDir, ref: "refs/notes/custom" });
+    const custom = exportNotesJsonl(tempDir, { ref: "refs/notes/custom" });
+    expect(custom.count).toBe(1);
+    const parsed = JSON.parse(custom.jsonl.trim()) as ExportedNoteRecord;
+    expect(parsed.sha).toBe(shaUnnoted);
+    expect(parsed.note).toEqual({ custom: true });
+
+    expect(() => exportNotesJsonl(tempDir, { ref: "--bad-ref" })).toThrow(/Governance violation/);
   });
 });

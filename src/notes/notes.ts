@@ -1,6 +1,9 @@
 import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { extractTrailers } from "../audit/audit.js";
-import { validateGitReference } from "../git/safe.js";
+import { rejectNotesReference, validateGitReference, verifyCommitish } from "../git/safe.js";
+import { resolveConfinedOutputPath } from "../telemetry/report.js";
 
 export const DEFAULT_NOTES_REF = "refs/notes/lognexus";
 
@@ -306,4 +309,195 @@ export function fetchNotes(remote: string = "origin", options: NoteOptions = {})
   } catch {
     return false;
   }
+}
+
+export interface NoteExportOptions {
+  /** Exclude commits reachable from this commitish (`<since>..HEAD`). */
+  since?: string;
+  /** Restrict exported records to a ticket identifier (e.g. `40`, `#40`, `PROJ-12`). */
+  issue?: string;
+  /** Confined relative or in-repo output file path for the generated JSONL archive. */
+  outputPath?: string;
+  /** Git Notes reference to export from. Defaults to `refs/notes/lognexus`. */
+  ref?: string;
+}
+
+export interface ExportedNoteRecord {
+  sha: string;
+  timestamp: string;
+  subject: string;
+  note: Record<string, unknown> | string;
+}
+
+export interface NoteExportResult {
+  count: number;
+  jsonl: string;
+  outputPath: string | null;
+}
+
+function normalizeIssueIdentifier(issue: string | number): string {
+  let raw = String(issue).trim();
+  while (raw.startsWith("#")) raw = raw.slice(1);
+  const numeric = Number.parseInt(raw, 10);
+  if (raw !== "" && String(numeric) === raw) return String(numeric);
+  return raw.toUpperCase();
+}
+
+function isTokenChar(code: number): boolean {
+  return (
+    (code >= 97 && code <= 122) || // a-z
+    (code >= 48 && code <= 57) || // 0-9
+    code === 95 || // _
+    code === 45 // -
+  );
+}
+
+function hasDelimitedToken(haystack: string, token: string): boolean {
+  if (token === "") return false;
+  let fromIndex = 0;
+  while (fromIndex <= haystack.length - token.length) {
+    const idx = haystack.indexOf(token, fromIndex);
+    if (idx === -1) return false;
+    const beforeOk = idx === 0 || !isTokenChar(haystack.charCodeAt(idx - 1));
+    const afterIdx = idx + token.length;
+    const afterOk = afterIdx === haystack.length || !isTokenChar(haystack.charCodeAt(afterIdx));
+    if (beforeOk && afterOk) return true;
+    fromIndex = idx + 1;
+  }
+  return false;
+}
+
+function parseNoteExportContent(rawNote: string): Record<string, unknown> | string {
+  const trimmed = rawNote.trim();
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Plain-text or legacy notes remain trimmed strings.
+  }
+  return trimmed;
+}
+
+function matchesExportIssue(
+  normalizedIssue: string,
+  subject: string,
+  body: string,
+  note: Record<string, unknown> | string,
+): boolean {
+  if (normalizedIssue === "") return false;
+
+  if (typeof note === "object" && note !== null) {
+    const issueField = note.issue;
+    if (issueField !== null && typeof issueField === "object" && !Array.isArray(issueField)) {
+      const noteIssueId = (issueField as { id?: unknown }).id;
+      if (typeof noteIssueId === "number" || typeof noteIssueId === "string") {
+        if (normalizeIssueIdentifier(noteIssueId) === normalizedIssue) return true;
+      }
+    }
+  }
+
+  const lowered = normalizedIssue.toLowerCase();
+  const haystack = `${subject}\n${body}`.toLowerCase();
+  const scopedCandidates = [`(#${lowered}/`, `(#${lowered})`, `(${lowered}/`, `(${lowered})`];
+  if (scopedCandidates.some((candidate) => haystack.includes(candidate))) return true;
+
+  const isNumeric = String(Number.parseInt(normalizedIssue, 10)) === normalizedIssue;
+  return isNumeric
+    ? hasDelimitedToken(haystack, `#${lowered}`)
+    : hasDelimitedToken(haystack, lowered);
+}
+
+function writeConfinedJsonl(outputPath: string | null, jsonl: string): void {
+  if (outputPath === null) return;
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, jsonl, "utf8");
+}
+
+/**
+ * Exports Git Notes locally in deterministic topological oldest-to-newest JSONL order.
+ * Validates all Git references and confines optional file output inside `targetDir`.
+ */
+export function exportNotesJsonl(
+  targetDir: string = process.cwd(),
+  options: NoteExportOptions = {},
+): NoteExportResult {
+  const ref = validateRef(options.ref ?? DEFAULT_NOTES_REF);
+
+  const trimmedOutputPath = options.outputPath?.trim() ?? "";
+  const resolvedOutputPath =
+    trimmedOutputPath !== "" ? resolveConfinedOutputPath(targetDir, trimmedOutputPath) : null;
+
+  const sinceInput = options.since?.trim() ?? "";
+  let rangeArg = "HEAD";
+  if (sinceInput !== "") {
+    const safeSince = rejectNotesReference(sinceInput, "--since");
+    const sinceSha = verifyCommitish(safeSince, targetDir);
+    rangeArg = `${sinceSha}..HEAD`;
+  }
+
+  try {
+    verifyCommitish("HEAD", targetDir);
+  } catch {
+    writeConfinedJsonl(resolvedOutputPath, "");
+    return { count: 0, jsonl: "", outputPath: resolvedOutputPath };
+  }
+
+  const notes = listNotes({ cwd: targetDir, ref });
+  if (notes.length === 0) {
+    writeConfinedJsonl(resolvedOutputPath, "");
+    return { count: 0, jsonl: "", outputPath: resolvedOutputPath };
+  }
+
+  const notedShas = new Set<string>(notes.map((entry) => entry.commitSha));
+  const issueInput = options.issue?.trim() ?? "";
+  const normalizedIssue = issueInput !== "" ? normalizeIssueIdentifier(issueInput) : null;
+
+  const rawLog = execFileSync(
+    "git",
+    ["log", "--topo-order", "--reverse", "--format=%H%x00%cI%x00%s%x00%B%x1e", rangeArg],
+    {
+      cwd: targetDir,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    },
+  );
+
+  const records: ExportedNoteRecord[] = [];
+  for (const rawRecord of rawLog.split("\u001e")) {
+    const cleaned = rawRecord.trimStart();
+    if (cleaned === "") continue;
+
+    const [rawSha = "", timestamp = "", subject = "", ...bodyParts] = cleaned.split("\u0000");
+    const sha = rawSha.trim();
+    if (sha === "" || !notedShas.has(sha)) continue;
+
+    const rawNote = getNote(sha, { cwd: targetDir, ref });
+    if (rawNote === null) continue;
+
+    const note = parseNoteExportContent(rawNote);
+    const body = bodyParts.join("\u0000");
+    if (normalizedIssue !== null && !matchesExportIssue(normalizedIssue, subject, body, note)) {
+      continue;
+    }
+
+    records.push({
+      sha,
+      timestamp: timestamp.trim(),
+      subject: subject.trim(),
+      note,
+    });
+  }
+
+  const jsonl =
+    records.length > 0 ? `${records.map((record) => JSON.stringify(record)).join("\n")}\n` : "";
+  writeConfinedJsonl(resolvedOutputPath, jsonl);
+
+  return {
+    count: records.length,
+    jsonl,
+    outputPath: resolvedOutputPath,
+  };
 }

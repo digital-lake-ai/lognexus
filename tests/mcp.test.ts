@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -498,15 +498,80 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
   });
 
   describe("resources", () => {
-    it("lists lognexus://state and lognexus://routing", async () => {
+    it("lists lognexus://state, lognexus://routing, and lognexus://handoff", async () => {
       const res = await rpc("resources/list", undefined, tempDir);
       const { resources } = res.result as { resources: ReturnType<typeof listMcpResources> };
 
-      expect(resources.map((r) => r.uri)).toEqual(["lognexus://state", "lognexus://routing"]);
+      expect(resources.map((r) => r.uri)).toEqual([
+        "lognexus://state",
+        "lognexus://routing",
+        "lognexus://handoff",
+      ]);
       expect(resources.find((r) => r.uri === "lognexus://state")?.mimeType).toBe(
         "application/json",
       );
       expect(resources.find((r) => r.uri === "lognexus://routing")?.mimeType).toBe("text/markdown");
+      expect(resources.find((r) => r.uri === "lognexus://handoff")?.mimeType).toBe("text/markdown");
+    });
+
+    it("reads lognexus://handoff read-only on a clean repository without creating handoff.md", async () => {
+      const res = await rpc("resources/read", { uri: "lognexus://handoff" }, tempDir);
+      const { contents } = res.result as ResourceReadResult;
+
+      expect(contents).toHaveLength(1);
+      expect(contents[0].uri).toBe("lognexus://handoff");
+      expect(contents[0].mimeType).toBe("text/markdown");
+      expect(contents[0].text).toContain("# LogNexus Context Handoff");
+      expect(contents[0].text).toContain("**Issue:** none active");
+      expect(existsSync(join(tempDir, ".lognexus", "handoff.md"))).toBe(false);
+    });
+
+    it("reads lognexus://handoff with active issue and subtask contract without disk writes", async () => {
+      saveState(
+        {
+          schemaVersion: "1.0.0",
+          activeIssue: {
+            id: 38,
+            title: "Expose handoff MCP resource",
+            branch: "issue/38-handoff-resource",
+            phase: "commit",
+            tier: "tier-2",
+            readiness: "ready",
+          },
+          currentSubtask: {
+            id: "T2",
+            title: "Add readHandoffResource",
+            status: "in-progress",
+            contract: {
+              allowedFiles: ["src/mcp/resources.ts", "tests/mcp.test.ts"],
+              forbiddenFiles: ["src/mcp/tools.ts"],
+              decisionBudget: "none",
+            },
+          },
+          completedSubtasks: [],
+          lastSync: new Date().toISOString(),
+        },
+        tempDir,
+      );
+
+      const handoffPath = join(tempDir, ".lognexus", "handoff.md");
+      rmSync(handoffPath, { force: true });
+      expect(existsSync(handoffPath)).toBe(false);
+
+      const res = await rpc("resources/read", { uri: "lognexus://handoff" }, tempDir);
+      const { contents } = res.result as ResourceReadResult;
+
+      expect(contents).toHaveLength(1);
+      expect(contents[0].uri).toBe("lognexus://handoff");
+      expect(contents[0].mimeType).toBe("text/markdown");
+      expect(contents[0].text).toContain("# LogNexus Context Handoff");
+      expect(contents[0].text).toContain("#38 — Expose handoff MCP resource");
+      expect(contents[0].text).toContain("issue/38-handoff-resource");
+      expect(contents[0].text).toContain("**ID:** T2");
+      expect(contents[0].text).toContain("Add readHandoffResource");
+      expect(contents[0].text).toContain("`src/mcp/resources.ts`");
+      expect(contents[0].text).toContain("`tests/mcp.test.ts`");
+      expect(existsSync(handoffPath)).toBe(false);
     });
 
     it("reads lognexus://state as JSON matching the persisted state", async () => {

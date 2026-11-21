@@ -122,6 +122,8 @@ describe("CLI --help & Biome schema parity", () => {
     expect(usage).toContain("--isolation");
     expect(usage).toContain("--swarm-workers");
     expect(usage).toContain("--swarm-posts");
+    expect(usage).toContain("lognexus://handoff");
+    expect(usage).toContain("export [--since <ref>]");
   });
 
   it("documents the scoped telemetry subcommands in printUsage()", () => {
