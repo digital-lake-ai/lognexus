@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T15:15:25.266Z",
+  "issue": {
+    "id": 80,
+    "title": "feat(doctor,audit): add cross-platform doctor --mcp validation (#39) and .lognexus/policy.json profiles (#42)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Wire lognexus doctor --mcp CLI flag, public exports, and CLI tests",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/cli.ts",
+        "src/index.ts",
+        "tests/packaging.test.ts",
+        "tests/cli-help.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run version:check && npm run lint && npx vitest run tests/packaging.test.ts tests/cli-help.test.ts tests/doctor.test.ts tests/audit.test.ts && npm run build",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 2,
+    "posts": 172
+  }
+}
