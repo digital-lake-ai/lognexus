@@ -62,6 +62,16 @@ describe("getProjectStatus", () => {
       expect(status.recommendedTier).toContain("Claude Fable 5.2");
       expect(status.recommendedTier).toContain("Mythos 5.2");
       expect(status.recommendedTier).not.toContain("Gemini");
+
+      execFileSync("git", ["checkout", "-b", "issue/76-claude"], {
+        cwd: dir,
+        stdio: "ignore",
+        shell: false,
+      });
+      const claudeIssue = getProjectStatus(dir);
+      expect(claudeIssue.recommendedTier).toBe("tier-3 (Scoped Execution: Claude Haiku 5.5)");
+      expect(claudeIssue.recommendedTier).not.toContain("Sonnet 5.5");
+      expect(claudeIssue.recommendedTier).not.toContain("GPT-6.2 Sol");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -85,6 +95,8 @@ describe("getProjectStatus", () => {
       const codexIssue = getProjectStatus(codexDir);
       expect(codexIssue.recommendedTier).toContain("GPT-6 Luna");
       expect(codexIssue.recommendedTier).toContain("codex-mini");
+      expect(codexIssue.recommendedTier).not.toContain("Sonnet 5.5");
+      expect(codexIssue.recommendedTier).not.toContain("GPT-6.2 Sol");
 
       execFileSync("git", ["init", "-b", "main"], {
         cwd: copilotDir,
@@ -105,9 +117,30 @@ describe("getProjectStatus", () => {
       const copilotIssue = getProjectStatus(copilotDir);
       expect(copilotIssue.recommendedTier).toContain("Claude Haiku 5.5");
       expect(copilotIssue.recommendedTier).toContain("GPT-6 Luna");
+      expect(copilotIssue.recommendedTier).not.toContain("Sonnet 5.5");
+      expect(copilotIssue.recommendedTier).not.toContain("GPT-6.2 Sol");
     } finally {
       rmSync(codexDir, { recursive: true, force: true });
       rmSync(copilotDir, { recursive: true, force: true });
+    }
+  });
+
+  it("recommends pure tier-3 Gemini 3.8 Flash for antigravity on active issue branches", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lognexus-status-antigravity-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: dir, stdio: "ignore", shell: false });
+      mkdirSync(join(dir, ".gemini"));
+      execFileSync("git", ["checkout", "-b", "issue/78-antigravity"], {
+        cwd: dir,
+        stdio: "ignore",
+        shell: false,
+      });
+      const status = getProjectStatus(dir);
+      expect(status.ecosystemProfile).toBe("single-client (antigravity)");
+      expect(status.recommendedTier).toBe("tier-3 (Scoped Execution: Gemini 3.8 Flash)");
+      expect(status.recommendedTier).not.toContain("Hydrogen");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 

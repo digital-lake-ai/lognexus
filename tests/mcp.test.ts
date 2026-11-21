@@ -609,7 +609,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain("real runtime model identity");
       expect(text).toContain("keep telemetry `100%` silent in the background");
       expect(text).toContain("Gemini 4 Carbon / Argon / Neon");
-      expect(text).toContain("(`Neon`/`Carbon`/`Argon`/`Opus`)");
+      expect(text).toContain("(`Neon`/`Carbon`/`Argon`/`Opus`/`Claude Fable 5.2`/`GPT-6.2 Astra`)");
     });
 
     it("gets the lognexus-review prompt with the gate checklist", async () => {
