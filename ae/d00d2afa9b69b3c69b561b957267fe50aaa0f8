@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T13:36:28.162Z",
+  "issue": {
+    "id": 78,
+    "title": "chore(release): add 7-surface version:sync engine, CI lockstep gate, PyPI/npm badges, and code polish",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Add 7-surface version:sync engine and dynamic test version parity",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "scripts/sync-version.mjs",
+        "package.json",
+        "tests/packaging.test.ts",
+        "tests/e2e.test.ts",
+        "tests/mcp.test.ts",
+        "tests/sync-version.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "node scripts/sync-version.mjs --check && npm run lint && npx vitest run tests/packaging.test.ts tests/sync-version.test.ts tests/mcp.test.ts tests/e2e.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 2,
+    "posts": 158
+  }
+}
