@@ -1,0 +1,38 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T16:06:05.524Z",
+  "issue": {
+    "id": 82,
+    "title": "feat(note,mcp): add local JSONL note export (#40) and lognexus://handoff MCP resource (#38)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Expose read-only lognexus://handoff MCP resource (#38)",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/mcp/resources.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run version:check && npm run lint && npx vitest run tests/mcp.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 2,
+    "posts": 179
+  }
+}
