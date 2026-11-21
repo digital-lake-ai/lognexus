@@ -114,6 +114,7 @@ describe("CLI --help & Biome schema parity", () => {
     for (const tool of listMcpTools()) {
       expect(usage).toContain(tool.name);
     }
+    expect(usage).toContain("doctor [--mcp]");
     expect(usage).toContain("--stage-allowed");
     expect(usage).toContain("--prompt");
     expect(usage).toContain("--protect-tokens");
