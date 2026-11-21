@@ -1,11 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_ROUTING_TEMPLATE } from "../scaffold.js";
+import { generateContextHandoff, renderContextHandoff } from "../state/handoff.js";
 import { loadState } from "../state/manager.js";
 
 export const MCP_RESOURCE_PREFIX = "lognexus://";
 export const STATE_RESOURCE_URI = `${MCP_RESOURCE_PREFIX}state`;
 export const ROUTING_RESOURCE_URI = `${MCP_RESOURCE_PREFIX}routing`;
+export const HANDOFF_RESOURCE_URI = `${MCP_RESOURCE_PREFIX}handoff`;
 
 export interface ResourceDefinition {
   uri: string;
@@ -44,6 +46,13 @@ const RESOURCE_DEFINITIONS: ResourceDefinition[] = [
     name: "Model-tier routing configuration",
     description:
       "Multi-model routing rules from .lognexus/routing.md, or the default tier taxonomy when the project has not been initialized.",
+    mimeType: "text/markdown",
+  },
+  {
+    uri: HANDOFF_RESOURCE_URI,
+    name: "Context Handoff Snapshot",
+    description:
+      "Synthesized read-only Markdown handoff snapshot of the active issue, subtask contract, context budget, and recent governed commits.",
     mimeType: "text/markdown",
   },
 ];
@@ -90,6 +99,18 @@ export function readRoutingResource(targetDir: string = process.cwd()): Resource
   };
 }
 
+export function readHandoffResource(targetDir: string = process.cwd()): ResourceReadResult {
+  return {
+    contents: [
+      {
+        uri: HANDOFF_RESOURCE_URI,
+        mimeType: "text/markdown",
+        text: renderContextHandoff(generateContextHandoff(targetDir)),
+      },
+    ],
+  };
+}
+
 export function readMcpResource(
   uri: string,
   targetDir: string = process.cwd(),
@@ -99,6 +120,8 @@ export function readMcpResource(
       return readStateResource(targetDir);
     case ROUTING_RESOURCE_URI:
       return readRoutingResource(targetDir);
+    case HANDOFF_RESOURCE_URI:
+      return readHandoffResource(targetDir);
     default:
       throw new McpResourceError(`Unknown LogNexus resource: '${uri}'.`);
   }
