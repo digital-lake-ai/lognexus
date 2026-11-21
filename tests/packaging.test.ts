@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { checkVersionParity, readVersionSurfaces } from "../scripts/sync-version.mjs";
 import { listMcpTools } from "../src/mcp/tools.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -51,6 +52,32 @@ describe("MCP Registry manifest (server.json)", () => {
     expect(pyproject).toMatch(/^name = "lognexus-mcp"$/m);
     expect(pyproject).toMatch(new RegExp(`^version = "${server.version}"$`, "m"));
     expect(launcher).toContain(`__version__ = "${server.version}"`);
+  });
+
+  it("keeps all 7 version surfaces and minCriticalVersion in parity with package.json", () => {
+    const pkg = JSON.parse(readRepoFile("package.json")) as {
+      version: string;
+      lognexusPolicy?: { minCriticalVersion?: string };
+    };
+    const surfaces = readVersionSurfaces(repoRoot);
+    const parity = checkVersionParity(repoRoot);
+
+    expect(parity.ok).toBe(true);
+    expect(parity.mismatches).toEqual([]);
+    expect(surfaces.packageJson.version).toBe(pkg.version);
+    expect(surfaces.packageJson.minCriticalVersion).toBe("0.0.0");
+    expect(surfaces.packageLock.present).toBe(true);
+    expect(surfaces.packageLock.version).toBe(pkg.version);
+    expect(surfaces.packageLock.rootPackageVersion).toBe(pkg.version);
+    expect(surfaces.claudePlugin.version).toBe(pkg.version);
+    expect(surfaces.serverJson.version).toBe(pkg.version);
+    expect(surfaces.serverJson.packageVersions.length).toBeGreaterThanOrEqual(2);
+    for (const entry of surfaces.serverJson.packageVersions) {
+      expect(entry.version).toBe(pkg.version);
+    }
+    expect(surfaces.pyprojectToml.version).toBe(pkg.version);
+    expect(surfaces.pythonInit.version).toBe(pkg.version);
+    expect(surfaces.cliFallback.version).toBe(pkg.version);
   });
 });
 

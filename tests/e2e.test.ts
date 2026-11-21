@@ -88,10 +88,13 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
       "export const auth = true;",
       "feat(#42/T1): add user authentication\n\nAuthored-by: deepseek/chat (kimi-code)\n",
     );
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+      version: string;
+    };
     const notePayload = attachCurrentStateToCommit("HEAD", { cwd: tempDir });
     expect(notePayload.generator).toBe("LogNexus");
     expect(notePayload.subtask?.id).toBe("T1");
-    expect(notePayload.version).toBe("1.4.1");
+    expect(notePayload.version).toBe(pkg.version);
 
     const noteRaw = getNote("HEAD", { cwd: tempDir });
     expect(noteRaw).not.toBeNull();
@@ -148,7 +151,6 @@ describe("LogNexus End-to-End (E2E) Golden Path Lifecycle", () => {
     expect((mcpTimeline.result as ToolCallResult).content[0].text).toContain("`T1`");
 
     // 9b. Every published surface must advertise the same version (Glama handshake parity)
-    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     const mcpInitializeRaw = await processMcpMessage(
       JSON.stringify({ jsonrpc: "2.0", id: 3, method: "initialize", params: {} }),
       tempDir,

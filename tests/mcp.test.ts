@@ -65,12 +65,16 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
         serverInfo: { name: string; version: string };
       };
 
+      const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+        version: string;
+      };
+
       expect(result.protocolVersion).toBe("2024-11-05");
       expect(result.capabilities).toHaveProperty("tools");
       expect(result.capabilities).toHaveProperty("resources");
       expect(result.capabilities).toHaveProperty("prompts");
       expect(result.serverInfo.name).toBe("lognexus");
-      expect(result.serverInfo.version).toBe("1.4.1");
+      expect(result.serverInfo.version).toBe(pkg.version);
     });
 
     it("advertises the same version as the published package manifest", async () => {
