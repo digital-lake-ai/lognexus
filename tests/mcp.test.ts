@@ -65,12 +65,16 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
         serverInfo: { name: string; version: string };
       };
 
+      const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+        version: string;
+      };
+
       expect(result.protocolVersion).toBe("2024-11-05");
       expect(result.capabilities).toHaveProperty("tools");
       expect(result.capabilities).toHaveProperty("resources");
       expect(result.capabilities).toHaveProperty("prompts");
       expect(result.serverInfo.name).toBe("lognexus");
-      expect(result.serverInfo.version).toBe("1.4.1");
+      expect(result.serverInfo.version).toBe(pkg.version);
     });
 
     it("advertises the same version as the published package manifest", async () => {
@@ -605,7 +609,7 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(text).toContain("real runtime model identity");
       expect(text).toContain("keep telemetry `100%` silent in the background");
       expect(text).toContain("Gemini 4 Carbon / Argon / Neon");
-      expect(text).toContain("(`Neon`/`Carbon`/`Argon`/`Opus`)");
+      expect(text).toContain("(`Neon`/`Carbon`/`Argon`/`Opus`/`Claude Fable 5.2`/`GPT-6.2 Astra`)");
     });
 
     it("gets the lognexus-review prompt with the gate checklist", async () => {

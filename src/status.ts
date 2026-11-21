@@ -278,11 +278,11 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
 > = {
   antigravity: {
     base: "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon)",
-    issue: "tier-3 (Scoped Execution: Gemini 3.8 Flash / Gemini 4 Hydrogen)",
+    issue: "tier-3 (Scoped Execution: Gemini 3.8 Flash)",
   },
   "claude-code": {
     base: "tier-1 (Reasoning / Planning: Claude Fable 5.2 / Mythos 5.2 / Claude Opus 5.5)",
-    issue: "tier-3 (Scoped Execution: Claude Haiku 5.5 / Claude Sonnet 5.5)",
+    issue: "tier-3 (Scoped Execution: Claude Haiku 5.5)",
   },
   cursor: {
     base: "tier-1 (Reasoning / Planning: Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon / Cursor Frontier)",
@@ -291,12 +291,11 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
   },
   codex: {
     base: "tier-1 (Reasoning / Planning: OpenAI GPT-6.2 Astra / o3)",
-    issue: "tier-3 (Scoped Execution: OpenAI GPT-6 Luna / codex-mini / GPT-6.2 Sol)",
+    issue: "tier-3 (Scoped Execution: OpenAI GPT-6 Luna / codex-mini)",
   },
   copilot: {
     base: "tier-1 (Reasoning / Planning: Claude Fable 5.2 / GPT-6.2 Astra)",
-    issue:
-      "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna / Claude Sonnet 5.5 / GPT-6.2 Sol)",
+    issue: "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna)",
   },
   kimi: {
     base: "tier-1 (Reasoning / Planning: Kimi K3 Thinking / Tier-1)",

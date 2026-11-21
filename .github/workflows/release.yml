@@ -109,6 +109,23 @@ jobs:
         if: steps.detect.outputs.should_release == 'true'
         run: npm ci
 
+      - name: Enforce 7-surface version lockstep parity
+        if: steps.detect.outputs.should_release == 'true'
+        run: npm run version:check
+
+      - name: Verify CHANGELOG release heading
+        if: steps.detect.outputs.should_release == 'true'
+        env:
+          VERSION: ${{ steps.detect.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f CHANGELOG.md ] || ! grep -Fq "## [${VERSION}]" CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::Release ${VERSION} is missing a matching '## [${VERSION}]' heading in CHANGELOG.md."
+            exit 1
+          fi
+          echo "Verified CHANGELOG.md contains ## [${VERSION}]."
+
       - name: Lint check
         if: steps.detect.outputs.should_release == 'true'
         run: npm run lint
@@ -153,7 +170,6 @@ jobs:
 
       - name: Publish to PyPI (OIDC Trusted Publisher)
         if: steps.detect.outputs.should_release == 'true'
-        continue-on-error: true
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist-pypi/

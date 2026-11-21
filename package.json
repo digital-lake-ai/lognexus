@@ -13,6 +13,8 @@
     "build": "tsc",
     "lint": "biome check .",
     "test": "vitest run",
+    "version:check": "node scripts/sync-version.mjs --check",
+    "version:sync": "node scripts/sync-version.mjs",
     "prepublishOnly": "npm run build && npm run test"
   },
   "keywords": [

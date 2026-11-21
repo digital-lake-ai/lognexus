@@ -291,10 +291,7 @@ function stripCanonicalDecorations(collapsed: string): string {
     const rest = slug.slice("anthropic-".length);
     slug = rest.startsWith("claude-") ? `claude/${rest.slice("claude-".length)}` : `claude/${rest}`;
   }
-  if (slug.startsWith("openai-")) {
-    const rest = slug.slice("openai-".length);
-    slug = rest.startsWith("openai-") ? `openai/${rest.slice("openai-".length)}` : `openai/${rest}`;
-  }
+  if (slug.startsWith("openai-")) slug = `openai/${slug.slice("openai-".length)}`;
   if (slug.startsWith("gemini-")) slug = `gemini/${slug.slice("gemini-".length)}`;
   if (slug.startsWith("claude-")) slug = `claude/${slug.slice("claude-".length)}`;
   if (slug === "fable" || slug.startsWith("fable-")) slug = `claude/${slug}`;

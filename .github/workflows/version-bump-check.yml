@@ -1,6 +1,7 @@
 # Enforces the versioning policy from CONTRIBUTING.md:
-# any PR that touches commands/, skills/, or .claude-plugin/ must bump
-# .claude-plugin/plugin.json `version`.
+# 1. Every PR to main must keep all 7 version surfaces in lockstep (`sync-version.mjs --check`).
+# 2. Any PR that touches commands/, skills/, or .claude-plugin/ must bump `.claude-plugin/plugin.json` `version`.
+# 3. Any PR that bumps version must include a matching `## [X.Y.Z]` heading in `CHANGELOG.md`.
 
 name: Version bump check
 
@@ -17,7 +18,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify plugin.json version bump on gated paths
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Enforce 7-surface version lockstep parity
+        run: node scripts/sync-version.mjs --check
+
+      - name: Verify plugin.json version bump on gated paths and CHANGELOG entry
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -40,30 +49,29 @@ jobs:
             [ -n "$gated_hit" ] && break
           done <<<"$changed"
 
-          if [ -z "$gated_hit" ]; then
-            echo "No gated paths changed; version bump not required."
-            exit 0
-          fi
-
-          echo "Gated path changed (e.g. $gated_hit). Checking plugin.json version..."
-
           base_version=$(git show "$BASE_SHA:.claude-plugin/plugin.json" | jq -r .version)
           head_version=$(git show "$HEAD_SHA:.claude-plugin/plugin.json" | jq -r .version)
 
           echo "  base version: $base_version"
           echo "  head version: $head_version"
 
-          if [ "$base_version" = "$head_version" ]; then
+          if [ "$base_version" != "$head_version" ]; then
+            if [ ! -f CHANGELOG.md ] || ! grep -Fq "## [${head_version}]" CHANGELOG.md; then
+              echo "::error file=CHANGELOG.md::PR bumps version to ${head_version} without a matching '## [${head_version}]' heading in CHANGELOG.md."
+              exit 1
+            fi
+            echo "Version bumped from $base_version to $head_version (CHANGELOG.md verified)."
+          elif [ -n "$gated_hit" ]; then
             echo
-            echo "::error file=.claude-plugin/plugin.json::PR touches gated paths but plugin.json version is unchanged ($base_version)."
+            echo "::error file=.claude-plugin/plugin.json::PR touches gated paths (e.g. $gated_hit) but plugin.json version is unchanged ($base_version)."
             cat <<'MSG'
 
           This PR changes paths under commands/, skills/, or .claude-plugin/
           but does not bump .claude-plugin/plugin.json `version`.
 
-          See CONTRIBUTING.md "Versioning" section for the bump rule.
+          See CONTRIBUTING.md "Versioning Policy" section for the bump rule.
           MSG
             exit 1
+          else
+            echo "No gated paths changed; version bump not required."
           fi
-
-          echo "Version bumped from $base_version to $head_version."

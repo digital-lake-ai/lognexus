@@ -11,8 +11,10 @@
 <div align="center">
 
 [![CI](https://github.com/digital-lake-ai/lognexus/actions/workflows/ci.yml/badge.svg)](https://github.com/digital-lake-ai/lognexus/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/@digital-lake/lognexus?color=0969da&label=npm)](https://www.npmjs.com/package/@digital-lake/lognexus)
-[![npm downloads](https://img.shields.io/npm/dw/@digital-lake/lognexus?color=cb3837&logo=npm&label=downloads)](https://www.npmjs.com/package/@digital-lake/lognexus)
+[![npm version](https://img.shields.io/npm/v/@digital-lake/lognexus?color=0969da&logo=npm&label=npm)](https://www.npmjs.com/package/@digital-lake/lognexus)
+[![npm downloads](https://img.shields.io/npm/dm/@digital-lake/lognexus?color=cb3837&logo=npm&label=npm%20downloads)](https://www.npmjs.com/package/@digital-lake/lognexus)
+[![PyPI version](https://img.shields.io/pypi/v/lognexus-mcp?color=3775a9&logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/lognexus-mcp/)
+[![PyPI downloads](https://img.shields.io/pypi/dw/lognexus-mcp?color=3775a9&logo=pypi&logoColor=white&label=pypi%20downloads)](https://pypi.org/project/lognexus-mcp/)
 [![LogNexus MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/digital-lake-ai/lognexus/badges/score.svg)](https://glama.ai/mcp/servers/digital-lake-ai/lognexus)
 [![Organization](https://img.shields.io/badge/org-Digital_Lake-7c3aed)](https://github.com/digital-lake-ai)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Fuel_the_AI-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/digitallake)
