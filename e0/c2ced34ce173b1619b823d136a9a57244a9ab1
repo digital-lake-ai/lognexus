@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T13:46:28.304Z",
+  "issue": {
+    "id": 78,
+    "title": "chore(release): add 7-surface version:sync engine, CI lockstep gate, PyPI/npm badges, and code polish",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Add monthly npm and PyPI README badges and polish tier-3 labels",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "README.md",
+        "src/audit/audit.ts",
+        "src/mcp/prompts.ts",
+        "src/status.ts",
+        "tests/mcp.test.ts",
+        "tests/status.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run lint && npx vitest run tests/audit.test.ts tests/mcp.test.ts tests/status.test.ts",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 2,
+    "posts": 162
+  }
+}
