@@ -1,8 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hasStandaloneHelpFlag, main } from "../src/cli.js";
+import { attachNote } from "../src/notes/notes.js";
 
 describe("Universal CLI --help handling", () => {
   let tempDir: string;
@@ -199,5 +201,131 @@ describe("Universal CLI --help handling", () => {
 
     expect(process.exitCode).toBe(originalExitCode);
     expect(logs.join("\n")).toContain("[FAIL] LogNexus Rules:");
+  });
+
+  it("exits cleanly with code 0 on note export --help without running git", async () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("unexpected process.exit");
+    }) as never);
+
+    const code = await main(["note", "export", "--help"]);
+
+    expect(code).toBe(0);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(errors).toEqual([]);
+    expect(logs.join("\n")).toContain("Usage:");
+    expect(logs.join("\n")).toContain("export [--since <ref>]");
+  });
+
+  it("fails with process.exitCode = 1 on note export --unknown", async () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("unexpected process.exit");
+    }) as never);
+
+    await main(["note", "export", "--unknown"]);
+
+    expect(process.exitCode).toBe(1);
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(errors.join("\n")).toContain("[ERROR] Unknown note export option: --unknown");
+    expect(logs.join("\n")).toContain("Usage:");
+  });
+
+  it("outputs pure parseable JSONL to stdout without banner text on note export", async () => {
+    execSync("git init", { cwd: tempDir, stdio: "ignore" });
+    execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+    execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "sample.txt"), "sample data", "utf8");
+    execSync("git add sample.txt", { cwd: tempDir, stdio: "ignore" });
+    execSync('git commit -m "feat(#82/T1): add sample"', { cwd: tempDir, stdio: "ignore" });
+
+    attachNote(
+      JSON.stringify({ issue: { id: 82, title: "Export" }, subtask: { id: "T1" } }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const logs: string[] = [];
+    const stdoutChunks: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+      stdoutChunks.push(String(chunk));
+      return true;
+    });
+
+    const code = await main(["note", "export"]);
+
+    expect(code).toBe(0);
+    expect(errors).toEqual([]);
+    expect(logs).toEqual([]);
+    const fullStdout = stdoutChunks.join("");
+    expect(fullStdout).not.toContain("LogNexus CLI");
+    expect(fullStdout).not.toContain("Usage:");
+    const lines = fullStdout.trim().split("\n");
+    expect(lines.length).toBe(1);
+    const parsed = JSON.parse(lines[0]) as { subject: string; note: { subtask: { id: string } } };
+    expect(parsed.subject).toContain("feat(#82/T1): add sample");
+    expect(parsed.note.subtask.id).toBe("T1");
+  });
+
+  it("writes .jsonl file cleanly on note export -o .lognexus/notes-archive.jsonl", async () => {
+    execSync("git init", { cwd: tempDir, stdio: "ignore" });
+    execSync('git config user.name "Test Runner"', { cwd: tempDir, stdio: "ignore" });
+    execSync('git config user.email "test@example.com"', { cwd: tempDir, stdio: "ignore" });
+    writeFileSync(join(tempDir, "sample.txt"), "sample data", "utf8");
+    execSync("git add sample.txt", { cwd: tempDir, stdio: "ignore" });
+    execSync('git commit -m "feat(#82/T1): add sample"', { cwd: tempDir, stdio: "ignore" });
+
+    attachNote(
+      JSON.stringify({ issue: { id: 82, title: "Export" }, subtask: { id: "T1" } }),
+      "HEAD",
+      { cwd: tempDir },
+    );
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+      logs.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...parts: unknown[]) => {
+      errors.push(parts.map(String).join(" "));
+    });
+
+    const code = await main(["note", "export", "-o", ".lognexus/notes-archive.jsonl"]);
+
+    expect(code).toBe(0);
+    expect(errors).toEqual([]);
+    expect(logs.join("\n")).toContain(
+      "[OK] Exported 1 Git Note(s) to .lognexus/notes-archive.jsonl",
+    );
+
+    const exportedFile = join(tempDir, ".lognexus", "notes-archive.jsonl");
+    expect(existsSync(exportedFile)).toBe(true);
+    const content = readFileSync(exportedFile, "utf8");
+    const lines = content.trim().split("\n");
+    expect(lines.length).toBe(1);
+    const parsed = JSON.parse(lines[0]) as { subject: string };
+    expect(parsed.subject).toContain("feat(#82/T1): add sample");
   });
 });

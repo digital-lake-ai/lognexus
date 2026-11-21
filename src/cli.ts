@@ -8,7 +8,14 @@ import { executeAtomicCommit, type ParsedCommitArgs, parseCommitArgs } from "./c
 import { runDiagnostics } from "./doctor.js";
 import { startMcpServer } from "./mcp/server.js";
 import { attachCurrentStateToCommit } from "./notes/attach.js";
-import { fetchNotes, getNote, listNotes, pushNotes, searchNotesMemory } from "./notes/notes.js";
+import {
+  exportNotesJsonl,
+  fetchNotes,
+  getNote,
+  listNotes,
+  pushNotes,
+  searchNotesMemory,
+} from "./notes/notes.js";
 import { initProject } from "./scaffold.js";
 import {
   generateContextHandoff,
@@ -218,6 +225,8 @@ Note Subcommands:
   lognexus note [show] [commit]     Display LogNexus Git Note for commit (default: HEAD)
   lognexus note attach [commit]     Attach current session state as Git Note to commit
                                     [--swarm-workers <n>] [--swarm-posts <n>]
+  lognexus note export [--since <ref>] [--issue <id>] [-o|--output <path>]
+                                    Export Git Notes as local JSONL
   lognexus note list                List all commits with LogNexus Git Notes
   lognexus note search [query]      Recall past decisions stored in refs/notes/lognexus
                                     [--file <path>] [--author <model>] [--issue <num>]
@@ -245,7 +254,7 @@ MCP Server:
              lognexus_state_finish_task, lognexus_state_clear, lognexus_commit,
              lognexus_note_show, lognexus_note_attach, lognexus_timeline, lognexus_audit,
              lognexus_telemetry
-  Resources: lognexus://state, lognexus://routing
+  Resources: lognexus://state, lognexus://routing, lognexus://handoff
   Prompts:   lognexus-plan, lognexus-review
 
 Examples:
@@ -722,6 +731,58 @@ async function handleNote(args: string[]) {
         console.log(`[OK] Notes fetched from ${remote} successfully.\n`);
       } else {
         console.error(`[FAIL] Could not fetch notes from ${remote}.\n`);
+      }
+      break;
+    }
+
+    case "export": {
+      let since: string | undefined;
+      let issue: string | undefined;
+      let outputPath: string | undefined;
+
+      for (let i = 1; i < args.length; i += 1) {
+        const arg = args[i];
+        if (arg === "--help" || arg === "-h") {
+          printUsage();
+          return;
+        }
+        if (arg === "--since" || arg === "--issue" || arg === "-o" || arg === "--output") {
+          const val = args[i + 1];
+          if (val === undefined || val.startsWith("-")) {
+            console.error(`Missing value for '${arg}'.\n`);
+            printUsage();
+            process.exitCode = 1;
+            return;
+          }
+          if (arg === "--since") since = val;
+          else if (arg === "--issue") issue = val;
+          else outputPath = val;
+          i += 1;
+        } else if (arg.startsWith("-")) {
+          console.error(`[ERROR] Unknown note export option: ${arg}\n`);
+          printUsage();
+          process.exitCode = 1;
+          return;
+        } else {
+          console.error(`[ERROR] Unknown argument for note export: ${arg}\n`);
+          printUsage();
+          process.exitCode = 1;
+          return;
+        }
+      }
+
+      try {
+        const result = exportNotesJsonl(process.cwd(), { since, issue, outputPath });
+        if (outputPath) {
+          console.log(`[OK] Exported ${result.count} Git Note(s) to ${outputPath}\n`);
+        } else {
+          process.stdout.write(result.jsonl);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[ERROR] Note export failed: ${msg}\n`);
+        process.exitCode = 1;
+        return;
       }
       break;
     }
