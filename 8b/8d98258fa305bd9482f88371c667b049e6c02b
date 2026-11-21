@@ -1,0 +1,38 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T15:04:00.875Z",
+  "issue": {
+    "id": 80,
+    "title": "feat(doctor,audit): add cross-platform doctor --mcp validation (#39) and .lognexus/policy.json profiles (#42)",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Add Zod-validated .lognexus/policy.json audit severity profiles (#42)",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/audit/policy.ts",
+        "src/audit/audit.ts",
+        "tests/audit.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run version:check && npm run lint && npx vitest run tests/audit.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 2,
+    "posts": 168
+  }
+}
