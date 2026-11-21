@@ -34,23 +34,28 @@ LogNexus is an open-source orchestrator and Git-backed cognitive memory layer fo
 
 LogNexus follows [semver](https://semver.org/).
 
-The version lives in seven synchronized surfaces:
-- `package.json` (`version`) and `package-lock.json`
+The version lives in seven synchronized surfaces managed by `scripts/sync-version.mjs`:
+- `package.json` (`version`, preserving `lognexusPolicy.minCriticalVersion: "0.0.0"`)
+- `package-lock.json` (`version` and `packages[""].version`)
 - `.claude-plugin/plugin.json` (`version`)
-- `server.json` (`version` and `packages[*].version`)
-- `pyproject.toml` (`version`) and `python/lognexus_mcp/__init__.py` (`__version__`)
+- `server.json` (`version` and every `packages[*].version`)
+- `pyproject.toml` (`[project] version`)
+- `python/lognexus_mcp/__init__.py` (`__version__`)
 - `src/cli.ts` (`getCliVersion()` fallback)
 
-### Bump Rule
-If your PR modifies anything under:
-- `commands/`
-- `skills/`
-- `.claude-plugin/`
+Use the built-in npm scripts to verify parity or bump all seven surfaces atomically:
+```bash
+npm run version:check
+npm run version:sync <X.Y.Z>
+```
 
-Your PR **must** bump `.claude-plugin/plugin.json` `version` (and keep all seven version surfaces above synchronized). CI enforces the gated prefix check via `.github/workflows/version-bump-check.yml`.
+### Hybrid Trunk-Based Release Train
+LogNexus uses a **Hybrid Trunk-Based Release Train** workflow so `main`-sourced Claude Code plugins never drift from published `npm` / PyPI flags:
+- **Trunk PRs** (`src/`, `tests/`, `scripts/`, `README.md`, `CONTRIBUTING.md`, `.github/`): merge to `main` in lockstep at the current published version. `npm run version:check` runs on every PR via `.github/workflows/version-bump-check.yml` to enforce 7-surface parity without forcing a premature npm/PyPI release.
+- **Release Train PRs** (`commands/`, `skills/`, `.claude-plugin/`): any PR touching gated plugin paths **must** run `npm run version:sync <X.Y.Z>` across all seven surfaces and add a matching `## [<X.Y.Z>]` section to `CHANGELOG.md`. `.github/workflows/version-bump-check.yml` blocks gated PRs without both the version bump and the matching `CHANGELOG.md` heading.
 
 ### Releases
-Every version bump merged to `main` automatically triggers a GitHub Release and tag via `.github/workflows/release.yml`.
+Every version bump merged to `main` triggers `.github/workflows/release.yml`, which re-verifies `npm run version:check` and `CHANGELOG.md`, runs lint/tests/build, creates the Git tag and GitHub Release, and publishes strictly to both npm and PyPI via OIDC Trusted Publishers.
 
 ---
 
@@ -92,7 +97,8 @@ Before opening a PR:
 # Check cross-references and envelopes
 grep -rnE '(^|[^!:-])lognexus:[a-z]+' skills commands --include='*.md' | grep -vE '<!-- lognexus:'
 
-# Run lint and test suite (when working on runtime code)
+# Verify 7-surface version parity and run lint and test suite
+npm run version:check
 npm run lint
 npm test
 ```
