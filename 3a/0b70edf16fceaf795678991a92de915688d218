@@ -1,0 +1,40 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T16:15:50.859Z",
+  "issue": {
+    "id": 82,
+    "title": "feat(note,mcp): add local JSONL note export (#40) and lognexus://handoff MCP resource (#38)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "Wire lognexus note export CLI subcommand, exports, and usage tests",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/cli.ts",
+        "src/index.ts",
+        "tests/packaging.test.ts",
+        "tests/cli-help.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "src/mcp/server.ts",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "npm run version:check && npm run lint && npx vitest run tests/notes.test.ts tests/mcp.test.ts tests/packaging.test.ts tests/cli-help.test.ts && npm run build",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-3",
+  "swarm": {
+    "workers": 2,
+    "posts": 181
+  }
+}
