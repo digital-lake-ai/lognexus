@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, posix } from "node:path";
+import { loadAuditPolicy } from "./audit/policy.js";
 import { resolveRoutingProfile } from "./routing/profile.js";
 import {
   countPublishedReleases,
@@ -13,6 +15,13 @@ export interface DiagnosticCheck {
   name: string;
   status: "pass" | "warn" | "fail";
   message: string;
+}
+
+export interface DoctorOptions {
+  mcp?: boolean;
+  platform?: NodeJS.Platform;
+  homeDir?: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 export function checkGit(targetDir: string = process.cwd()): DiagnosticCheck {
@@ -98,25 +107,35 @@ export function checkRulesConfig(targetDir: string = process.cwd()): DiagnosticC
   const lognexusDir = join(targetDir, ".lognexus");
 
   if (existsSync(lognexusDir)) {
+    const auditPolicy = loadAuditPolicy(targetDir);
+    if (auditPolicy.exists && !auditPolicy.valid) {
+      return {
+        name: "LogNexus Rules",
+        status: "fail",
+        message: `Invalid .lognexus/policy.json: ${auditPolicy.errors.join("; ")}`,
+      };
+    }
+
+    const policySuffix = auditPolicy.exists ? `, policy: ${auditPolicy.profile}` : "";
     const profile = resolveRoutingProfile(targetDir);
     if (profile.hasRoutingFile) {
       if (profile.warnings.length > 0) {
         return {
           name: "LogNexus Rules",
           status: "warn",
-          message: `Found .lognexus/routing.md (routing mode: ${profile.routingMode}, orchestration: ${profile.orchestrationMode}, review_gate: ${profile.effectiveReviewGate}) — warning(s): ${profile.warnings.join("; ")}`,
+          message: `Found .lognexus/routing.md (routing mode: ${profile.routingMode}, orchestration: ${profile.orchestrationMode}, review_gate: ${profile.effectiveReviewGate})${policySuffix} — warning(s): ${profile.warnings.join("; ")}`,
         };
       }
       return {
         name: "LogNexus Rules",
         status: "pass",
-        message: `Found .lognexus/ (routing mode: ${profile.routingMode}, orchestration: ${profile.orchestrationMode}, review_gate: ${profile.effectiveReviewGate})`,
+        message: `Found .lognexus/ (routing mode: ${profile.routingMode}, orchestration: ${profile.orchestrationMode}, review_gate: ${profile.effectiveReviewGate})${policySuffix}`,
       };
     }
     return {
       name: "LogNexus Rules",
       status: "warn",
-      message: "Found .lognexus/ directory, but routing.md is missing (run 'lognexus init')",
+      message: `Found .lognexus/ directory, but routing.md is missing (run 'lognexus init')${policySuffix}`,
     };
   }
 
@@ -226,8 +245,294 @@ export function checkAgentEcosystem(targetDir: string = process.cwd()): Diagnost
   };
 }
 
-export function runDiagnostics(targetDir: string = process.cwd()): DiagnosticCheck[] {
-  return [
+interface McpCandidateFile {
+  label: string;
+  path: string;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizedBasename(value: string): string {
+  const forwardSlashed = value.trim().replace(/\\/g, "/");
+  return posix.basename(forwardSlashed).toLowerCase();
+}
+
+function resolveClaudeDesktopConfigPath(
+  platform: NodeJS.Platform,
+  home: string,
+  env: NodeJS.ProcessEnv,
+): string {
+  if (platform === "darwin") {
+    return join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+  }
+  if (platform === "win32") {
+    const appData =
+      env.APPDATA && env.APPDATA.trim() !== "" ? env.APPDATA : join(home, "AppData", "Roaming");
+    return join(appData, "Claude", "claude_desktop_config.json");
+  }
+  const xdgConfig =
+    env.XDG_CONFIG_HOME && env.XDG_CONFIG_HOME.trim() !== ""
+      ? env.XDG_CONFIG_HOME
+      : join(home, ".config");
+  return join(xdgConfig, "Claude", "claude_desktop_config.json");
+}
+
+function matchesNpmPackageArg(arg: string): boolean {
+  const normalized = arg.trim().toLowerCase();
+  return (
+    normalized === "@digital-lake/lognexus" || normalized.startsWith("@digital-lake/lognexus@")
+  );
+}
+
+function matchesPyPiPackageArg(arg: string): boolean {
+  const normalized = arg.trim().toLowerCase();
+  return (
+    normalized === "lognexus-mcp" ||
+    normalized.startsWith("lognexus-mcp@") ||
+    normalized.startsWith("lognexus-mcp==")
+  );
+}
+
+function isLogNexusServerEntry(serverName: string, entry: unknown): boolean {
+  if (serverName.toLowerCase().includes("lognexus")) {
+    return true;
+  }
+  if (!isPlainObject(entry)) {
+    return false;
+  }
+
+  if (typeof entry.command === "string") {
+    const lowerCmd = entry.command.toLowerCase();
+    const base = normalizedBasename(entry.command);
+    if (
+      lowerCmd.includes("@digital-lake/lognexus") ||
+      lowerCmd.includes("lognexus-mcp") ||
+      lowerCmd.includes("lognexus_mcp") ||
+      base === "lognexus" ||
+      base === "lognexus.cmd" ||
+      base === "lognexus.exe" ||
+      base === "lognexus-mcp" ||
+      base === "lognexus-mcp.exe"
+    ) {
+      return true;
+    }
+  }
+
+  if (Array.isArray(entry.args)) {
+    for (const arg of entry.args) {
+      if (typeof arg !== "string") continue;
+      const lowerArg = arg.toLowerCase();
+      const base = normalizedBasename(arg);
+      if (
+        lowerArg.includes("@digital-lake/lognexus") ||
+        lowerArg.includes("lognexus-mcp") ||
+        lowerArg.includes("lognexus_mcp") ||
+        base === "lognexus" ||
+        base === "lognexus.cmd"
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function validateLogNexusServerEntry(
+  candidateLabel: string,
+  serverName: string,
+  entry: unknown,
+): { valid: true; launcher: string } | { valid: false; error: string } {
+  if (!isPlainObject(entry)) {
+    return {
+      valid: false,
+      error: `${candidateLabel} (${serverName}): server entry must be an object`,
+    };
+  }
+
+  if (typeof entry.command !== "string" || entry.command.trim() === "") {
+    return {
+      valid: false,
+      error: `${candidateLabel} (${serverName}): missing or empty "command"`,
+    };
+  }
+
+  if (entry.args !== undefined) {
+    if (!Array.isArray(entry.args) || !entry.args.every((item) => typeof item === "string")) {
+      return {
+        valid: false,
+        error: `${candidateLabel} (${serverName}): "args" must be an array of strings`,
+      };
+    }
+  }
+
+  const command = entry.command.trim();
+  const baseCmd = normalizedBasename(command);
+  const args: string[] = Array.isArray(entry.args) ? entry.args : [];
+
+  if (baseCmd === "npx" || baseCmd === "npx.cmd" || baseCmd === "bunx" || baseCmd === "pnpm") {
+    const hasPkg = args.some(matchesNpmPackageArg);
+    const hasMcp = args.includes("mcp");
+    if (hasPkg && hasMcp) {
+      return { valid: true, launcher: `${candidateLabel} (${baseCmd} @digital-lake/lognexus mcp)` };
+    }
+    if (hasPkg && !hasMcp) {
+      return {
+        valid: false,
+        error: `${candidateLabel} (${serverName}): missing "mcp" subcommand argument for ${baseCmd} @digital-lake/lognexus`,
+      };
+    }
+  }
+
+  if (baseCmd === "lognexus" || baseCmd === "lognexus.cmd") {
+    if (args.includes("mcp")) {
+      return { valid: true, launcher: `${candidateLabel} (${baseCmd} mcp)` };
+    }
+    return {
+      valid: false,
+      error: `${candidateLabel} (${serverName}): missing "mcp" subcommand argument for ${baseCmd}`,
+    };
+  }
+
+  if (baseCmd === "node" || baseCmd === "node.exe") {
+    const firstArg = args[0];
+    const hasCliEntry =
+      typeof firstArg === "string" &&
+      (normalizedBasename(firstArg) === "cli.js" || firstArg.toLowerCase().includes("cli.js"));
+    if (hasCliEntry && args.includes("mcp")) {
+      return { valid: true, launcher: `${candidateLabel} (${baseCmd} cli.js mcp)` };
+    }
+  }
+
+  if (baseCmd === "uvx" || baseCmd === "uvx.exe" || baseCmd === "pipx") {
+    if (args.some(matchesPyPiPackageArg)) {
+      return { valid: true, launcher: `${candidateLabel} (${baseCmd} lognexus-mcp)` };
+    }
+  }
+
+  if (baseCmd === "lognexus-mcp" || baseCmd === "lognexus-mcp.exe") {
+    return { valid: true, launcher: `${candidateLabel} (${baseCmd})` };
+  }
+
+  if (
+    baseCmd === "python" ||
+    baseCmd === "python.exe" ||
+    baseCmd === "python3" ||
+    baseCmd === "python3.exe" ||
+    baseCmd === "py" ||
+    baseCmd === "py.exe"
+  ) {
+    const mIdx = args.indexOf("-m");
+    if (mIdx !== -1 && args[mIdx + 1] === "lognexus_mcp") {
+      return { valid: true, launcher: `${candidateLabel} (${baseCmd} -m lognexus_mcp)` };
+    }
+  }
+
+  return {
+    valid: false,
+    error: `${candidateLabel} (${serverName}): invalid LogNexus MCP command "${command} ${args.join(" ")}". Expected e.g. "npx -y @digital-lake/lognexus mcp" or "uvx lognexus-mcp"`,
+  };
+}
+
+/**
+ * Inspects Claude Desktop, Cursor, VS Code, and workspace MCP client configs
+ * without modifying any file on disk.
+ */
+export function checkMcpClientConfigs(
+  targetDir: string = process.cwd(),
+  options: DoctorOptions = {},
+): DiagnosticCheck {
+  const platform = options.platform ?? process.platform;
+  const home = options.homeDir ?? homedir();
+  const env = options.env ?? process.env;
+
+  const candidates: McpCandidateFile[] = [
+    { label: "Claude Desktop", path: resolveClaudeDesktopConfigPath(platform, home, env) },
+    { label: "Cursor", path: join(targetDir, ".cursor", "mcp.json") },
+    { label: "VS Code", path: join(targetDir, ".vscode", "mcp.json") },
+    { label: "Workspace", path: join(targetDir, ".mcp.json") },
+  ];
+
+  const failures: string[] = [];
+  const validEntries: string[] = [];
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate.path)) {
+      continue;
+    }
+
+    let parsed: unknown;
+    try {
+      const raw = readFileSync(candidate.path, "utf8");
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      failures.push(`${candidate.label} (${candidate.path}): invalid JSON (${msg})`);
+      continue;
+    }
+
+    if (!isPlainObject(parsed)) {
+      failures.push(`${candidate.label} (${candidate.path}): config root must be a JSON object`);
+      continue;
+    }
+
+    const serverMaps: Record<string, unknown>[] = [];
+    for (const key of ["mcpServers", "servers"] as const) {
+      if (Object.hasOwn(parsed, key) && parsed[key] !== undefined) {
+        if (!isPlainObject(parsed[key])) {
+          failures.push(`${candidate.label} (${candidate.path}): "${key}" must be an object`);
+        } else {
+          serverMaps.push(parsed[key]);
+        }
+      }
+    }
+
+    for (const serverMap of serverMaps) {
+      for (const [serverName, entry] of Object.entries(serverMap)) {
+        if (!isLogNexusServerEntry(serverName, entry)) {
+          continue;
+        }
+        const check = validateLogNexusServerEntry(candidate.label, serverName, entry);
+        if (check.valid) {
+          validEntries.push(check.launcher);
+        } else {
+          failures.push(check.error);
+        }
+      }
+    }
+  }
+
+  if (failures.length > 0) {
+    return {
+      name: "MCP Client Configs",
+      status: "fail",
+      message: failures.join("; "),
+    };
+  }
+
+  if (validEntries.length >= 1) {
+    return {
+      name: "MCP Client Configs",
+      status: "pass",
+      message: `Verified ${validEntries.length} LogNexus MCP config(s): ${validEntries.join(", ")}`,
+    };
+  }
+
+  return {
+    name: "MCP Client Configs",
+    status: "warn",
+    message:
+      "No LogNexus MCP server config found — configure 'npx -y @digital-lake/lognexus mcp' or 'uvx lognexus-mcp'",
+  };
+}
+
+export function runDiagnostics(
+  targetDir: string = process.cwd(),
+  options?: DoctorOptions,
+): DiagnosticCheck[] {
+  const checks = [
     checkGit(targetDir),
     checkGitHubCli(),
     checkRulesConfig(targetDir),
@@ -235,4 +540,10 @@ export function runDiagnostics(targetDir: string = process.cwd()): DiagnosticChe
     checkVersionMaturity(targetDir),
     checkAgentEcosystem(targetDir),
   ];
+
+  if (options?.mcp === true) {
+    checks.push(checkMcpClientConfigs(targetDir, options));
+  }
+
+  return checks;
 }
