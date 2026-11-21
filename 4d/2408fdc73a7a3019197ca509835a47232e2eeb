@@ -1,0 +1,38 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-21T13:38:37.136Z",
+  "issue": {
+    "id": 78,
+    "title": "chore(release): add 7-surface version:sync engine, CI lockstep gate, PyPI/npm badges, and code polish",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Enforce 7-surface lockstep gate, CHANGELOG check, and strict PyPI release",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        ".github/workflows/version-bump-check.yml",
+        ".github/workflows/release.yml",
+        "CONTRIBUTING.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        ".claude-plugin/plugin.json",
+        "package.json"
+      ],
+      "decisionBudget": "none",
+      "verificationCmd": "node scripts/sync-version.mjs --check && npm run lint && npx vitest run tests/packaging.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 2
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 2,
+    "posts": 160
+  }
+}
