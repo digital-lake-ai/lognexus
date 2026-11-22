@@ -166,7 +166,7 @@ Before writing code, the Tier-1 orchestrator emits the `T1..Tn` plan with pre-as
 - Omit `model` (`"auto"`) on implementation workers unless explicitly requested by the developer, allowing Antigravity to allocate runtime capacity dynamically.
 - Sign `--author` with each worker's real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
 - Record `--isolation swarm --swarm-workers <n> --swarm-posts <count>` on subtasks and commits.
-- Bound contracts under `CONTEXT_MAX_FILES = 6` implementation files and `CONTEXT_MAX_LOC = 1200` lines, handing context via `npx @digital-lake/lognexus handoff --prompt`.
+- Bound contracts under `CONTEXT_MAX_FILES = 6` implementation files and `CONTEXT_MAX_LOC = 1200` lines, handing context via `npx @digital-lake/lognexus handoff --prompt`. Native MCP clients can alternatively read `lognexus://handoff` (`text/markdown`) alongside `lognexus://state` and `lognexus://routing` as an in-memory, zero-disk-write equivalent.
 
 ### 3. Review gate
 

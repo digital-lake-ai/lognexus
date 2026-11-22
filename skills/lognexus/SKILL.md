@@ -19,7 +19,7 @@ Use GitHub as a complete knowledge graph where every brainstorm, commit, review,
 
 To eliminate cognitive amnesia between conversation resets, context compactations, or model handoffs:
 1. **At Session Start or after conversation compactation:**
-   Inspect `.lognexus/state.json` or run `npx @digital-lake/lognexus state show` to immediately recover active issue, branch, current subtask, and delegation contract.
+   Inspect `.lognexus/state.json`, run `npx @digital-lake/lognexus state show`, or read MCP resources (`lognexus://state`, `lognexus://routing`, `lognexus://handoff`) to immediately recover active issue, branch, current subtask, and delegation contract. Validate MCP setup and audit policy with `npx @digital-lake/lognexus doctor --mcp`.
 2. **Synchronize State:**
    Run `npx @digital-lake/lognexus state sync` upon branch checkout or switching to update local state from Git and GitHub.
 3. **Subtask Tracking & Contract Declaration:**
@@ -37,6 +37,7 @@ To eliminate cognitive amnesia between conversation resets, context compactation
      ```bash
      npx @digital-lake/lognexus handoff --prompt
      ```
+     (Native MCP clients can read `lognexus://handoff` alongside `lognexus://state` and `lognexus://routing` for pure in-memory Markdown handoff synthesis with 0 disk writes).
    - After verification passes:
      ```bash
      npx @digital-lake/lognexus state finish-task <id>
@@ -128,6 +129,11 @@ npx @digital-lake/lognexus commit \
   --swarm-posts 42
 ```
 
+Export structured Git Notes in topological JSONL format:
+```bash
+npx @digital-lake/lognexus note export [--since <ref>] [--issue <id>] [-o|--output <path>]
+```
+
 Alternatively, commit via standard Git following the ID-first convention:
 
 ```bash
@@ -180,7 +186,7 @@ gh issue edit 999 --remove-label "lognexus/in-progress" --add-label "lognexus/ne
 
 ### Step 5 — Independent Review (`/lognexus review`)
 
-Review gating is controlled by `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (where `auto` resolves to `intra-fleet` distinct-model review). **ChatGPT / OpenAI Codex environments NEVER force cross-vendor review**: `review_gate: auto` uses `intra-fleet` within OpenAI (`GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`), and single-session or solo ChatGPT / Codex workflows where cross-model review is unnecessary or unavailable can set `review_gate: advisory` or `review_gate: off`.
+Review gating is controlled by `review_gate: auto | intra-fleet | cross-vendor | advisory | off` in `.lognexus/routing.md` (where `auto` resolves to `intra-fleet` distinct-model review). **ChatGPT / OpenAI Codex environments NEVER force cross-vendor review**: `review_gate: auto` uses `intra-fleet` within OpenAI (`GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`), and single-session or solo ChatGPT / Codex workflows where cross-model review is unnecessary or unavailable can set `review_gate: advisory` or `review_gate: off`. Audit rules are configured in `.lognexus/policy.json` (`profiles`: `default` | `incremental` | `strict`), where rules `invalid-identity`, `review-gate-separation`, `base-branch-range`, and `invalid-policy` enforce a hardcoded non-overridable error floor.
 
 An independent reviewer model (e.g., `openai/gpt-6.2-astra (codex)` or `openai/gpt-5.4 (codex)` under cross-vendor review, or a distinct Tier-1 model like `Gemini 4 Argon`, `Gemini 4 Neon`, or `GPT-6.2 Astra` reviewing `GPT-6.2 Sol`/`GPT-6 Luna` under intra-fleet review) loads `commands/lognexus/review.md`, reads the diff, and posts the signed review comment on the PR:
 
@@ -343,11 +349,11 @@ All artifacts use `#ID` as the primary key for fast, token-efficient retrieval.
 | Stacked PR title | `<type>(#<new-id>): ... [stack: #<parent>]` | `fix(#43): race cond [stack: #42]` |
 | Memory entry | `#<id>: <decision>` | `#42: chose JWT over sessions` |
 
-**Branch lanes:** Both scoped lanes (`issue/<id>-<slug>` and `security/<id>-<slug>`) are recognized and treated identically across the LogNexus engine (`status`, `timeline`, `audit`, and protected branch guard). Direct commits or pushes to `main` are strictly blocked.
+**Branch lanes:** Both scoped lanes (`issue/<id>-<slug>` and `security/<id>-<slug>`) are recognized and treated identically across the LogNexus engine (`status`, `timeline`, `audit`, and protected branch guard). Direct commits or pushes to `main` are strictly blocked. Pre-merge audit compliance is enforced via `lognexus audit` under `.lognexus/policy.json` (`default` | `incremental` | `strict`).
 
 **Task IDs:** Tasks carry local IDs (`T1`, `T2`, ...) scoped to the issue. Commits use `#<id>/<Tn>`.
 
-**Retrieval:** `gh issue list --search "#42"` | `git log --grep="#42"` | `git log --grep="#42/T1"` | `gh pr list --search "#42"`
+**Retrieval:** `gh issue list --search "#42"` | `git log --grep="#42"` | `git log --grep="#42/T1"` | `gh pr list --search "#42"` | `npx @digital-lake/lognexus note export --issue 42`
 
 ### Envelope Schema and Triage Fields
 
@@ -608,6 +614,10 @@ The timeline comment is the minimum: one paragraph explaining what happened, why
 
 All recommended skills are optional. The current optional integrations are listed below. Without them, lognexus falls back to direct `gh`/`git` commands.
 
+### MCP & Policy Validation
+
+Run `npx @digital-lake/lognexus doctor --mcp` for read-only cross-platform MCP client config validation (`Claude Desktop`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.mcp.json`) and `.lognexus/policy.json` schema validation.
+
 ### User-Facing Language
 
 The phase numbers are internal workflow labels. Do not surface them to the user.
@@ -704,7 +714,7 @@ Before implementation writes begin, the Tier-1 orchestrator emits the `T1..Tn` p
 - Omit `model` (`"auto"`) on implementation workers unless explicitly requested by the developer, allowing Antigravity to allocate runtime capacity dynamically.
 - Sign `--author` with each worker's real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
 - Record `--isolation swarm --swarm-workers <n> --swarm-posts <count>` on commits and state updates.
-- Keep subtask contracts strictly within context budgets (`CONTEXT_MAX_FILES = 6` implementation files, `CONTEXT_MAX_LOC = 1200` lines), handing context via `npx @digital-lake/lognexus handoff --prompt`.
+- Keep subtask contracts strictly within context budgets (`CONTEXT_MAX_FILES = 6` implementation files, `CONTEXT_MAX_LOC = 1200` lines), handing context via `npx @digital-lake/lognexus handoff --prompt` (or the pure in-memory `lognexus://handoff` MCP resource with 0 disk writes).
 
 Isolation backend is tracked separately from the orchestration primitive. A git worktree, forked workspace, or tmux session may all isolate delegated work, but only the primary feature branch/worktree is lognexus's canonical branch record.
 
