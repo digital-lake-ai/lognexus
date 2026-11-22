@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.4.1",
+  "timestamp": "2026-11-22T02:35:23.780Z",
+  "issue": {
+    "id": 84,
+    "title": "release: publish LogNexus v1.5.0 (doctor --mcp, audit policy.json, note export, lognexus://handoff & release engine)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Sync skills and commands for v1.5.0 capabilities",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "skills/lognexus/SKILL.md",
+        "skills/lognexus/references/closure-and-review.md",
+        "skills/lognexus/references/commit-workflow.md",
+        "skills/lognexus/references/orchestrator-protocol.md",
+        "commands/lognexus/review.md",
+        "commands/lognexus/resume.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "package.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 2
+  }
+}
