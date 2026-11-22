@@ -33,7 +33,7 @@ body:
     attributes:
       label: LogNexus version
       description: Output of `npx @digital-lake/lognexus --version`.
-      placeholder: "1.4.1"
+      placeholder: "1.5.0"
     validations:
       required: true
 

@@ -30,6 +30,8 @@ npx @digital-lake/lognexus handoff --prompt
 ```
 - **Context Budgets:** Subtasks must strictly respect `CONTEXT_MAX_FILES = 6` implementation files (test files exempt) and `CONTEXT_MAX_LOC = 1200` lines.
 - **Swarm Attribution Rules:** Under `orchestration: auto`, implementation workers omit `model` (`"auto"`) unless requested, and MUST sign `--author` with their real canonical runtime identity (never literal `"auto"` or `"<provider>/<model>"`).
+- **MCP Resources & Health:** Native MCP clients can query `lognexus://state`, `lognexus://routing`, and `lognexus://handoff` for zero-disk-write state recovery and in-memory handoffs. Run `npx @digital-lake/lognexus doctor --mcp` to validate MCP client configurations and `.lognexus/policy.json`.
+- **Portable Notes Export:** Export structured commit history and notes with `npx @digital-lake/lognexus note export --issue <id>` for portable session context transfer.
 
 **Session-resume comment:** every resumed session must post a `[lognexus/session-resume]` comment on the issue. This is distinct from `[lognexus/session-start]` — it marks a continuation, not a first start. The comment must include the last commit, uncommitted changes summary, remaining tasks, and where work was left off.
 

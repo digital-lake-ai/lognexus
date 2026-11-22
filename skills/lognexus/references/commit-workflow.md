@@ -81,6 +81,18 @@ npx @digital-lake/lognexus commit \
 
 Use `-F / --file <filePath>` for multiline messages or on Windows shells to prevent quote-stripping.
 
+### Exporting Git Notes (`note export`)
+
+To extract attached Git Notes (`refs/notes/lognexus`) for downstream analytics, audit, or session handoffs:
+
+```bash
+npx @digital-lake/lognexus note export [--since <ref>] [--issue <id>] [-o|--output <path>]
+```
+
+- **Topological JSONL:** Walks git history via `--topo-order --reverse` to emit valid newline-delimited JSON.
+- **Pure stdout:** When `-o` is omitted, notes stream directly to stdout without banner decorations, making it pipeline-ready.
+- **Security & Confinement:** Validates `--since` refs to reject malicious arguments and enforces that `-o|--output` paths remain strictly confined inside the repository workspace.
+
 **Identity & Anti-Spoofing Rules:**
 - Literal placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`) are strictly prohibited. Sign with real canonical runtime identities.
 - The authoring agent must never write `Reviewed-by:` trailers or self-approve.

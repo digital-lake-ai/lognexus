@@ -153,6 +153,20 @@ Two independent review modes are supported:
 1. **Cross-Vendor Review** *(recommended best practice for milestone releases)*: The reviewer belongs to a different provider family than the author (e.g., `gemini/*` reviewed by `claude/*`, `openai/*`, or `deepseek/*`).
 2. **Intra-Fleet Distinct-Model Review** *(supported for single-provider workflows such as Antigravity, Claude Code, or Codex / ChatGPT)*: The reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Neon`, `Gemini 4 Carbon`, or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Fable 5.2` / `Opus 5.5` reviewing `Claude Sonnet 5.5` or `Claude Haiku 5.5`; `OpenAI GPT-6.2 Astra` reviewing `GPT-6.2 Sol` or `GPT-6 Luna`).
 
+### Audit Policy Configuration (`.lognexus/policy.json`)
+
+Repositories configure audit strictness and rule enforcement via `.lognexus/policy.json`:
+- **Profiles:**
+  - `"default"`: Standard balanced enforcement for active feature development.
+  - `"incremental"`: Softened checks for legacy branches or rapid prototyping.
+  - `"strict"`: Hardened zero-tolerance validation for release branches and protected paths.
+- **Rule Overrides:** Specific rule severity levels can be customized under `rules` (`"off"`, `"warn"`, `"error"`).
+- **Non-Overridable Error Floor:** Four foundational governance rules cannot be downgraded or disabled under any profile or override — they maintain a hardcoded `"error"` floor:
+  - `"invalid-identity"`: Enforces valid canonical model identity syntax.
+  - `"review-gate-separation"`: Blocks author/reviewer collision and self-approval.
+  - `"base-branch-range"`: Validates proper target branch commit ranges.
+  - `"invalid-policy"`: Rejects malformed policy schemas or configurations.
+
 ### Anti-Spoofing Rule (Non-Negotiable)
 
 - **No author agent (`Authored-by`) may write `Reviewed-by:` trailers or run `gh pr merge`.**
@@ -225,6 +239,7 @@ A PR may be merged when:
 3. If any approving review uses `approve-with-follow-ups`, the `Follow-ups:` field must reference a valid open issue containing the non-blocking findings. Do not merge until this issue exists.
 4. The PR body includes `Closes #<N>` linking to the tracking issue.
 5. The issue closure will have linked evidence (the merged PR itself serves as evidence).
+6. Pre-merge audit (`npx @digital-lake/lognexus audit`) passes under the configured `.lognexus/policy.json` profile without unhandled errors.
 
 ### Mandatory `--no-ff` Merge Command
 

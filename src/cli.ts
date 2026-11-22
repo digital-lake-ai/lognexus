@@ -80,7 +80,7 @@ export function getCliVersion(): string {
   } catch {
     // fallback
   }
-  return "1.4.1";
+  return "1.5.0";
 }
 
 function printHeader() {

@@ -61,12 +61,12 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 - **Contract-First Subtasks & Alphanumeric Tickets:** Tasks are bounded by strict decision budgets, file allowlists, and stop conditions—supporting both GitHub issues (`feat(#42/T1)`) and Jira/Linear ticket schemes (`feat(SLM-201/T1)`).
 - **Persistent State & Session Recovery:** Local session state engine (`.lognexus/state.json`) prevents amnesia across context compactations and conversation resets, retaining completed subtask metadata through the closing commit.
 - **Automated Context Handoff (`lognexus handoff`):** Regenerates a complete `.lognexus/handoff.md` from local state — cycle state, active subtask contract, live scope-drift report, completed-subtask table and next required action — so a fresh session (or a different model) resumes without re-deriving context. Auto-refreshed on `state set-task` and on every `--finish-task` commit.
-- **Live Scope-Drift Guard (`lognexus status` / `lognexus doctor`):** Diffs the working tree against the `allowedFiles` of the active contract on every status and diagnostic run, catching out-of-contract writes before they reach a commit.
-- **Memory Recall Filter (`lognexus note search`):** Queries the LogNexus Git Notes history by file, model, issue or free text, returning the newest matches first — the reasoning behind a decision stays retrievable months later.
+- **Live Scope-Drift & Environment Guard (`lognexus status` / `lognexus doctor`):** Diffs the working tree against the `allowedFiles` of the active contract on every status and diagnostic run, catching out-of-contract writes before they reach a commit. Supports `lognexus doctor --mcp` to validate cross-platform MCP client setups and `.lognexus/policy.json` schemas.
+- **Memory Recall & Notes Export (`lognexus note search` / `lognexus note export`):** Queries the LogNexus Git Notes history by file, model, issue or free text, returning the newest matches first, or exports causation-preserving JSONL notes (`note export`) for offline auditing and session handoffs.
 - **Startup Update & Legal Terms Gate:** A non-interactive gate surfaces update and legal-terms requirements at CLI startup, consulting the npm registry through `execFileSync` with `shell: false` and a 2500 ms timeout. The MCP transport is exempt.
 - **Git Notes Engine (Quiet Mode / `git-ai` v3):** Attaches structured session payloads and contracts to commits under `refs/notes/lognexus` without changing commit SHAs.
 - **Native MCP Stdio Server (`lognexus mcp`):** Zero-dependency JSON-RPC 2.0 stdio server exposing LogNexus tools, live state resources, and prompts to Claude Desktop, Cursor, and any MCP client.
-- **Journey Timeline & Review Gate Audit:** Reconstructs the complete branch journey into structured PR descriptions (`lognexus timeline --pr-body`) and programmatically audits review gate separation (`lognexus audit`).
+- **Journey Timeline & Review Gate Audit:** Reconstructs the complete branch journey into structured PR descriptions (`lognexus timeline --pr-body`) and programmatically audits review gate separation (`lognexus audit`) under `.lognexus/policy.json` profiles (`default`, `incremental`, `strict`) with a hardcoded review-gate error floor.
 - **Hidden Metadata Envelopes:** HTML comments preserve machine-parseable state (`<!-- lognexus: kind: state ... -->`) without cluttering human-readable markdown.
 - **Scaffolding & Health CLI (`@digital-lake/lognexus`):** Lightweight CLI for repository scaffolding (`init`), health diagnostics (`doctor`), and real-time status inspection (`status`).
 - **Optional Multi-Model Token Shield (`init --protect-tokens`):** Opt-in, zero-runtime-overhead workspace hygiene flag that scaffolds official context-exclusion and read-deny rules (`.geminiignore`, `.aiexclude`, `.cursorignore`, `.claude/settings.json` covering `node_modules/**`, lockfiles, `dist/**`, `dist-pypi/**`, `.next/**`, `.venv/**`, `__pycache__/**`, `.rooignore`, `.codeiumignore`, `.aiderignore`) tailored to the agent ecosystems detected in your repository—preventing accidental token leakage on lockfiles and build artifacts, translating directly into lower context costs without touching the MCP server.
@@ -170,9 +170,10 @@ npx @digital-lake/lognexus init --enable-telemetry
 npx @digital-lake/lognexus init --no-telemetry
 ```
 
-Verify your environment anytime (including multi-manifest SemVer drift checks):
+Verify your environment anytime (including multi-manifest SemVer drift checks and MCP client configuration health):
 ```bash
 npx @digital-lake/lognexus doctor
+npx @digital-lake/lognexus doctor --mcp
 ```
 
 Inspect active branch, ecosystem profile, review gate mode, and tier advisory:
@@ -209,9 +210,10 @@ Quiet Mode with Git Notes (`refs/notes/lognexus`, standard `git-ai` v3):
 npx @digital-lake/lognexus note attach HEAD --swarm-workers 2 --swarm-posts 4
 npx @digital-lake/lognexus note show HEAD
 npx @digital-lake/lognexus note push origin
+npx @digital-lake/lognexus note export --since main -o notes.jsonl
 ```
 
-Journey Timeline reconstruction and Review Gate audit:
+Journey Timeline reconstruction and Review Gate audit (configured via `.lognexus/policy.json` with `default`, `incremental`, `strict` profiles and a non-overridable review-gate error floor):
 ```bash
 npx @digital-lake/lognexus timeline main
 npx @digital-lake/lognexus timeline main --pr-body
@@ -225,15 +227,17 @@ npx @digital-lake/lognexus handoff
 npx @digital-lake/lognexus handoff --prompt
 npx @digital-lake/lognexus handoff --json
 
-# Inspect the working tree against the active subtask contract
+# Inspect the working tree against the active subtask contract and validate MCP client health
 npx @digital-lake/lognexus status
 npx @digital-lake/lognexus doctor
+npx @digital-lake/lognexus doctor --mcp
 
-# Recall past reasoning from Git Notes, newest matches first
+# Recall past reasoning from Git Notes or export topological JSONL
 npx @digital-lake/lognexus note search "scope drift"
 npx @digital-lake/lognexus note search --file src/cli.ts
 npx @digital-lake/lognexus note search --issue 30 --limit 5
 npx @digital-lake/lognexus note search --author "deepseek" --json
+npx @digital-lake/lognexus note export --issue 30 -o notes.jsonl
 ```
 
 Opt-in Telemetry 2.0, LOC-Weighted ROI & Cohort Benchmarks (100% local, zero network calls):
@@ -297,7 +301,7 @@ pip install lognexus-mcp
 
 **Exposed Capabilities:**
 - **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_commit`, `lognexus_note_show`, `lognexus_note_attach`, `lognexus_timeline`, `lognexus_audit`, `lognexus_telemetry`
-- **Resources:** `lognexus://state`, `lognexus://routing`
+- **Resources:** `lognexus://state`, `lognexus://routing`, `lognexus://handoff`
 - **Prompts:** `lognexus-plan`, `lognexus-review`
 
 ### 3. Install Rules in Your Agent Environment

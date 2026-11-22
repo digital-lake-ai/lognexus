@@ -22,6 +22,7 @@ Configured via `review_gate: auto | intra-fleet | cross-vendor | advisory | off`
 - **Intra-Fleet Distinct-Model Review:** Reviewer is a distinct canonical Tier-1 model operating in an independent reviewer session/subagent separate from the Tier-2/Tier-3 author model (e.g., `Gemini 4 Neon`, `Gemini 4 Carbon`, or `Gemini 4 Argon` reviewing `Gemini 4 Hydrogen` or `Gemini 3.8 Flash`; `Claude Opus 5.5` reviewing `Claude Sonnet 5.5` or `Claude Haiku`).
 - **Strictly blocked:** Identical canonical model family across any reasoning-effort suffix (`-none | -minimal | -low | -medium | -high | -extra | -xhigh | -xtrahigh | -extra-high`) is strictly blocked from reviewing or approving its own code.
 - **Strictly prohibited:** Placeholder identities (`"auto"`, `"<provider>/<model>"`, bare `"orchestrator"`, `"unknown/other"`). Every agent must sign with its real canonical runtime identity.
+- **Audit Policy & Verification:** Verify PR compliance with `npx @digital-lake/lognexus audit`. Profiles (`default` | `incremental` | `strict`) are configured in `.lognexus/policy.json`, where `invalid-identity`, `review-gate-separation`, `base-branch-range`, and `invalid-policy` enforce a hardcoded non-overridable review-gate error floor. Run `npx @digital-lake/lognexus doctor --mcp` to validate MCP configuration health and schema compliance.
 
 **Anti-Spoofing Rule (non-negotiable):**
 - No author agent (`Authored-by`) may write `Reviewed-by:` trailers or execute `gh pr merge`.
