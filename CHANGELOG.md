@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 A major feature, MCP governance, audit policy, and release automation milestone (`#38`, `#39`, `#40`, `#42`, `#60`, `#78`, `#84`). Delivers `lognexus doctor --mcp` for cross-platform validation of client configurations and audit policies, configurable Zod-validated audit policies via `.lognexus/policy.json` (`default`, `incremental`, `strict`) with hardcoded review-gate error floors, `lognexus note export` for topological JSONL export of Git Notes, and the read-only `lognexus://handoff` MCP resource for zero-disk-write in-memory handoff synthesis. Establishes a deterministic 7-surface SemVer synchronization engine and lockstep release pipeline while maintaining **TDQS Grade A in Security & Schema Integrity** with `0` changes to `src/mcp/tools.ts` and `"minCriticalVersion": "0.0.0"`.
 
 ### Added
-- **MCP Client Configuration & Policy Validator (`#39`, `src/doctor/mcp-doctor.ts`, `src/cli.ts`):**
+- **MCP Client Configuration & Policy Validator (`#39`, `src/doctor.ts`, `src/cli.ts`):**
   - Added `npx @digital-lake/lognexus doctor --mcp` for read-only cross-platform MCP client configuration validation across Claude Desktop (`darwin`, `linux`, `win32`), `.cursor/mcp.json`, `.vscode/mcp.json` (`servers` and `mcpServers`), and `.mcp.json`.
   - Added schema and semantic validation for `.lognexus/policy.json`, checking profile structure and rule severity configurations without executing network calls or altering user settings.
 - **Configurable Audit Policy Profiles (`#42`, `src/audit/policy.ts`, `src/audit/audit.ts`):**
@@ -25,12 +25,12 @@ A major feature, MCP governance, audit policy, and release automation milestone 
 - **In-Memory MCP Handoff Resource (`#38`, `src/mcp/resources.ts`):**
   - Exposed `lognexus://handoff` (`text/markdown`) alongside `lognexus://state` and `lognexus://routing` as an in-memory, zero-disk-write Markdown handoff snapshot for native MCP clients.
 - **Deterministic 7-Surface SemVer Sync & Release Pipeline (`#60`, `#78`, `scripts/sync-version.mjs`):**
-  - Implemented `scripts/sync-version.mjs` with `npm run version:check` and `npm run version:sync <X.Y.Z>` keeping all 7 repository version surfaces (`package.json`, `package-lock.json`, `dist-pypi/pyproject.toml`, `src/version.ts`, `.claude-plugin/plugin.json`, `CHANGELOG.md`, `README.md`) in lockstep.
+  - Implemented `scripts/sync-version.mjs` with `npm run version:check` and `npm run version:sync <X.Y.Z>` keeping all 7 repository version surfaces (`package.json`, `package-lock.json`, `.claude-plugin/plugin.json`, `server.json`, `pyproject.toml`, `python/lognexus_mcp/__init__.py`, `src/cli.ts`) in lockstep.
   - Integrated Hybrid Trunk-Based Release Train lockstep checks (`.github/workflows/version-bump-check.yml`), strict PyPI OIDC publishing in `.github/workflows/release.yml`, and monthly download badges in `README.md`.
 
 ### Changed
 - **Skills and Commands Synchronization:** Updated `skills/lognexus/**` and `commands/lognexus/**` to document `doctor --mcp`, `.lognexus/policy.json`, `note export`, and `lognexus://handoff` while maintaining strict CI cross-reference hygiene (`cross-ref-check.yml`).
-- **Documentation and Version Surfaces:** Updated `README.md`, `docs/TELEMETRY_PRIVACY.md`, `.github/ISSUE_TEMPLATE/diagnostic-report.yml`, and runtime CLI status strings to reflect `1.5.0` while maintaining `Policy Version: 2.0.0` and GDPR consent isolation.
+- **Documentation and Version Surfaces:** Updated `README.md`, `docs/TELEMETRY_PRIVACY.md`, `.github/ISSUE_TEMPLATE/diagnostic-report.yml`, and all 7 manifest/CLI version surfaces to reflect `1.5.0` while maintaining `Policy Version: 2.0.0` and GDPR consent isolation.
 - **Review Cycle Enhancements:** Refined diagnostic reporting in `src/audit/audit.ts`, prompt descriptions in `src/mcp/prompts.ts`, and CLI output formatting in `src/status.ts`.
 
 ### Security
