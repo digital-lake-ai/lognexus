@@ -1,0 +1,38 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.5.0",
+  "timestamp": "2026-11-24T04:31:15.057Z",
+  "issue": {
+    "id": 88,
+    "title": "chore(deps-dev): bump @biomejs/biome to 2.6.8 (with schema sync) and vitest to 5.1.1",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Bump @biomejs/biome to 2.6.8, sync biome.json schema, and bump vitest to 5.1.1",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        "biome.json"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run version:check && npm run lint && npx vitest run tests/packaging.test.ts",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 2
+  }
+}
