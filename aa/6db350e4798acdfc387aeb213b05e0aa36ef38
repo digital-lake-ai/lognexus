@@ -1,0 +1,45 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.5.0",
+  "timestamp": "2026-11-25T03:42:01.631Z",
+  "issue": {
+    "id": 90,
+    "title": "feat(doctor,telemetry): add Antigravity v2.35 MCP/env detection and Nov 2026 model parity",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Add DeepSeek V4, xAI Grok, GLM-5.4, Qwen 4 Max, Kimi K3.1 Pro and GPT-6-Cyber parity",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/telemetry/detector.ts",
+        "src/telemetry/benchmark.ts",
+        "src/audit/audit.ts",
+        "src/status.ts",
+        "tests/telemetry.test.ts",
+        "tests/telemetry-benchmark.test.ts",
+        "tests/audit.test.ts",
+        "tests/status.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npx vitest run tests/telemetry.test.ts tests/telemetry-benchmark.test.ts tests/audit.test.ts tests/status.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 4
+  }
+}
