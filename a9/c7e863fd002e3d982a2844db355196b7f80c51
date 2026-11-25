@@ -1,0 +1,41 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.5.0",
+  "timestamp": "2026-11-25T04:04:50.882Z",
+  "issue": {
+    "id": 94,
+    "title": "release: publish LogNexus v1.6.0 (Antigravity v2.35, Nov 2026 models, MCP ToolAnnotations & SEO/GEO hub)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Create static SEO/GEO site, GitHub Pages workflow and update README MCP overview",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "site/index.html",
+        "site/llms.txt",
+        "site/robots.txt",
+        "site/sitemap.xml",
+        ".github/workflows/pages.yml",
+        "README.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 2
+  }
+}
