@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2026-11-25
+
+### Summary
+A milestone release delivering official Antigravity v2.35 environment integration, declarative MCP tool annotations, November 2026 frontier model parity, and a static SEO/GEO documentation hub (`#88`, `#90`, `#92`, `#94`). Expands MCP client configuration discovery in `src/doctor.ts` to locate Antigravity `~/.gemini/config/mcp_config.json` and `.agents/mcp_config.json`, auto-detects Antigravity `ConversationService` session context in `src/telemetry/consent-prompt.ts`, introduces official declarative MCP `ToolAnnotations` (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) across all 12 tools in `src/mcp/tools.ts` & `src/index.ts`, adds November 2026 frontier model recognition (DeepSeek V4-Pro/V4/V4.1-Flash, xAI Grok 4.6/4.7, Z.ai GLM-5.4, Qwen 4 Max, Moonshot Kimi K3.1 Pro/Thinking, GPT-6-Cyber) across `src/telemetry/detector.ts`, `src/telemetry/benchmark.ts`, `src/audit/audit.ts`, and `src/status.ts`, and deploys a static SEO/GEO hub (`site/index.html`, `site/llms.txt`, `site/robots.txt`, `site/sitemap.xml`, `.github/workflows/pages.yml`) while maintaining **TDQS Grade A in Security & Schema Integrity** with `"lognexusPolicy.minCriticalVersion": "0.0.0"`.
+
+### Added
+- **Antigravity v2.35 & Multi-Client MCP Discovery (`#90`, `src/doctor.ts`, `src/telemetry/consent-prompt.ts`):**
+  - Added Antigravity v2.35 MCP client config discovery for `~/.gemini/config/mcp_config.json`, `.agents/mcp_config.json`, `~/.cursor/mcp.json`, and `~/.claude.json` in `src/doctor.ts`, including cross-platform Windows backslash normalization.
+  - Added native detection of Antigravity `ConversationService` environment keys (`ANTIGRAVITY_CONVERSATION_ID`, `ANTIGRAVITY_LS_ADDRESS`, `ANTIGRAVITY_CSRF_TOKEN`, `ANTIGRAVITY_PROJECT_ID`) in `src/telemetry/consent-prompt.ts` for headless agent session awareness.
+- **November 2026 Frontier Model Parity (`#90`, `src/telemetry/detector.ts`, `src/telemetry/benchmark.ts`, `src/audit/audit.ts`, `src/status.ts`):**
+  - Added comprehensive tier routing and detector recognition for frontier models: DeepSeek V4-Pro (Tier-1), DeepSeek V4 (Tier-2), DeepSeek V4.1-Flash (Tier-3), xAI Grok 4.6/4.7 (Tier-1), Grok Code Fast (Tier-3), Z.ai GLM-5.4 (Tier-1), GLM-4-Flash (Tier-3), Qwen 4 Max (Tier-1), Qwen Coder (Tier-2), Moonshot Kimi K3.1 Pro / Thinking (Tier-1), Kimi K3 (Tier-2), and OpenAI GPT-6-Cyber (Tier-1).
+  - Added benchmark and audit telemetry support across all newly recognized frontier families.
+- **Official Declarative MCP Tool Annotations (`#92`, `src/mcp/tools.ts`, `src/index.ts`):**
+  - Declared spec-compliant `ToolAnnotations` (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) across all 12 LogNexus MCP tools (5 read-only, 5 non-destructive write, 2 state-reset) in `src/mcp/tools.ts`.
+  - Re-exported `type ToolAnnotations` from `src/index.ts` without altering tool names, schemas, or runtime execution logic.
+- **Static SEO/GEO Hub & Documentation (`#94`, `site/index.html`, `site/llms.txt`, `site/robots.txt`, `site/sitemap.xml`, `.github/workflows/pages.yml`):**
+  - Published static documentation hub with `SoftwareApplication` Schema.org JSON-LD structured metadata in `site/index.html`.
+  - Added AI agent indexing discovery files `site/llms.txt`, `site/robots.txt`, and `site/sitemap.xml` with automated deployment via `.github/workflows/pages.yml`.
+
+### Changed
+- **Dependencies & Tooling Consolidation (`#88`, `package.json`, `biome.json`):**
+  - Updated `@biomejs/biome` to `2.6.8` with modernized schema in `biome.json`, updated `vitest` to `5.1.1`, and kept development dependencies streamlined.
+- **Documentation & Skills Synchronization (`#90`, `#92`, `#94`, `README.md`, `skills/lognexus/**`, `commands/lognexus/**`):**
+  - Updated `README.md` with Antigravity MCP configuration paths and declarative tool capabilities.
+  - Synchronized `skills/lognexus/SKILL.md`, `skills/lognexus/references/model-routing.md`, and `commands/lognexus/models.md` for November 2026 frontier models and MCP annotations while preserving zero cross-reference regressions.
+  - Updated Software Version examples to `1.6.0` in `docs/TELEMETRY_PRIVACY.md` and `.github/ISSUE_TEMPLATE/diagnostic-report.yml` while strictly isolating `Policy Version: 2.0.0`.
+
+### Security
+- **TDQS Grade A in Security & Schema Integrity:**
+  - Declarative-only `ToolAnnotations`: Zero changes to tool names, input schemas, or handler logic in `src/mcp/tools.ts`.
+  - Minimum critical policy version remains locked at `"lognexusPolicy.minCriticalVersion": "0.0.0"`.
+  - Strict zero-network-egress guarantee preserved for local telemetry and diagnostic inspection.
+  - Policy Version remains strictly locked at `2.0.0` with GDPR consent isolation.
+
 ## [1.5.0] - 2026-11-22
 
 ### Summary
