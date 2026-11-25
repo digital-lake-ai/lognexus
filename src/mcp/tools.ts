@@ -23,10 +23,19 @@ export const MCP_SERVER_NAME = "lognexus";
 const TIER_VALUES: readonly string[] = ["tier-1", "tier-2", "tier-3"];
 const DECISION_BUDGET_VALUES: readonly string[] = ["none", "narrow", "full"];
 
+export interface ToolAnnotations {
+  title?: string;
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
+
 export interface ToolDefinition {
   name: string;
   title: string;
   description: string;
+  annotations: ToolAnnotations;
   inputSchema: {
     type: "object";
     properties: Record<string, unknown>;
@@ -60,6 +69,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Status: Inspect workspace and Git branch state",
     description:
       "Inspect the current Git branch, whether the directory is a Git repository, the active issue, the routing mode and the recommended model tier. Use when you need a cheap read-only snapshot before choosing a branch, a tier, or a next action. Not for reading the subtask contract (use lognexus_state_get) or for refreshing the state from Git and GitHub (use lognexus_state_sync).",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {},
@@ -71,6 +86,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus State: Get persistent session state",
     description:
       "Return the persistent LogNexus agent state (.lognexus/state.json) as stored on disk: active issue, current subtask and its file contract, completed subtasks and last synchronization timestamp. Use when you need the current contract or completion list and nothing has changed the branch since the last sync. Not for validating the state against the Git branch or GitHub (use lognexus_state_sync), and not for starting or finishing subtasks (use lognexus_state_set_task or lognexus_state_finish_task).",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {},
@@ -82,6 +103,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus State: Synchronize state from Git branch and GitHub",
     description:
       "Reconcile the persistent state with the current Git branch and GitHub metadata, rewriting .lognexus/state.json and returning the updated state. Use when you just checked out a branch, rebased, opened a PR, or suspect the stored state is stale. Not for a plain read of what is already on disk (use lognexus_state_get); sync mutates the store and runs git and gh.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     inputSchema: {
       type: "object",
       properties: {},
@@ -93,6 +120,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus State: Set active subtask and file contract",
     description:
       "Mark a subtask as in progress and persist its closed delegation contract (allowed files, forbidden files, decision budget, verification command) plus the active issue tier. Equivalent to 'lognexus state set-task <id> [title]'. Use when you begin a new subtask and need the file scope enforced by the commit engine and the audit. Not for marking a subtask complete (use lognexus_state_finish_task) and not for reading the contract (use lognexus_state_get).",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -148,6 +181,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus State: Finish subtask and mark completed",
     description:
       "Mark a subtask as completed in the persistent state and return the updated state. Equivalent to 'lognexus state finish-task <id>'. Use when the subtask work has already been committed and its Git Note attached. Not for creating the commit itself (use lognexus_commit with finishTask: true, which finishes the task atomically) and not for editing the contract (use lognexus_state_set_task).",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -165,6 +204,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus State: Clear session state",
     description:
       "Reset the persistent LogNexus agent state to empty. Equivalent to 'lognexus state clear'. Use when abandoning an issue, switching to an unrelated task, or recovering from a corrupted state file. Not for finishing a single subtask (use lognexus_state_finish_task); clearing is destructive and drops the whole contract.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {},
@@ -176,6 +221,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Commit: Atomic commit with Git Note and review gate",
     description:
       "Atomically create a Git commit with conventional commit format, authorship trailers, subtask file contract validation, optional task finishing, and Git Note attachment in a single operation. Use when creating any commit on a LogNexus branch, including the atomic subtask commits that close a Tn. Not for retro-attaching a note to a commit that already exists (use lognexus_note_attach), and not for bypassing the gate: the commit engine refuses to run on a protected branch and rejects files outside the contract.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -226,6 +277,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Note: Show Git Note attached to commit",
     description:
       "Read the LogNexus Git Note (refs/notes/lognexus) attached to a commit and return its parsed JSON payload. Defaults to HEAD. Use when verifying that a commit carries the expected tier, subtask and contract before a review or a merge. Not for creating or repairing notes (use lognexus_note_attach).",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -242,6 +299,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Note: Attach state as Git Note to commit",
     description:
       "Attach the current LogNexus state as a Git Note (refs/notes/lognexus) to a commit that already exists. Defaults to HEAD. Use when backfilling manually on commits created outside the commit engine, or repairing a missing note. Not for normal commits: lognexus_commit already attaches the note as part of the atomic operation, so attaching again is only needed when the note was lost.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -258,6 +321,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Timeline: Generate PR Journey Timeline",
     description:
       "Reconstruct the branch Journey Timeline against a base branch: commit list enriched with Git Notes, subtask IDs, tiers and Authored-by/Reviewed-by trailers, rendered as a Markdown table, JSON or a PR body draft. Use when preparing a pull request description or reviewing the subtask sequence of a branch. Not for judging compliance (use lognexus_audit, which reports violations rather than a narrative).",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -279,6 +348,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Audit: Audit review gate and commit traceability",
     description:
       "Audit the branch commits against the LogNexus review gate: commit format, Authored-by trailer, Git Notes coverage, subtask file contracts, and author/reviewer separation including self-approval detection. Use when you need the pass/fail gate before merging or before opening a pull request. Not for producing the PR narrative (use lognexus_timeline); audit reports violations and never fixes them.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
@@ -295,6 +370,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     title: "LogNexus Telemetry: Local performance and ROI cost report",
     description:
       "Inspect local telemetry status, enable strictly local performance metrics (zero network calls), disable tracking, inspect the zero-PII local payload, generate telemetry markdown reports, or clear the metrics store. Use when measuring subtask duration, Git Notes coverage and estimated cost savings. Not for any form of upload: telemetry is local-only, stored in .lognexus/telemetry.json, and no data leaves the working directory.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     inputSchema: {
       type: "object",
       properties: {
