@@ -1,0 +1,41 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.5.0",
+  "timestamp": "2026-11-25T03:36:28.660Z",
+  "issue": {
+    "id": 90,
+    "title": "feat(doctor,telemetry): add Antigravity v2.35 MCP/env detection and Nov 2026 model parity",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Add Antigravity v2.35 MCP config paths and agent env keys",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/doctor.ts",
+        "src/telemetry/consent-prompt.ts",
+        "tests/doctor.test.ts",
+        "tests/consent-prompt.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npx vitest run tests/doctor.test.ts tests/consent-prompt.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 2
+  }
+}
