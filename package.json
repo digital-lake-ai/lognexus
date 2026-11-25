@@ -1,6 +1,6 @@
 {
   "name": "@digital-lake/lognexus",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "mcpName": "io.github.digital-lake-ai/lognexus",
   "description": "The Universal, Git-powered context & rules framework for native AI agents (Claude, OpenAI, Gemini, DeepSeek) across Linux, macOS, and Windows. Scaffolding CLI, native MCP server, and repository governance.",
   "type": "module",
@@ -61,7 +61,7 @@
     "type": "git",
     "url": "git+https://github.com/digital-lake-ai/lognexus.git"
   },
-  "homepage": "https://github.com/digital-lake-ai/lognexus#readme",
+  "homepage": "https://digital-lake-ai.github.io/lognexus/",
   "bugs": {
     "url": "https://github.com/digital-lake-ai/lognexus/issues"
   },
