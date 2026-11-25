@@ -1,0 +1,39 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.5.0",
+  "timestamp": "2026-11-25T03:51:22.668Z",
+  "issue": {
+    "id": 92,
+    "title": "feat(mcp): add official MCP ToolAnnotations across all 12 tools",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T1",
+    "title": "Add declarative MCP ToolAnnotations across all 12 tools",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/mcp/tools.ts",
+        "src/index.ts",
+        "tests/mcp.test.ts"
+      ],
+      "forbiddenFiles": [
+        "package.json",
+        "package-lock.json",
+        "skills/lognexus/SKILL.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npx vitest run tests/mcp.test.ts tests/packaging.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 2
+  }
+}
