@@ -2,10 +2,12 @@
   <img src="docs/assets/logo.png" alt="LogNexus Logo" width="360">
 </p>
 
-# LogNexus
+# LogNexus — Git-Native Memory & MCP Server for AI Coding Agents
 
 <p align="center">
-  <strong>The Universal, Git-Powered Context & Rules Framework for Native AI Agents</strong>
+  <strong>The Universal, Git-Powered Context & Rules Framework for Native AI Agents</strong><br>
+  Available on npm as <code>@digital-lake/lognexus</code> and PyPI as <code>lognexus-mcp</code>.<br>
+  Explore the 12 annotated MCP tools & 3 resources on the official <a href="https://digital-lake-ai.github.io/lognexus/">LogNexus Documentation & SEO Hub</a>.
 </p>
 
 <div align="center">
@@ -38,7 +40,7 @@ As AI coding agents take on complex engineering tasks across different IDEs, the
 
 **LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.** It is a **100% generic, model-agnostic and editor-agnostic framework** that operates directly inside your native AI development environments:
 - **Clients:** Claude Code, Cursor, Codex, GitHub Copilot, Google Antigravity, Kimi Code, VS Code, Zed.
-- **Models:** Anthropic Claude (`Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude Opus / Sonnet / Haiku 5.5`), OpenAI (`GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), Google Gemini (`Gemini 4 Neon`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), Moonshot AI (`Kimi K3` / Kimi Code), DeepSeek (`R1`, `V3`, `Chat`).
+- **Models:** Anthropic Claude (`Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude Opus / Sonnet / Haiku 5.5`), Google Gemini (`Gemini 4 Neon` / `Orchestrator (Neon)`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), OpenAI (`GPT-6-Cyber`, `GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), DeepSeek (`DeepSeek V4-Pro`, `DeepSeek V4.1-Flash`, `R1`, `V3`, `Chat`), xAI (`Grok 4.7`), Z.ai (`GLM-5.4`), Alibaba (`Qwen 4 Max`), Moonshot AI (`Kimi K3.1 Pro`, `Kimi K3` / Kimi Code).
 - **Supported Platforms:** **Linux**, **macOS**, and **Windows** (`linux`, `darwin`, `win32` — 100% cross-platform Node.js >= 20 & Git >= 2.28, zero native binary dependencies).
 
 ```
@@ -53,7 +55,7 @@ Issues (Why & Goals) ──▶ Branches (Task Scopes) ──▶ Commits (Context
 
 ## Key Features
 
-- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Anthropic Claude** (`Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude 5.5`), **OpenAI** (`GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), **Google Gemini** (`Gemini 4 Neon` / `Orchestrator (Neon)`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **Moonshot AI** (`Kimi K3` / Kimi Code), and **DeepSeek** (`R1`, `V3`, `Chat`).
+- **Universal Multi-Model Support:** Native cognitive guidelines and prompt specifications for **Anthropic Claude** (`Claude Fable 5.2`, `Claude Mythos 5.2`, `Claude 5.5`), **Google Gemini** (`Gemini 4 Neon` / `Orchestrator (Neon)`, `Gemini 4 Carbon`, `Gemini 4 Argon`, `Gemini 4 Hydrogen`, `Gemini 3.8 Pro & Flash`), **OpenAI** (`GPT-6-Cyber`, `GPT-6.2 Astra`, `GPT-6.2 Sol`, `GPT-6 Luna`, `codex-mini`, `o3` / `o4`), **DeepSeek** (`DeepSeek V4-Pro`, `DeepSeek V4.1-Flash`, `R1`, `V3`, `Chat`), **xAI** (`Grok 4.7`), **Z.ai** (`GLM-5.4`), **Alibaba** (`Qwen 4 Max`), and **Moonshot AI** (`Kimi K3.1 Pro`, `Kimi K3` / Kimi Code).
 - **Universal Client Compatibility:** Drop-in support for **Claude Code**, **Cursor**, **Codex**, **GitHub Copilot** (`.github/copilot-instructions.md`), **Google Antigravity**, and **Kimi Code / VS Code**.
 - **Adaptive Ecosystem Routing & Native Swarm Coordination:** Declarative `.lognexus/routing.md` (`orchestration: auto | swarm | subagent | off`, `review_gate: auto | intra-fleet | cross-vendor | advisory | off`, `implementer: auto`, `reviewer: auto`) with Hard Turn-1 Discovery Probes (`> 3` files), immediate Swarm UI handoff, and native Swarm contract flags (`--assignee`, `--isolation swarm`, `--swarm-workers`, `--swarm-posts`).
 - **Atomic Commit Engine (`lognexus commit` & MCP `lognexus_commit`):** Validates subtask file contracts, verifies reviewer separation, injects authorship trailers, commits changes, marks subtasks completed, and attaches Git Notes in a single ~0.15s execution.
@@ -170,7 +172,7 @@ npx @digital-lake/lognexus init --enable-telemetry
 npx @digital-lake/lognexus init --no-telemetry
 ```
 
-Verify your environment anytime (including multi-manifest SemVer drift checks and MCP client configuration health):
+Verify your environment anytime (including multi-manifest SemVer drift checks and MCP client configuration health across Claude Desktop, Cursor, Google Antigravity `~/.gemini/config/mcp_config.json` & `.agents/mcp_config.json`, `~/.cursor/mcp.json`, and `~/.claude.json`):
 ```bash
 npx @digital-lake/lognexus doctor
 npx @digital-lake/lognexus doctor --mcp
@@ -266,13 +268,27 @@ Telemetry 2.0 is **strictly local-only**: zero network egress, zero PII, and `O(
 
 ### 2. Connect via Model Context Protocol (MCP)
 
-LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp`) with zero external SDK dependencies. Connect it to Claude Desktop, Cursor, Google Antigravity, or any MCP-compliant client:
+LogNexus includes a native, lightweight JSON-RPC 2.0 stdio server (`lognexus mcp`) with zero external SDK dependencies, exposing **12 annotated MCP tools** (with standardized RFC `ToolAnnotations`: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`), **3 live resources**, and **2 prompts**. Connect it to Google Antigravity, Claude Desktop, Cursor, or any MCP-compliant client:
 
-**`claude_desktop_config.json` or Cursor MCP settings** — config file locations per operating system:
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux:** `~/.config/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **Cursor / VS Code:** `.cursor/mcp.json` or `.vscode/mcp.json`
+**Google Antigravity Setup** (`~/.gemini/config/mcp_config.json` or workspace `.agents/mcp_config.json`):
+```json
+{
+  "mcpServers": {
+    "lognexus": {
+      "command": "npx",
+      "args": ["-y", "@digital-lake/lognexus", "mcp"],
+      "eager": true
+    }
+  }
+}
+```
+> **Tip for Antigravity:** Add `"eager": true` so Antigravity pre-warms the MCP server and registers tools eagerly on session startup.
+
+**Claude Desktop, Cursor & VS Code Setup** — configuration files:
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json` or `~/.claude.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json` or `~/.claude.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json` or `~/.claude.json`
+- **Cursor / VS Code:** `~/.cursor/mcp.json`, `.cursor/mcp.json` or `.vscode/mcp.json`
 
 ```json
 {
@@ -299,10 +315,13 @@ uvx lognexus-mcp
 pip install lognexus-mcp
 ```
 
-**Exposed Capabilities:**
-- **Tools:** `lognexus_status`, `lognexus_state_get`, `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_state_clear`, `lognexus_commit`, `lognexus_note_show`, `lognexus_note_attach`, `lognexus_timeline`, `lognexus_audit`, `lognexus_telemetry`
-- **Resources:** `lognexus://state`, `lognexus://routing`, `lognexus://handoff`
-- **Prompts:** `lognexus-plan`, `lognexus-review`
+**Exposed Capabilities & RFC ToolAnnotations:**
+- **12 Annotated Tools:**
+  - **Read-Only (5 tools):** `lognexus_status`, `lognexus_state_get`, `lognexus_note_show`, `lognexus_timeline`, `lognexus_audit` (`readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`).
+  - **Non-Destructive Write (5 tools):** `lognexus_state_sync`, `lognexus_state_set_task`, `lognexus_state_finish_task`, `lognexus_commit`, `lognexus_note_attach` (`readOnlyHint: false`, `destructiveHint: false`, `openWorldHint: false`).
+  - **State-Reset (2 tools):** `lognexus_state_clear` (`destructiveHint: true`), `lognexus_telemetry` (`destructiveHint: false`).
+- **3 Live Resources:** `lognexus://state`, `lognexus://routing`, `lognexus://handoff`
+- **2 Prompts:** `lognexus-plan`, `lognexus-review`
 
 ### 3. Install Rules in Your Agent Environment
 

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://digital-lake-ai.github.io/lognexus/sitemap.xml
