@@ -375,6 +375,7 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
   if (hasDelimitedMarker(trimmed, "luna")) return "openai/luna";
   if (hasDelimitedMarker(trimmed, "gpt-oss")) return "openai/gpt-oss";
   if (hasDelimitedMarker(headBeforeParens, "codex")) return "openai/codex";
+  if (hasDelimitedMarker(trimmed, "cyber")) return "openai/cyber";
   if (
     trimmed.includes("gpt") ||
     trimmed.includes("openai") ||
@@ -385,10 +386,33 @@ export function extractModelFamilyCategory(identityStr: string | null | undefine
     return "openai/gpt";
   }
   if (trimmed.includes("deepseek")) {
+    if (hasDelimitedMarker(trimmed, "v4") && hasDelimitedMarker(trimmed, "pro")) {
+      return "deepseek/v4-pro";
+    }
+    if (hasDelimitedMarker(trimmed, "v4")) {
+      return "deepseek/v4";
+    }
     return "deepseek/v3";
   }
   if (trimmed.includes("kimi") || trimmed.includes("moonshot")) return "moonshot/kimi";
-  if (trimmed.includes("qwen")) return "qwen/coder";
+  if (trimmed.includes("qwen")) {
+    return hasDelimitedMarker(trimmed, "max") ? "qwen/max" : "qwen/coder";
+  }
+  if (
+    trimmed.startsWith("xai/") ||
+    trimmed.startsWith("x-ai/") ||
+    hasDelimitedMarker(trimmed, "grok")
+  ) {
+    return "xai/grok";
+  }
+  if (
+    trimmed.startsWith("zai/") ||
+    trimmed.startsWith("z.ai/") ||
+    trimmed.startsWith("z-ai/") ||
+    hasDelimitedMarker(trimmed, "glm")
+  ) {
+    return "zai/glm";
+  }
 
   // Only a `provider/model` slug survives. A bare human name — a Git `user.name` with no slash
   // and no model marker — is anonymous history, and returning its first word would publish a
@@ -546,7 +570,12 @@ const GPT_5_PATTERN = /(?:^|[\s/_-])gpt[\s_-]5(?:\.\d+)?(?:$|[\s/_-])/;
 
 function shouldSkipEffortSuffix(head: string, suffix: string): boolean {
   if (suffix !== "-max") return false;
-  return head.startsWith("qwen/") || head === "qwen-max" || head.endsWith("-codex-max");
+  return (
+    head.startsWith("qwen/") ||
+    head.startsWith("qwen-") ||
+    head.includes("/qwen-") ||
+    head.endsWith("-codex-max")
+  );
 }
 
 function matchesBoundaryMarker(
@@ -590,6 +619,47 @@ export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | n
     head = head.slice(0, -suffix.length);
   }
 
+  // Check Grok on rawHead before effort stripping so `grok-code-fast` stays tier-3.
+  if (hasDelimitedMarker(rawHead, "grok")) {
+    if (hasDelimitedMarker(rawHead, "mini") || hasDelimitedMarker(rawHead, "grok-code-fast")) {
+      return "tier-3";
+    }
+    if (
+      hasDelimitedMarker(head, "grok-4") ||
+      hasDelimitedMarker(head, "grok-3") ||
+      hasDelimitedMarker(head, "grok 4") ||
+      hasDelimitedMarker(head, "grok 3")
+    ) {
+      return "tier-1";
+    }
+    return "tier-2";
+  }
+
+  if (hasDelimitedMarker(head, "glm")) {
+    if (
+      hasDelimitedMarker(head, "flash") ||
+      hasDelimitedMarker(head, "air") ||
+      hasDelimitedMarker(head, "mini") ||
+      hasDelimitedMarker(head, "lite")
+    ) {
+      return "tier-3";
+    }
+    if (hasDelimitedMarker(head, "glm-5") || hasDelimitedMarker(head, "glm 5")) {
+      return "tier-1";
+    }
+    return "tier-2";
+  }
+
+  if (head.includes("deepseek") && hasDelimitedMarker(head, "v4")) {
+    if (hasDelimitedMarker(head, "flash")) {
+      return "tier-3";
+    }
+    if (hasDelimitedMarker(head, "pro")) {
+      return "tier-1";
+    }
+    return "tier-2";
+  }
+
   // Tier-3 fast checks must run before Tier-1 gpt-5/o4 and generic Tier-2 openai/gpt.
   if (head.includes("flash-worker-agy") || head.includes("worker-agy")) {
     return "tier-3";
@@ -614,10 +684,14 @@ export function inferTierFromAuthor(identityStr?: string | null): AuthorTier | n
     hasDelimitedMarker(head, "fable") ||
     hasDelimitedMarker(head, "mythos") ||
     hasDelimitedMarker(head, "astra") ||
+    hasDelimitedMarker(head, "cyber") ||
     (!hasO1Mini && hasDelimitedMarker(head, "o1")) ||
     (!hasO3Mini && hasDelimitedMarker(head, "o3")) ||
     hasDelimitedMarker(head, "o4") ||
     GPT_5_PATTERN.test(head) ||
+    (hasDelimitedMarker(head, "qwen") && hasDelimitedMarker(head, "max")) ||
+    (hasDelimitedMarker(head, "kimi") &&
+      (hasDelimitedMarker(head, "thinking") || hasDelimitedMarker(head, "pro"))) ||
     (head.includes("deepseek") &&
       (hasDelimitedMarker(head, "r1") || hasDelimitedMarker(head, "reasoner")))
   ) {

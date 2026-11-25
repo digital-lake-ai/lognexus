@@ -657,6 +657,28 @@ describe("Canonical family normalization for the flagship Gemini 4 identities", 
       expect(parseIdentity("openai/o3-mini")?.family).toBe("openai/o3-mini");
     });
 
+    it("normalizes November 2026 frontier aliases across xAI, Z.ai, DeepSeek V4, Qwen 4 Max, and GPT-6-Cyber", () => {
+      expect(parseIdentity("x-ai/grok-4.7")?.family).toBe("xai/grok-4.7");
+      expect(parseIdentity("grok-4.7")?.family).toBe("xai/grok-4.7");
+      expect(parseIdentity("xAI Grok 4.7")?.family).toBe("xai/grok-4.7");
+      expect(parseIdentity("z.ai/glm-5.4")?.family).toBe("zai/glm-5.4");
+      expect(parseIdentity("z-ai/glm-5.4-high")?.family).toBe("zai/glm-5.4");
+      expect(parseIdentity("glm-5.4")?.family).toBe("zai/glm-5.4");
+      expect(parseIdentity("Z.ai GLM 5.4")?.family).toBe("zai/glm-5.4");
+      expect(parseIdentity("deepseek-v4-pro-high")?.family).toBe("deepseek/v4-pro");
+      expect(parseIdentity("DeepSeek V4 Pro")?.family).toBe("deepseek/v4-pro");
+      expect(parseIdentity("qwen-4-max")?.family).toBe("qwen/qwen-4-max");
+      expect(parseIdentity("qwen-4-max-high")?.family).toBe("qwen/qwen-4-max");
+      expect(parseIdentity("qwen/qwen-4-max")?.family).toBe("qwen/qwen-4-max");
+      expect(parseIdentity("gpt-6-2-cyber-high")?.family).toBe("openai/gpt-6.2-cyber");
+      expect(parseIdentity("OpenAI GPT-6-Cyber")?.family).toBe("openai/gpt-6-cyber");
+
+      expect(checkReviewGate("x-ai/grok-4.7", "grok-4.7", "intra-fleet").violated).toBe(true);
+      expect(checkReviewGate("z.ai/glm-5.4", "glm-5.4", "intra-fleet").violated).toBe(true);
+      expect(checkReviewGate("qwen-4-max", "qwen/qwen-4-max", "intra-fleet").violated).toBe(true);
+      expect(checkReviewGate("xai/grok-4.7", "zai/glm-5.4", "cross-vendor").violated).toBe(false);
+    });
+
     it("derives vendor strictly from the model family prefix, never from client qualifiers", () => {
       const ds = parseIdentity("deepseek/VS Code (kimi-code)");
       const claude = parseIdentity("anthropic/claude-sonnet-4-6-high (cursor)");

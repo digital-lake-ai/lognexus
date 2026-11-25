@@ -341,9 +341,16 @@ describe("Zero-PII Snapshot Exporter & Cohort Benchmark", () => {
           JSON.stringify({
             environment: { detectedStacks: ["typescript", "nodejs"] },
             languageBreakdown: [{ ext: ".ts", category: "source" }],
-            modelBreakdown: [{ family: "gemini/argon", tier: "tier-1" }],
+            modelBreakdown: [
+              { family: "gemini/argon", tier: "tier-1" },
+              { family: "xai/grok", tier: "tier-1" },
+              { family: "zai/glm", tier: "tier-1" },
+              { family: "deepseek/v4-pro", tier: "tier-1" },
+              { family: "qwen/max", tier: "tier-1" },
+              { family: "openai/cyber", tier: "tier-1" },
+            ],
           }),
-          ["nodejs", "source", "gemini"],
+          ["nodejs", "source", "gemini", "xai", "zai"],
         ),
       ).not.toThrow();
 

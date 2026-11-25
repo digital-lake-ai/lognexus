@@ -144,6 +144,27 @@ describe("getProjectStatus", () => {
     }
   });
 
+  it("recommends Kimi K3.1 Pro and Kimi Code for kimi single-ecosystem projects", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lognexus-status-kimi-"));
+    try {
+      execFileSync("git", ["init", "-b", "main"], { cwd: dir, stdio: "ignore", shell: false });
+      mkdirSync(join(dir, ".kimi"));
+      const mainStatus = getProjectStatus(dir);
+      expect(mainStatus.ecosystemProfile).toBe("single-client (kimi)");
+      expect(mainStatus.recommendedTier).toContain("Kimi K3.1 Pro");
+
+      execFileSync("git", ["checkout", "-b", "issue/90-kimi"], {
+        cwd: dir,
+        stdio: "ignore",
+        shell: false,
+      });
+      const issueStatus = getProjectStatus(dir);
+      expect(issueStatus.recommendedTier).toContain("Kimi Code");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("ignores commented routing directives when reporting routingMode", () => {
     const dir = mkdtempSync(join(tmpdir(), "lognexus-status-comments-"));
     try {

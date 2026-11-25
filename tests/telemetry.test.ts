@@ -452,6 +452,97 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(inferTierFromAuthor("solver")).toBeNull();
       expect(inferTierFromAuthor("Jane Doe <jane@sol.example.com>")).toBeNull();
     });
+
+    it("classifies November 2026 frontier models (DeepSeek V4, Grok 4.6/4.7, GLM-5.4, Qwen 4 Max, Kimi K3.1 Pro, GPT-6-Cyber)", () => {
+      // DeepSeek V4 line
+      expect(extractModelFamilyCategory("deepseek/v4-pro")).toBe("deepseek/v4-pro");
+      expect(extractModelFamilyCategory("deepseek-v4-pro")).toBe("deepseek/v4-pro");
+      expect(extractModelFamilyCategory("DeepSeek V4 Pro")).toBe("deepseek/v4-pro");
+      expect(inferTierFromAuthor("deepseek/v4-pro")).toBe("tier-1");
+      expect(inferTierFromAuthor("deepseek-v4-pro-high")).toBe("tier-1");
+
+      expect(extractModelFamilyCategory("deepseek/v4")).toBe("deepseek/v4");
+      expect(extractModelFamilyCategory("deepseek-v4")).toBe("deepseek/v4");
+      expect(extractModelFamilyCategory("deepseek/v4.1")).toBe("deepseek/v4");
+      expect(inferTierFromAuthor("deepseek/v4")).toBe("tier-2");
+      expect(inferTierFromAuthor("deepseek-v4")).toBe("tier-2");
+      expect(inferTierFromAuthor("deepseek/v4.1")).toBe("tier-2");
+
+      expect(extractModelFamilyCategory("deepseek/v4.1-flash")).toBe("deepseek/v4");
+      expect(extractModelFamilyCategory("deepseek-v4-flash")).toBe("deepseek/v4");
+      expect(inferTierFromAuthor("deepseek/v4.1-flash")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek-v4-flash")).toBe("tier-3");
+
+      // Legacy DeepSeek invariants
+      expect(extractModelFamilyCategory("deepseek/VS Code (kimi-code)")).toBe("deepseek/v3");
+      expect(extractModelFamilyCategory("deepseek/chat (kimi-code)")).toBe("deepseek/v3");
+      expect(inferTierFromAuthor("deepseek/chat (kimi-code)")).toBe("tier-3");
+      expect(inferTierFromAuthor("deepseek/r1")).toBe("tier-1");
+      expect(inferTierFromAuthor("deepseek/v3")).toBe("tier-3");
+
+      // xAI Grok line
+      expect(extractModelFamilyCategory("xai/grok-4.7")).toBe("xai/grok");
+      expect(extractModelFamilyCategory("x-ai/grok-4.6")).toBe("xai/grok");
+      expect(extractModelFamilyCategory("xAI Grok 4.7")).toBe("xai/grok");
+      expect(extractModelFamilyCategory("grok-code-fast")).toBe("xai/grok");
+      expect(inferTierFromAuthor("xai/grok-4.7")).toBe("tier-1");
+      expect(inferTierFromAuthor("x-ai/grok-4.6-high")).toBe("tier-1");
+      expect(inferTierFromAuthor("xAI Grok 4.7")).toBe("tier-1");
+      expect(inferTierFromAuthor("grok-3")).toBe("tier-1");
+      expect(inferTierFromAuthor("xai/grok-code")).toBe("tier-2");
+      expect(inferTierFromAuthor("grok-2")).toBe("tier-2");
+      expect(inferTierFromAuthor("grok-2.3")).toBe("tier-2");
+      expect(inferTierFromAuthor("grok-3-mini")).toBe("tier-3");
+      expect(inferTierFromAuthor("grok-code-fast")).toBe("tier-3");
+      expect(inferTierFromAuthor("xai/grok-code-fast")).toBe("tier-3");
+
+      // Z.ai GLM line
+      expect(extractModelFamilyCategory("zai/glm-5.4")).toBe("zai/glm");
+      expect(extractModelFamilyCategory("z.ai/glm-5.4")).toBe("zai/glm");
+      expect(extractModelFamilyCategory("z-ai/glm-5")).toBe("zai/glm");
+      expect(extractModelFamilyCategory("Z.ai GLM 5.4")).toBe("zai/glm");
+      expect(inferTierFromAuthor("zai/glm-5.4")).toBe("tier-1");
+      expect(inferTierFromAuthor("z.ai/glm-5")).toBe("tier-1");
+      expect(inferTierFromAuthor("Z.ai GLM 5.4")).toBe("tier-1");
+      expect(inferTierFromAuthor("zai/glm-4")).toBe("tier-2");
+      expect(inferTierFromAuthor("zai/glm-4.5")).toBe("tier-2");
+      expect(inferTierFromAuthor("zai/glm-4-flash")).toBe("tier-3");
+      expect(inferTierFromAuthor("zai/glm-4.5-air")).toBe("tier-3");
+      expect(inferTierFromAuthor("glm-5-mini")).toBe("tier-3");
+      expect(inferTierFromAuthor("glm-4-lite")).toBe("tier-3");
+
+      // Alibaba Qwen 4 Max
+      expect(extractModelFamilyCategory("qwen-4-max")).toBe("qwen/max");
+      expect(extractModelFamilyCategory("qwen/qwen-max")).toBe("qwen/max");
+      expect(extractModelFamilyCategory("Qwen 4 Max")).toBe("qwen/max");
+      expect(extractModelFamilyCategory("qwen/qwen-plus")).toBe("qwen/coder");
+      expect(extractModelFamilyCategory("qwen/coder")).toBe("qwen/coder");
+      expect(inferTierFromAuthor("qwen-4-max")).toBe("tier-1");
+      expect(inferTierFromAuthor("qwen-4-max-high")).toBe("tier-1");
+      expect(inferTierFromAuthor("qwen/qwen-max")).toBe("tier-1");
+      expect(inferTierFromAuthor("qwen-max")).toBe("tier-1");
+      expect(inferTierFromAuthor("qwen/coder")).toBe("tier-3");
+      expect(inferTierFromAuthor("Qwen Coder")).toBe("tier-3");
+      expect(inferTierFromAuthor("Qwen Lee")).toBeNull();
+
+      // Moonshot Kimi K3.1 Pro / Thinking
+      expect(extractModelFamilyCategory("moonshot/kimi-k3.1-pro")).toBe("moonshot/kimi");
+      expect(extractModelFamilyCategory("kimi-k3-thinking")).toBe("moonshot/kimi");
+      expect(inferTierFromAuthor("moonshot/kimi-k3.1-pro")).toBe("tier-1");
+      expect(inferTierFromAuthor("kimi-k3-thinking")).toBe("tier-1");
+      expect(inferTierFromAuthor("kimi/k2-thinking")).toBe("tier-1");
+      expect(inferTierFromAuthor("moonshot/kimi-k3")).toBe("tier-3");
+      expect(inferTierFromAuthor("Kimi K3")).toBe("tier-3");
+      expect(inferTierFromAuthor("kimi-code")).toBe("tier-3");
+      expect(inferTierFromAuthor("Kimi Lee")).toBeNull();
+
+      // OpenAI GPT-6-Cyber
+      expect(extractModelFamilyCategory("openai/gpt-6-cyber")).toBe("openai/cyber");
+      expect(extractModelFamilyCategory("gpt-6.2-cyber")).toBe("openai/cyber");
+      expect(extractModelFamilyCategory("OpenAI GPT-6-Cyber")).toBe("openai/cyber");
+      expect(inferTierFromAuthor("openai/gpt-6-cyber")).toBe("tier-1");
+      expect(inferTierFromAuthor("gpt-6.2-cyber")).toBe("tier-1");
+    });
   });
 
   describe("Zero-PII Metric Collection & ROI Calculation", () => {

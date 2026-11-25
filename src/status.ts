@@ -290,7 +290,7 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
       "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash / Cursor Fast)",
   },
   codex: {
-    base: "tier-1 (Reasoning / Planning: OpenAI GPT-6.2 Astra / o3)",
+    base: "tier-1 (Reasoning / Planning: OpenAI GPT-6.2 Astra / GPT-6-Cyber / o3)",
     issue: "tier-3 (Scoped Execution: OpenAI GPT-6 Luna / codex-mini)",
   },
   copilot: {
@@ -298,8 +298,8 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
     issue: "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna)",
   },
   kimi: {
-    base: "tier-1 (Reasoning / Planning: Kimi K3 Thinking / Tier-1)",
-    issue: "tier-3 (Scoped Execution: Kimi Code / Tier-3)",
+    base: "tier-1 (Reasoning / Planning: Kimi K3.1 Pro / K3 Thinking)",
+    issue: "tier-3 (Scoped Execution: Kimi Code / K3)",
   },
   zed: {
     base: "tier-1 (Reasoning / Planning: Zed — Claude Fable 5.2 / GPT-6.2 Astra / Gemini 4 Carbon)",
@@ -360,9 +360,9 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
   const singleLabels = singleEcosystem ? SINGLE_ECOSYSTEM_TIER_LABELS[singleEcosystem] : undefined;
   const recommendedTier = activeIssue
     ? (singleLabels?.issue ??
-      "tier-3 (Scoped Execution: Claude Haiku 5.5, GPT-6 Luna / GPT-4o-mini, DeepSeek Chat, Gemini Flash)")
+      "tier-3 (Scoped Execution: Claude Haiku 5.5, GPT-6 Luna / GPT-4o-mini, DeepSeek V4-Flash / Chat, GLM-4-Flash, Grok Code Fast, Gemini Flash)")
     : (singleLabels?.base ??
-      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Fable 5.2 / Claude Opus 5.5, OpenAI GPT-6.2 Astra / o3, DeepSeek R1)");
+      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Fable 5.2 / Claude Opus 5.5, OpenAI GPT-6.2 Astra / GPT-6-Cyber / o3, Grok 4.7, DeepSeek R1 / V4-Pro, GLM-5.4, Qwen 4 Max)");
 
   return {
     branch,
