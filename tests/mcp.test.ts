@@ -189,6 +189,39 @@ describe("MCP Server (JSON-RPC 2.0 over stdio)", () => {
       expect(setTaskTier?.description).toBe(expected);
       expect(commitTier?.description).toBe(expected);
     });
+
+    it("exposes official ToolAnnotations across all 12 tools with exact hint counts", async () => {
+      const res = await rpc("tools/list", undefined, tempDir);
+      const { tools } = res.result as { tools: ReturnType<typeof listMcpTools> };
+
+      expect(tools).toHaveLength(12);
+      for (const tool of tools) {
+        expect(tool.annotations).toBeDefined();
+        expect(typeof tool.annotations.readOnlyHint).toBe("boolean");
+        expect(typeof tool.annotations.destructiveHint).toBe("boolean");
+        expect(typeof tool.annotations.idempotentHint).toBe("boolean");
+        expect(typeof tool.annotations.openWorldHint).toBe("boolean");
+      }
+
+      const readOnlyTools = tools.filter((t) => t.annotations.readOnlyHint);
+      const nonDestructiveTools = tools.filter((t) => !t.annotations.destructiveHint);
+      const destructiveTools = tools.filter((t) => t.annotations.destructiveHint);
+      const closedWorldTools = tools.filter((t) => !t.annotations.openWorldHint);
+      const openWorldTools = tools.filter((t) => t.annotations.openWorldHint);
+
+      expect(readOnlyTools).toHaveLength(5);
+      expect(nonDestructiveTools).toHaveLength(10);
+      expect(destructiveTools.map((t) => t.name)).toEqual([
+        "lognexus_state_clear",
+        "lognexus_telemetry",
+      ]);
+      expect(closedWorldTools).toHaveLength(11);
+      expect(openWorldTools.map((t) => t.name)).toEqual(["lognexus_state_sync"]);
+
+      const commitTool = tools.find((t) => t.name === "lognexus_commit");
+      expect(commitTool?.annotations.idempotentHint).toBe(false);
+      expect(commitTool?.annotations.destructiveHint).toBe(false);
+    });
   });
 
   describe("tools/call", () => {

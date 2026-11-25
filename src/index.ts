@@ -71,6 +71,7 @@ export {
   callMcpTool,
   listMcpTools,
   MCP_SERVER_NAME,
+  type ToolAnnotations,
   type ToolCallResult,
   type ToolDefinition,
 } from "./mcp/tools.js";
