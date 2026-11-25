@@ -304,7 +304,7 @@ function isLogNexusServerEntry(serverName: string, entry: unknown): boolean {
   }
 
   if (typeof entry.command === "string") {
-    const lowerCmd = entry.command.toLowerCase();
+    const lowerCmd = entry.command.replace(/\\/g, "/").toLowerCase();
     const base = normalizedBasename(entry.command);
     if (
       lowerCmd.includes("@digital-lake/lognexus") ||
@@ -323,7 +323,7 @@ function isLogNexusServerEntry(serverName: string, entry: unknown): boolean {
   if (Array.isArray(entry.args)) {
     for (const arg of entry.args) {
       if (typeof arg !== "string") continue;
-      const lowerArg = arg.toLowerCase();
+      const lowerArg = arg.replace(/\\/g, "/").toLowerCase();
       const base = normalizedBasename(arg);
       if (
         lowerArg.includes("@digital-lake/lognexus") ||
@@ -437,8 +437,8 @@ function validateLogNexusServerEntry(
 }
 
 /**
- * Inspects Claude Desktop, Cursor, VS Code, and workspace MCP client configs
- * without modifying any file on disk.
+ * Inspects Claude Desktop, Antigravity, Cursor, Claude Code, VS Code, and workspace
+ * MCP client configs without modifying any file on disk.
  */
 export function checkMcpClientConfigs(
   targetDir: string = process.cwd(),
@@ -450,7 +450,11 @@ export function checkMcpClientConfigs(
 
   const candidates: McpCandidateFile[] = [
     { label: "Claude Desktop", path: resolveClaudeDesktopConfigPath(platform, home, env) },
+    { label: "Antigravity Global", path: join(home, ".gemini", "config", "mcp_config.json") },
+    { label: "Antigravity Workspace", path: join(targetDir, ".agents", "mcp_config.json") },
     { label: "Cursor", path: join(targetDir, ".cursor", "mcp.json") },
+    { label: "Cursor Global", path: join(home, ".cursor", "mcp.json") },
+    { label: "Claude Code Global", path: join(home, ".claude.json") },
     { label: "VS Code", path: join(targetDir, ".vscode", "mcp.json") },
     { label: "Workspace", path: join(targetDir, ".mcp.json") },
   ];

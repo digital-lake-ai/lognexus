@@ -449,6 +449,74 @@ describe("doctor diagnostics", () => {
       expect(vsCodeMcpServers.message).toContain("VS Code (lognexus mcp)");
     });
 
+    it("validates Antigravity Global/Workspace, Cursor Global, and Claude Code Global MCP configs including Windows backslash paths", () => {
+      const home = join(tempDir, "agy-home");
+      const agyGlobalCfg = join(home, ".gemini", "config", "mcp_config.json");
+      const agyWorkspaceCfg = join(tempDir, ".agents", "mcp_config.json");
+      const cursorGlobalCfg = join(home, ".cursor", "mcp.json");
+      const claudeGlobalCfg = join(home, ".claude.json");
+
+      mkdirSync(join(agyGlobalCfg, ".."), { recursive: true });
+      mkdirSync(join(agyWorkspaceCfg, ".."), { recursive: true });
+      mkdirSync(join(cursorGlobalCfg, ".."), { recursive: true });
+
+      writeFileSync(
+        agyGlobalCfg,
+        JSON.stringify({
+          mcpServers: {
+            "custom-server-key": {
+              command: "node",
+              args: [
+                "C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\@digital-lake\\lognexus\\dist\\cli.js",
+                "mcp",
+              ],
+            },
+          },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        agyWorkspaceCfg,
+        JSON.stringify({
+          mcpServers: {
+            lognexus: { command: "npx", args: ["-y", "@digital-lake/lognexus", "mcp"] },
+          },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        cursorGlobalCfg,
+        JSON.stringify({
+          mcpServers: {
+            lognexus: { command: "uvx", args: ["lognexus-mcp"] },
+          },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        claudeGlobalCfg,
+        JSON.stringify({
+          mcpServers: {
+            lognexus: { command: "lognexus", args: ["mcp"] },
+          },
+        }),
+        "utf8",
+      );
+
+      const check = checkMcpClientConfigs(tempDir, {
+        platform: "win32",
+        homeDir: home,
+        env: {},
+      });
+
+      expect(check.name).toBe("MCP Client Configs");
+      expect(check.status).toBe("pass");
+      expect(check.message).toContain("Antigravity Global (node cli.js mcp)");
+      expect(check.message).toContain("Antigravity Workspace (npx @digital-lake/lognexus mcp)");
+      expect(check.message).toContain("Cursor Global (uvx lognexus-mcp)");
+      expect(check.message).toContain("Claude Code Global (lognexus mcp)");
+    });
+
     it("fails when @digital-lake/lognexus entry is missing the 'mcp' subcommand", () => {
       const emptyHome = join(tempDir, "empty-home");
       writeFileSync(
