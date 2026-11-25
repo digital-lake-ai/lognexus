@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lognexus-mcp"
-version = "1.5.0"
+version = "1.6.0"
 description = "Universal Git-powered persistent memory, context rules & native MCP server for AI coding agents (Claude, OpenAI, Gemini, DeepSeek) across Linux, macOS, and Windows."
 readme = "README.md"
 license = { text = "MIT" }
@@ -44,7 +44,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/digital-lake-ai/lognexus#readme"
+Homepage = "https://digital-lake-ai.github.io/lognexus/"
 Repository = "https://github.com/digital-lake-ai/lognexus"
 Issues = "https://github.com/digital-lake-ai/lognexus/issues"
 Changelog = "https://github.com/digital-lake-ai/lognexus/blob/main/CHANGELOG.md"

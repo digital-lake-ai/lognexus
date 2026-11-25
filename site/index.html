@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LogNexus MCP Server &amp; Git-Native Agent Memory (@digital-lake/lognexus · lognexus-mcp)</title>
+  <meta name="description" content="Official documentation and MCP server specifications for LogNexus (@digital-lake/lognexus &amp; lognexus-mcp). Git-native persistent memory, subtask contracts, and review gates for AI coding agents.">
+  <link rel="canonical" href="https://digital-lake-ai.github.io/lognexus/">
+  <link rel="alternate" type="text/markdown" href="https://digital-lake-ai.github.io/lognexus/llms.txt">
+
+  <!-- OpenGraph / Social Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://digital-lake-ai.github.io/lognexus/">
+  <meta property="og:title" content="LogNexus MCP Server &amp; Git-Native Agent Memory">
+  <meta property="og:description" content="Git-native memory, state machine, and Model Context Protocol (MCP) server for multi-model AI coding agents. Zero network egress, 100% local-first.">
+  <meta property="og:site_name" content="LogNexus">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="LogNexus MCP Server &amp; Git-Native Agent Memory">
+  <meta name="twitter:description" content="Universal Git-powered context and Model Context Protocol (MCP) stdio server for native AI agents.">
+
+  <!-- Schema.org JSON-LD SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://digital-lake-ai.github.io/lognexus/#npm",
+        "name": "LogNexus (npm: @digital-lake/lognexus)",
+        "alternateName": ["@digital-lake/lognexus", "LogNexus MCP Server"],
+        "description": "Git-native memory, state machine, and Model Context Protocol (MCP) server for multi-model AI coding agents.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "softwareVersion": "1.6.0",
+        "license": "https://opensource.org/licenses/MIT",
+        "url": "https://digital-lake-ai.github.io/lognexus/",
+        "codeRepository": "https://github.com/digital-lake-ai/lognexus",
+        "sameAs": [
+          "https://github.com/digital-lake-ai/lognexus",
+          "https://www.npmjs.com/package/@digital-lake/lognexus",
+          "https://pypi.org/project/lognexus-mcp/",
+          "https://glama.ai/mcp/servers/digital-lake-ai/lognexus"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://digital-lake-ai.github.io/lognexus/#pypi",
+        "name": "LogNexus (PyPI: lognexus-mcp)",
+        "alternateName": ["lognexus-mcp", "LogNexus Python MCP Server"],
+        "description": "Lightweight Python distribution of LogNexus Model Context Protocol (MCP) server for Claude Desktop, Cursor, Antigravity, and AI coding agents.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows",
+        "softwareVersion": "1.6.0",
+        "license": "https://opensource.org/licenses/MIT",
+        "url": "https://digital-lake-ai.github.io/lognexus/",
+        "codeRepository": "https://github.com/digital-lake-ai/lognexus",
+        "sameAs": [
+          "https://github.com/digital-lake-ai/lognexus",
+          "https://www.npmjs.com/package/@digital-lake/lognexus",
+          "https://pypi.org/project/lognexus-mcp/",
+          "https://glama.ai/mcp/servers/digital-lake-ai/lognexus"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --heading: #f0f6fc;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --code-bg: #0b0e14;
+      --tag-ro: #238636;
+      --tag-w: #1f6feb;
+      --tag-reset: #da3633;
+      --muted: #8b949e;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 2rem 1.5rem;
+    }
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2rem;
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+    h1 {
+      color: var(--heading);
+      font-size: 2.2rem;
+      margin-bottom: 0.75rem;
+    }
+    .subtitle {
+      color: var(--accent);
+      font-size: 1.15rem;
+      font-weight: 500;
+      margin-bottom: 1.25rem;
+    }
+    .badge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 6px;
+      text-decoration: none;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .badge.primary {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    section {
+      margin-bottom: 3rem;
+    }
+    h2 {
+      color: var(--heading);
+      font-size: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    h3 {
+      color: var(--heading);
+      font-size: 1.2rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    p, ul, ol {
+      margin-bottom: 1rem;
+    }
+    ul, ol {
+      padding-left: 1.5rem;
+    }
+    li {
+      margin-bottom: 0.35rem;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+      color: var(--accent-hover);
+    }
+    pre, code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+    }
+    code {
+      background-color: var(--card-bg);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      color: #e6edf3;
+    }
+    pre {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+    }
+    pre code {
+      background: transparent;
+      border: none;
+      padding: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .card h3 {
+      margin-top: 0;
+      color: var(--heading);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: var(--card-bg);
+      color: var(--heading);
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .tag-ro { background-color: var(--tag-ro); color: #fff; }
+    .tag-w { background-color: var(--tag-w); color: #fff; }
+    .tag-reset { background-color: var(--tag-reset); color: #fff; }
+    .callout {
+      background-color: rgba(88, 166, 255, 0.08);
+      border-left: 4px solid var(--accent);
+      padding: 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      margin-top: 3rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    footer a {
+      margin: 0 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>LogNexus</h1>
+      <p class="subtitle">Git-Native Agent Memory &amp; Model Context Protocol (MCP) Server</p>
+      <div class="badge-bar">
+        <a class="badge primary" href="https://www.npmjs.com/package/@digital-lake/lognexus">npm: @digital-lake/lognexus (v1.6.0)</a>
+        <a class="badge primary" href="https://pypi.org/project/lognexus-mcp/">PyPI: lognexus-mcp (v1.6.0)</a>
+        <a class="badge" href="https://glama.ai/mcp/servers/digital-lake-ai/lognexus">Glama Server Hub (Grade A)</a>
+        <a class="badge" href="https://github.com/digital-lake-ai/lognexus">GitHub Repository</a>
+        <a class="badge" href="llms.txt">llms.txt (AI Index)</a>
+      </div>
+      <p>LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph for AI coding agents. It provides zero-overhead coordination, review gates, subtask contracts, and atomic commits without API proxies or network egress.</p>
+    </header>
+
+    <main>
+      <section id="quick-install">
+        <h2>Quick Install &amp; Client Configuration</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Node.js / npm (Universal CLI &amp; MCP)</h3>
+            <p>Run the stdio MCP server directly without manual installation:</p>
+            <pre><code>npx -y @digital-lake/lognexus mcp</code></pre>
+            <p>Scaffold repository rules, contracts, and routing:</p>
+            <pre><code>npx @digital-lake/lognexus init</code></pre>
+          </div>
+          <div class="card">
+            <h3>Python / uvx (PyPI Distribution)</h3>
+            <p>Zero-install MCP stdio launch via <code>uvx</code>:</p>
+            <pre><code>uvx lognexus-mcp</code></pre>
+            <p>Or install globally via pip:</p>
+            <pre><code>pip install lognexus-mcp</code></pre>
+          </div>
+        </div>
+
+        <h3>Google Antigravity Setup</h3>
+        <p>Register LogNexus in your user config (<code>~/.gemini/config/mcp_config.json</code>) or project configuration (<code>.agents/mcp_config.json</code>):</p>
+        <pre><code>{
+  "mcpServers": {
+    "lognexus": {
+      "command": "npx",
+      "args": ["-y", "@digital-lake/lognexus", "mcp"],
+      "eager": true
+    }
+  }
+}</code></pre>
+        <div class="callout">
+          <strong>Tip for Antigravity:</strong> Adding <code>"eager": true</code> instructs Antigravity to pre-warm the MCP stdio connection immediately upon session startup, avoiding cold-start latency when agents query tools.
+        </div>
+
+        <h3>Claude Desktop &amp; Cursor Setup</h3>
+        <p>Add LogNexus to your <code>claude_desktop_config.json</code> or <code>.cursor/mcp.json</code>:</p>
+        <pre><code>{
+  "mcpServers": {
+    "lognexus": {
+      "command": "npx",
+      "args": ["-y", "@digital-lake/lognexus", "mcp"]
+    }
+  }
+}</code></pre>
+      </section>
+
+      <section id="mcp-tools">
+        <h2>Annotated Model Context Protocol (MCP) Tools</h2>
+        <p>LogNexus exposes <strong>12 annotated MCP tools</strong> categorized by operational safety. Every tool specifies standardized RFC ToolAnnotations (<code>readOnlyHint</code>, <code>destructiveHint</code>, <code>idempotentHint</code>, <code>openWorldHint</code>) to ensure secure, deterministic tool execution by AI models.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Tool Name</th>
+              <th>Category</th>
+              <th>ToolAnnotations</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>lognexus_status</code></td>
+              <td><span class="tag tag-ro">Read-Only</span></td>
+              <td><code>ro=true, destr=false, idemp=true, ow=false</code></td>
+              <td>Inspects repository git branch, active issue, rules routing mode, ecosystem profile, review gate mode, recommended tier, and working-tree scope drift.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_state_get</code></td>
+              <td><span class="tag tag-ro">Read-Only</span></td>
+              <td><code>ro=true, destr=false, idemp=true, ow=false</code></td>
+              <td>Retrieves persistent agent state (<code>.lognexus/state.json</code>) including active subtask, contract boundaries, allowed files, decision budget, and completed history.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_note_show</code></td>
+              <td><span class="tag tag-ro">Read-Only</span></td>
+              <td><code>ro=true, destr=false, idemp=true, ow=false</code></td>
+              <td>Reads structured LogNexus Git Notes attached to a commit under <code>refs/notes/lognexus</code> (standard git-ai v3 format).</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_timeline</code></td>
+              <td><span class="tag tag-ro">Read-Only</span></td>
+              <td><code>ro=true, destr=false, idemp=true, ow=false</code></td>
+              <td>Reconstructs the end-to-end task journey and commit history into structured Markdown or Pull Request body descriptions.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_audit</code></td>
+              <td><span class="tag tag-ro">Read-Only</span></td>
+              <td><code>ro=true, destr=false, idemp=true, ow=false</code></td>
+              <td>Programmatically verifies review gate separation (<code>Authored-by</code> ≠ <code>Reviewed-by</code>), contract integrity, and branch compliance against policy profiles.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_state_sync</code></td>
+              <td><span class="tag tag-w">Write</span></td>
+              <td><code>ro=false, destr=false, idemp=true, ow=false</code></td>
+              <td>Synchronizes local session state with git HEAD, resolving branch switches and commit alignment.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_state_set_task</code></td>
+              <td><span class="tag tag-w">Write</span></td>
+              <td><code>ro=false, destr=false, idemp=false, ow=false</code></td>
+              <td>Sets or updates the active subtask contract with title, assigned agent, isolation mode, allowed file allowlist, and verification command.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_state_finish_task</code></td>
+              <td><span class="tag tag-w">Write</span></td>
+              <td><code>ro=false, destr=false, idemp=true, ow=false</code></td>
+              <td>Marks a subtask finished in session state, recording commit SHA, completion timestamp, and notes.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_commit</code></td>
+              <td><span class="tag tag-w">Write</span></td>
+              <td><code>ro=false, destr=false, idemp=false, ow=false</code></td>
+              <td>Executes an atomic commit that validates subtask file allowlists, injects authorship trailers, marks subtask completed, and attaches Git Notes in ~0.15s.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_note_attach</code></td>
+              <td><span class="tag tag-w">Write</span></td>
+              <td><code>ro=false, destr=false, idemp=true, ow=false</code></td>
+              <td>Attaches structured session context and causation metadata to a commit under <code>refs/notes/lognexus</code> without altering the commit SHA.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_state_clear</code></td>
+              <td><span class="tag tag-reset">State-Reset</span></td>
+              <td><code>ro=false, destr=true, idemp=true, ow=false</code></td>
+              <td>Resets the active subtask contract or clears the full task list to recover from erroneous agent state transitions.</td>
+            </tr>
+            <tr>
+              <td><code>lognexus_telemetry</code></td>
+              <td><span class="tag tag-reset">State-Reset</span></td>
+              <td><code>ro=false, destr=false, idemp=false, ow=false</code></td>
+              <td>Records local Zero-PII events or queries telemetry state. Strictly local storage in <code>.lognexus/telemetry.json</code>; zero network calls.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="mcp-resources">
+        <h2>MCP Resources &amp; Prompts</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>MCP Resources (3 Live URIs)</h3>
+            <ul>
+              <li><code>lognexus://state</code> &mdash; Real-time JSON snapshot of active issue, current subtask contract, and completion history.</li>
+              <li><code>lognexus://routing</code> &mdash; Declarative ecosystem routing configuration (<code>.lognexus/routing.md</code>) defining orchestration and review gates.</li>
+              <li><code>lognexus://handoff</code> &mdash; Automated context handoff document (<code>.lognexus/handoff.md</code>) with live scope-drift report and next actionable prompt.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>MCP Prompts (2 Guided Workflows)</h3>
+            <ul>
+              <li><code>lognexus-plan</code> &mdash; Guides the AI agent through strict task decomposition into contract-bounded subtasks T1..Tn.</li>
+              <li><code>lognexus-review</code> &mdash; Guides independent reviewer models through pre-merge verification, diff auditing, and signature generation.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="compatibility">
+        <h2>Supported Models &amp; Client Ecosystems (November 2026)</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Supported AI Coding Models</h3>
+            <ul>
+              <li><strong>DeepSeek:</strong> DeepSeek V4-Pro, DeepSeek V4.1-Flash, R1, V3</li>
+              <li><strong>xAI:</strong> Grok 4.7, Grok Code Fast</li>
+              <li><strong>Z.ai:</strong> GLM-5.4, GLM-4-Flash</li>
+              <li><strong>Alibaba:</strong> Qwen 4 Max, Qwen 2.5 Coder</li>
+              <li><strong>Moonshot AI:</strong> Kimi K3.1 Pro, Kimi K3</li>
+              <li><strong>OpenAI:</strong> GPT-6-Cyber, GPT-6.2 Astra / Sol / Luna, o3, o4, codex-mini</li>
+              <li><strong>Anthropic:</strong> Claude Fable 5.2, Claude Mythos 5.2, Claude Opus / Sonnet / Haiku 5.5</li>
+              <li><strong>Google:</strong> Gemini 4 Neon / Carbon / Argon / Hydrogen, Gemini 3.8 Pro &amp; Flash</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Supported Client Environments</h3>
+            <ul>
+              <li><strong>Google Antigravity:</strong> Full support via workspace skills, prompt guidelines, and eager stdio MCP transport.</li>
+              <li><strong>Claude Code:</strong> Native plugin integration via <code>claude plugin add digital-lake-ai/lognexus</code>.</li>
+              <li><strong>Cursor &amp; VS Code:</strong> Project rules and native stdio MCP server via <code>.cursor/mcp.json</code>.</li>
+              <li><strong>Codex &amp; GitHub Copilot:</strong> Native instructions via <code>.github/copilot-instructions.md</code>.</li>
+              <li><strong>Zed &amp; Kimi Code:</strong> JSON-RPC 2.0 stdio MCP integration.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy">
+        <h2>Architecture &amp; Zero-PII Privacy</h2>
+        <p>LogNexus operates entirely on your local machine using standard Git facilities:</p>
+        <ul>
+          <li><strong>Zero Network Egress:</strong> LogNexus does not send code, prompts, tokens, or Git data to external servers or telemetry endpoints.</li>
+          <li><strong>Git Notes Preservation:</strong> Metadata is committed under <code>refs/notes/lognexus</code>, preserving pristine commit SHAs without polluting commit histories.</li>
+          <li><strong>Deterministic Contract Boundaries:</strong> Subtasks enforce explicit allowlists (<code>allowedFiles</code>) and decision budgets, blocking rogue modifications before they reach a commit.</li>
+          <li><strong>Non-Negotiable Review Separation:</strong> Independent review gates verify that <code>Authored-by</code> and <code>Reviewed-by</code> models belong to distinct sessions or providers.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2026 Digital Lake AI. Distributed under the MIT License.</p>
+      <p>
+        <a href="https://github.com/digital-lake-ai/lognexus">GitHub</a> &bull;
+        <a href="https://www.npmjs.com/package/@digital-lake/lognexus">npm</a> &bull;
+        <a href="https://pypi.org/project/lognexus-mcp/">PyPI</a> &bull;
+        <a href="https://glama.ai/mcp/servers/digital-lake-ai/lognexus">Glama</a> &bull;
+        <a href="llms.txt">llms.txt</a> &bull;
+        <a href="sitemap.xml">Sitemap</a>
+      </p>
+    </footer>
+  </div>
+</body>
+</html>

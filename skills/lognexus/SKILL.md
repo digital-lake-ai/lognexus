@@ -19,7 +19,7 @@ Use GitHub as a complete knowledge graph where every brainstorm, commit, review,
 
 To eliminate cognitive amnesia between conversation resets, context compactations, or model handoffs:
 1. **At Session Start or after conversation compactation:**
-   Inspect `.lognexus/state.json`, run `npx @digital-lake/lognexus state show`, or read MCP resources (`lognexus://state`, `lognexus://routing`, `lognexus://handoff`) to immediately recover active issue, branch, current subtask, and delegation contract. Validate MCP setup and audit policy with `npx @digital-lake/lognexus doctor --mcp`.
+   Inspect `.lognexus/state.json`, run `npx @digital-lake/lognexus state show`, or read MCP resources (`lognexus://state`, `lognexus://routing`, `lognexus://handoff`) to immediately recover active issue, branch, current subtask, and delegation contract. Validate MCP setup and audit policy with `npx @digital-lake/lognexus doctor --mcp` (discovering Antigravity `~/.gemini/config/mcp_config.json`, `.agents/mcp_config.json`, Cursor, Claude Desktop, and VS Code, with declarative `ToolAnnotations` like `readOnlyHint` and `idempotentHint` across all 12 tools).
 2. **Synchronize State:**
    Run `npx @digital-lake/lognexus state sync` upon branch checkout or switching to update local state from Git and GitHub.
 3. **Subtask Tracking & Contract Declaration:**
@@ -402,8 +402,8 @@ Every lognexus artifact (comments, PR bodies, review sign-offs) must carry a pro
 | Field | Values | Examples |
 |-------|--------|---------|
 | `role` | `Authored-by`, `Updated-by`, `Reviewed-by`, `Last-code-by`, or `Planned-by` | — |
-| `family` | Provider name, lowercase | `claude`, `openai`, `google`, `deepseek` |
-| `version` | Model identifier | `fable-5.2`, `mythos-5.2`, `opus-5.5`, `sonnet-5.5`, `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6-luna`, `gpt-5.4`, `carbon`, `argon`, `neon`, `hydrogen` |
+| `family` | Provider name, lowercase | `claude`, `openai`, `google`, `deepseek`, `xai`, `zai`, `qwen`, `moonshot` |
+| `version` | Model identifier | `fable-5.2`, `mythos-5.2`, `opus-5.5`, `sonnet-5.5`, `gpt-6.2-astra`, `gpt-6.2-sol`, `gpt-6-luna`, `gpt-6-cyber`, `gpt-5.4`, `carbon`, `argon`, `neon`, `hydrogen`, `v4-pro`, `v4.1-flash`, `grok-4.7`, `glm-5.4`, `qwen-4-max`, `kimi-k3.1-pro` |
 | `tool` | Runtime environment, lowercase | `claude-code`, `codex`, `copilot`, `cursor`, `antigravity`, `kimi-code` |
 | `qualifier` | Optional metadata string; may be compound when needed | `effort: high`, `orchestrator`, `sub-agent: reviewer`, `effort: high; orchestrator` |
 
@@ -419,11 +419,15 @@ Every lognexus artifact (comments, PR bodies, review sign-offs) must carry a pro
 | Cursor | System prompt model identifier | `claude/opus-5.5 (cursor)` |
 | Antigravity (Tier-1 Orchestrators) | Workspace agent configuration | **`Gemini 4 Neon`** (`gemini/neon`, `Orchestrator (Neon)` / `gemini-pro-orchestrator-neon`), `Gemini 4 Carbon` (`gemini/carbon`), `Gemini 4 Argon` (`gemini/argon`) |
 | Antigravity (Tier-2/3 Workers) | Runtime subagent or swarm worker | `google/gemini-4-hydrogen-high (antigravity)`, `google/gemini-3.8-flash-high (antigravity)`, `gemini-flash-worker-agy` |
-| Kimi Code | Active model identifier in editor | `deepseek/VS Code (kimi-code)` |
+| Kimi Code / Moonshot | Active model identifier in editor | `moonshot/kimi-k3.1-pro (kimi-code)`, `deepseek/VS Code (kimi-code)` |
+| xAI Grok | API / CLI runtime environment | `xai/grok-4.7 (grok-cli)` |
+| Z.ai GLM | API / CLI runtime environment | `zai/glm-5.4 (glm-cli)` |
+| Qwen | API / CLI runtime environment | `qwen/qwen-4-max (qwen-cli)` |
 | Other | Best available model identifier | `<family>/<version> (<tool>)` |
 
 **November 2026 Normalization & Shared-Weights Gate:**
 - Effort/speed suffixes (`-ultrafast`, `-fast`, `-light`, `-max`, `-extra-high`, `-xhigh`, `-high`, `-medium`, `-low`, `-minimal`, `-none`) and `codex/* -> openai/*` provider aliases strip cleanly during family normalization (`claude/fable-5-2` == `claude/fable-5.2`, `openai/gpt-6-2-astra` == `openai/gpt-6.2-astra`).
+- Frontier models across DeepSeek (**DeepSeek V4-Pro** / **V4** / **V4.1-Flash**), xAI (**Grok 4.6/4.7** / **Grok Code Fast**), Z.ai (**GLM-5.4** / **GLM-4-Flash**), Qwen (**Qwen 4 Max** / **Qwen Coder**), Moonshot (**Kimi K3.1 Pro / Thinking**), and OpenAI (**GPT-6-Cyber**) are fully supported and mapped into the 3-tier taxonomy.
 - `Claude Fable 5.2` (`claude/fable-5.2`) and `Claude Mythos 5.2` (`claude/mythos-5.2`) share identical underlying base weights: `Fable <-> Mythos` cross-review is blocked as self-approval, while `Fable`/`Mythos` may review `Opus 5.5`, `Sonnet 5.5`, or `Haiku 5.5` under `intra-fleet`.
 - In `CODEX_CI` or `CODEX_SANDBOX_NETWORK_DISABLED` agent subshells, interactive telemetry prompts stay suppressed (`CODEX_HOME` alone does not suppress human TTY prompts).
 
@@ -616,7 +620,7 @@ All recommended skills are optional. The current optional integrations are liste
 
 ### MCP & Policy Validation
 
-Run `npx @digital-lake/lognexus doctor --mcp` for read-only cross-platform MCP client config validation (`Claude Desktop`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.mcp.json`) and `.lognexus/policy.json` schema validation.
+Run `npx @digital-lake/lognexus doctor --mcp` for read-only cross-platform MCP client config validation (`Claude Desktop`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.mcp.json`, Antigravity `~/.gemini/config/mcp_config.json`, `.agents/mcp_config.json`) and `.lognexus/policy.json` schema validation. All 12 MCP tools declare official `ToolAnnotations` (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
 
 ### User-Facing Language
 

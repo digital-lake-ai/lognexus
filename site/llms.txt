@@ -1,0 +1,77 @@
+# LogNexus
+
+> Git-native memory, state machine, and Model Context Protocol (MCP) server for multi-model AI coding agents.
+
+LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph. It prevents agent amnesia, enforces subtask file contracts, and automates atomic commits with cryptographic Git Notes (`refs/notes/lognexus`).
+
+- Canonical Documentation: https://digital-lake-ai.github.io/lognexus/
+- GitHub Repository: https://github.com/digital-lake-ai/lognexus
+- npm Package: https://www.npmjs.com/package/@digital-lake/lognexus
+- PyPI Package: https://pypi.org/project/lognexus-mcp/
+- Glama Server Hub: https://glama.ai/mcp/servers/digital-lake-ai/lognexus
+- Software Version: 1.6.0
+- Architecture: 100% Local-First, Zero Network Egress, Privacy-Preserving
+
+## Packages & Launch Commands
+
+### Node.js / npm
+- Package: `@digital-lake/lognexus`
+- Run MCP Stdio Server: `npx -y @digital-lake/lognexus mcp`
+- CLI Health & Diagnostics: `npx @digital-lake/lognexus doctor --mcp`
+
+### Python / PyPI
+- Package: `lognexus-mcp`
+- Run MCP Stdio Server: `uvx lognexus-mcp` (or `pip install lognexus-mcp`)
+
+## Model Context Protocol (MCP) Interface
+
+LogNexus exposes a standard JSON-RPC 2.0 stdio interface compatible with Claude Desktop, Cursor, Google Antigravity, and any MCP client.
+
+### Annotated Tools (12 Tools)
+
+#### Read-Only Tools (5 tools)
+- `lognexus_status`: Inspect current repository branch, active issue, rules routing mode, ecosystem profile, review gate, recommended tier, and scope drift.
+  - Annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_state_get`: Retrieve persistent agent state (`.lognexus/state.json`) including active subtask, contract boundaries, allowed files, decision budget, and completed history.
+  - Annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_note_show`: Display LogNexus Git Notes attached to a commit under `refs/notes/lognexus`.
+  - Annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_timeline`: Reconstruct commit and task journey timeline from Git Notes, formatted as Markdown or PR description.
+  - Annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_audit`: Programmatically audit review gate compliance (`Authored-by` != `Reviewed-by`) and contract verification on branch commits.
+  - Annotations: `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+
+#### Non-Destructive Write Tools (5 tools)
+- `lognexus_state_sync`: Synchronize state with git HEAD, aligning branch and commit context.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_state_set_task`: Set or update active subtask contract with title, assignee, isolation mode, allowed files, and verify command.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: false`
+- `lognexus_state_finish_task`: Mark a subtask completed in state with optional notes and commit SHA.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_commit`: Execute an atomic commit validating contract allowlists, injecting author trailers, marking subtask finished, and attaching Git Notes.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: false`
+- `lognexus_note_attach`: Attach structured Git Note payload to HEAD or specified commit under `refs/notes/lognexus`.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: false`
+
+#### State-Reset Tools (2 tools)
+- `lognexus_state_clear`: Clear or reset active subtask contract and optionally all task history.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: true`, `idempotentHint: true`, `openWorldHint: false`
+- `lognexus_telemetry`: Manage local-only Zero-PII telemetry events, consent status, and metric recording.
+  - Annotations: `readOnlyHint: false`, `destructiveHint: false`, `idempotentHint: false`, `openWorldHint: false`
+
+### Resources (3 URIs)
+- `lognexus://state`: Live JSON snapshot of `.lognexus/state.json`.
+- `lognexus://routing`: Multi-model routing and orchestration configuration (`.lognexus/routing.md`).
+- `lognexus://handoff`: Comprehensive session continuity document (`.lognexus/handoff.md`).
+
+### Prompts (2 Prompts)
+- `lognexus-plan`: Decompose requirements into structured subtasks (T1..Tn) bounded by file allowlists and decision budgets.
+- `lognexus-review`: Independent reviewer checklist ensuring verification gates and non-self-approval enforcement.
+
+## Supported Clients & Ecosystems
+
+- **Google Antigravity:** Full compatibility with MCP stdio configuration; recommend `"eager": true` in `mcp_config.json`.
+- **Claude Code:** Official plugin support via `claude plugin add digital-lake-ai/lognexus`.
+- **Cursor & VS Code:** Project-level integration via `.cursor/mcp.json`.
+- **Codex & GitHub Copilot:** Native instruction files via `.github/copilot-instructions.md`.
+- **Nov 2026 Models:** DeepSeek V4-Pro, DeepSeek V4.1-Flash, xAI Grok 4.7, Z.ai GLM-5.4, Qwen 4 Max, Kimi K3.1 Pro, GPT-6-Cyber, Claude Fable 5.2 / Mythos 5.2 / Opus 5.5, Gemini 4 Neon / Carbon / Argon / Hydrogen.
