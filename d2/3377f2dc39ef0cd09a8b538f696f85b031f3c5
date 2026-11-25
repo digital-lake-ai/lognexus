@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.5.0",
+  "timestamp": "2026-11-25T04:10:45.076Z",
+  "issue": {
+    "id": 94,
+    "title": "release: publish LogNexus v1.6.0 (Antigravity v2.35, Nov 2026 models, MCP ToolAnnotations & SEO/GEO hub)",
+    "tier": "tier-3"
+  },
+  "subtask": {
+    "id": "T2",
+    "title": "Prepend CHANGELOG 1.6.0 and update telemetry docs, templates, skills and commands",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "CHANGELOG.md",
+        "docs/TELEMETRY_PRIVACY.md",
+        ".github/ISSUE_TEMPLATE/diagnostic-report.yml",
+        "skills/lognexus/SKILL.md",
+        "skills/lognexus/references/model-routing.md",
+        "commands/lognexus/models.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint",
+      "assignee": "google/gemini-3.8-flash-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 4
+  }
+}
