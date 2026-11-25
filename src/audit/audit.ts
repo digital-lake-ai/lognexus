@@ -246,7 +246,12 @@ function isVersionDigitSegment(value: string): boolean {
 
 function shouldSkipEffortSuffix(slug: string, suffix: string): boolean {
   if (suffix !== "-max") return false;
-  return slug.startsWith("qwen/") || slug === "qwen-max" || slug.endsWith("-codex-max");
+  return (
+    slug.startsWith("qwen/") ||
+    slug.startsWith("qwen-") ||
+    slug.includes("/qwen-") ||
+    slug.endsWith("-codex-max")
+  );
 }
 
 /**
@@ -313,6 +318,18 @@ function stripCanonicalDecorations(collapsed: string): string {
   if (slug.startsWith("openai-")) slug = `openai/${slug.slice("openai-".length)}`;
   if (slug.startsWith("gemini-")) slug = `gemini/${slug.slice("gemini-".length)}`;
   if (slug.startsWith("claude-")) slug = `claude/${slug.slice("claude-".length)}`;
+  if (slug.startsWith("x-ai/")) slug = `xai/${slug.slice("x-ai/".length)}`;
+  else if (slug.startsWith("x-ai-")) slug = `xai/${slug.slice("x-ai-".length)}`;
+  else if (slug.startsWith("xai-")) slug = `xai/${slug.slice("xai-".length)}`;
+  if (slug.startsWith("grok-")) slug = `xai/${slug}`;
+  if (slug.startsWith("z.ai/")) slug = `zai/${slug.slice("z.ai/".length)}`;
+  else if (slug.startsWith("z-ai/")) slug = `zai/${slug.slice("z-ai/".length)}`;
+  else if (slug.startsWith("z.ai-")) slug = `zai/${slug.slice("z.ai-".length)}`;
+  else if (slug.startsWith("z-ai-")) slug = `zai/${slug.slice("z-ai-".length)}`;
+  else if (slug.startsWith("zai-")) slug = `zai/${slug.slice("zai-".length)}`;
+  if (slug.startsWith("glm-")) slug = `zai/${slug}`;
+  if (slug.startsWith("deepseek-")) slug = `deepseek/${slug.slice("deepseek-".length)}`;
+  if (slug.startsWith("qwen-")) slug = `qwen/${slug}`;
   if (slug === "fable" || slug.startsWith("fable-")) slug = `claude/${slug}`;
   if (slug === "mythos" || slug.startsWith("mythos-")) slug = `claude/${slug}`;
   if (

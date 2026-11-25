@@ -86,6 +86,10 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
         "ANTIGRAVITY_AGENT",
         "ANTIGRAVITY_TRAJECTORY_ID",
         "ANTIGRAVITY_SOURCE_METADATA",
+        "ANTIGRAVITY_CONVERSATION_ID",
+        "ANTIGRAVITY_LS_ADDRESS",
+        "ANTIGRAVITY_CSRF_TOKEN",
+        "ANTIGRAVITY_PROJECT_ID",
         "GEMINI_CLI",
         "AIDER_MODEL",
       ]) {
@@ -128,6 +132,10 @@ describe("Interactive Telemetry Consent Prompt (Policy v2.0.0)", () => {
       ).toBe(false);
       expect(isAgentEnvironment({ ANTIGRAVITY_TRAJECTORY_ID: "abc" })).toBe(true);
       expect(isAgentEnvironment({ ANTIGRAVITY_SOURCE_METADATA: "{}" })).toBe(true);
+      expect(isAgentEnvironment({ ANTIGRAVITY_CONVERSATION_ID: "conv-123" })).toBe(true);
+      expect(isAgentEnvironment({ ANTIGRAVITY_LS_ADDRESS: "http://127.0.0.1:42000" })).toBe(true);
+      expect(isAgentEnvironment({ ANTIGRAVITY_CSRF_TOKEN: "csrf-xyz" })).toBe(true);
+      expect(isAgentEnvironment({ ANTIGRAVITY_PROJECT_ID: "proj-1" })).toBe(true);
     });
 
     it("suppresses interactive consent for CODEX_CI and CODEX_SANDBOX_NETWORK_DISABLED but allows CODEX_HOME alone", () => {

@@ -68,6 +68,8 @@ const CANONICAL_MODEL_FAMILIES = [
   "openai/",
   "moonshot/",
   "qwen/",
+  "xai/",
+  "zai/",
 ];
 
 const UNKNOWN_MODEL_FAMILY = "unknown/other";
