@@ -12,6 +12,7 @@ import {
   extractCommitDiffStats,
   extractModelFamilyCategory,
   inferTierFromAuthor,
+  normalizeDiffTreePath,
 } from "./detector.js";
 import {
   type AnonymousDiagnosticPayload,
@@ -614,7 +615,16 @@ function listChangedFiles(sha: string, targetDir: string): string[] {
   try {
     const raw = execFileSync(
       "git",
-      ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", validateGitReference(sha)],
+      [
+        "-c",
+        "core.quotePath=false",
+        "diff-tree",
+        "--root",
+        "--no-commit-id",
+        "--name-only",
+        "-r",
+        validateGitReference(sha),
+      ],
       {
         cwd: targetDir,
         encoding: "utf8",
@@ -625,7 +635,7 @@ function listChangedFiles(sha: string, targetDir: string): string[] {
 
     return raw
       .split("\n")
-      .map((line) => line.trim().replace(/\\/g, "/"))
+      .map((line) => normalizeDiffTreePath(line).replace(/\\/g, "/"))
       .filter((line) => line !== "" && !line.startsWith(EPHEMERAL_PATH_PREFIX));
   } catch {
     return [];
