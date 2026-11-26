@@ -1,0 +1,42 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.6.1",
+  "timestamp": "2026-11-26T18:51:26.974Z",
+  "issue": {
+    "id": 98,
+    "title": "fix(telemetry,packaging): resolve diff-quote, tier-1 & duration telemetry bugs and adopt PEP 639",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T4",
+    "title": "Prevent follow-up duration double-counting and persist exact timedSubtasks",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "src/notes/attach.ts",
+        "src/telemetry/schema.ts",
+        "src/telemetry/collector.ts",
+        "tests/telemetry.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package-lock.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npx vitest run tests/telemetry.test.ts tests/telemetry-benchmark.test.ts",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1,
+      "swarmPosts": 1
+    },
+    "durationSec": 462
+  },
+  "tier": "tier-2",
+  "tierExplicit": false,
+  "author": "google/gemini-4-hydrogen-high (antigravity)",
+  "swarm": {
+    "workers": 1,
+    "posts": 1
+  }
+}
