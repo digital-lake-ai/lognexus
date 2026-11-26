@@ -103,6 +103,15 @@ npm run lint
 npm test
 ```
 
+### Model Lifecycle & Deprecation Verification (ModelCanon MCP)
+
+Before cutting a release or updating routing templates in `src/scaffold.ts` and `src/status.ts`, maintainers verify active model IDs and upcoming deprecation/shutdown dates using `@digital-lake/modelcanon`:
+
+- **CLI audit:** `npx -y @digital-lake/modelcanon audit <model_id> --json`
+- **MCP tools & resources:** `audit_model_id`, `get_latest_updates`, and resource `modelcanon://deprecations/upcoming`
+
+ModelCanon runs out-of-band during release maintenance so `LogNexus` preserves its strict `0` runtime `fetch()` invariant.
+
 ---
 
 ## 5. Reporting Issues
