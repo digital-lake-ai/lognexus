@@ -1,0 +1,36 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.6.0",
+  "timestamp": "2026-11-26T16:30:35.938Z",
+  "issue": {
+    "id": 96,
+    "title": "fix(shield): expand Token Shield for bun.lock & modern frameworks and ship v1.6.1",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "verify bun.lock Token Shield merge and context budget exemption",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "tests/scaffold.test.ts",
+        "tests/handoff.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1,
+      "swarmPosts": 1
+    }
+  },
+  "tier": "tier-2",
+  "swarm": {
+    "workers": 1,
+    "posts": 1
+  }
+}
