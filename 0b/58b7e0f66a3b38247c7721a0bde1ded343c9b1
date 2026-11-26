@@ -1,0 +1,45 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.6.2",
+  "timestamp": "2026-11-26T18:52:03.596Z",
+  "issue": {
+    "id": 98,
+    "title": "fix(telemetry,packaging): resolve diff-quote, tier-1 & duration telemetry bugs and adopt PEP 639",
+    "tier": "tier-2"
+  },
+  "subtask": {
+    "id": "T5",
+    "title": "Bump 7 core version surfaces and CHANGELOG for v1.6.2",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "package.json",
+        "package-lock.json",
+        ".claude-plugin/plugin.json",
+        "server.json",
+        "pyproject.toml",
+        "python/lognexus_mcp/__init__.py",
+        "src/cli.ts",
+        "CHANGELOG.md"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run version:check",
+      "assignee": "google/gemini-4-hydrogen-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1,
+      "swarmPosts": 1
+    },
+    "durationSec": 24
+  },
+  "tier": "tier-2",
+  "tierExplicit": false,
+  "author": "google/gemini-4-hydrogen-high (antigravity)",
+  "swarm": {
+    "workers": 1,
+    "posts": 1
+  }
+}
