@@ -91,6 +91,16 @@ describe("PyPI package metadata (pyproject.toml)", () => {
     expect(pyproject).toContain("Operating System :: Microsoft :: Windows");
     expect(pyproject).toContain("Operating System :: POSIX :: Linux");
   });
+
+  it("declares PEP 639 license metadata with setuptools>=77.0.3 and omits deprecated license classifiers", () => {
+    const pyproject = readRepoFile("pyproject.toml");
+
+    expect(pyproject).toContain('requires = ["setuptools>=77.0.3"]');
+    expect(pyproject).toMatch(/^license = "MIT"$/m);
+    expect(pyproject).toContain('license-files = ["LICENSE", "NOTICE.md"]');
+    expect(pyproject).not.toContain('license = { text = "MIT" }');
+    expect(pyproject).not.toContain("License :: OSI Approved :: MIT License");
+  });
 });
 
 describe("Python launcher (python/lognexus_mcp/__init__.py)", () => {

@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { executeAtomicCommit } from "../src/commit.js";
 import { attachCurrentStateToCommit } from "../src/index.js";
+import { getNote } from "../src/notes/notes.js";
+import { setSubtask } from "../src/state/manager.js";
 import {
   buildAnonymousDiagnosticPayload,
   declineTelemetry,
@@ -16,6 +19,7 @@ import {
   classifyFileCategory,
   inferTierFromAuthor,
   isGovernanceOrConfigSurface,
+  normalizeDiffTreePath,
 } from "../src/telemetry/detector.js";
 import {
   AnonymousCommunityPayloadSchema,
@@ -1884,6 +1888,287 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(afterSecond.summary.escalatedCommits).toBe(1);
       expect(afterSecond.summary.tierCommits["tier-1"]).toBe(1);
       expect(afterSecond.summary.swarmCommits).toBe(2);
+    });
+  });
+
+  describe("Cycle #98 Field Telemetry Hardening (T-BUG 1..5)", () => {
+    const note = (sha: string, payload: Record<string, unknown>) => {
+      execFileSync(
+        "git",
+        ["notes", "--ref=lognexus", "add", "-f", "-m", JSON.stringify(payload), sha],
+        { cwd: tempDir, stdio: "ignore", shell: false },
+      );
+    };
+
+    it("T-BUG 1: unquotes non-ASCII/space diff-tree paths so extensions never carry trailing quotes and contracts match", () => {
+      expect(normalizeDiffTreePath('"scripts/misión crítica.scp"')).toBe(
+        "scripts/misión crítica.scp",
+      );
+      expect(normalizeDiffTreePath("a/{old.scp => new.scp}")).toBe("a/new.scp");
+      expect(normalizeDiffTreePath('"old path.scp" => "new path.scp"')).toBe("new path.scp");
+
+      execSync('git config core.quotePath "true"', { cwd: tempDir, stdio: "ignore" });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+
+      const relPath = "scripts/misión crítica.scp";
+      const fullPath = join(tempDir, "scripts", "misión crítica.scp");
+      mkdirSync(dirname(fullPath), { recursive: true });
+      writeFileSync(fullPath, "[CHARDEF 0400]\nDEFNAME=c_test\n", "utf8");
+      execFileSync("git", ["add", "--", relPath], { cwd: tempDir, stdio: "ignore", shell: false });
+      execFileSync("git", ["commit", "-q", "-m", "feat(#98/T1): add accented script"], {
+        cwd: tempDir,
+        stdio: "ignore",
+        shell: false,
+      });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      note(sha, {
+        $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+        version: "1.6.1",
+        issue: { id: 98, tier: "tier-2" },
+        subtask: { id: "T1", contract: { allowedFiles: [relPath] } },
+        tier: "tier-2",
+      });
+
+      const diffs = extractCommitDiffStats(sha, tempDir);
+      expect(diffs.find((d) => d.ext === ".scp")?.linesAdded).toBe(2);
+      expect(diffs.some((d) => d.ext.includes('"'))).toBe(false);
+
+      recordCommitTelemetry({
+        sha,
+        author: "google/gemini-4-hydrogen-high (antigravity)",
+        tier: "tier-2",
+        targetDir: tempDir,
+      });
+
+      const live = loadTelemetry(tempDir);
+      expect(live.extensions[".scp"]?.linesAdded).toBe(2);
+      expect(live.extensions['.scp"']).toBeUndefined();
+      expect(live.summary.contractedCommits).toBe(1);
+      expect(live.summary.contractCompliancePct).toBe(100);
+
+      const synced = syncTelemetryFromGitNotes(tempDir, { issue: 98 });
+      expect(synced.extensions[".scp"]?.linesAdded).toBe(2);
+      expect(synced.extensions['.scp"']).toBeUndefined();
+      expect(synced.summary.contractedCommits).toBe(1);
+      expect(synced.summary.contractCompliancePct).toBe(100);
+    });
+
+    it("T-BUG 2: honours tierExplicit and upgrades issue:null and pre-1.4.0 notes for Tier-1 flagships", () => {
+      expect(
+        resolveCommitTier(
+          {
+            $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+            version: "1.6.1",
+            issue: { id: 98, tier: "tier-1" },
+            tier: "tier-3",
+            tierExplicit: true,
+          },
+          "tier-1",
+        ),
+      ).toBe("tier-3");
+
+      expect(
+        resolveCommitTier(
+          {
+            $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+            version: "1.6.1",
+            issue: { id: 98, tier: "tier-3" },
+            tier: "tier-3",
+            tierExplicit: false,
+          },
+          "tier-1",
+        ),
+      ).toBe("tier-1");
+
+      expect(
+        resolveCommitTier(
+          {
+            $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+            version: "1.6.1",
+            issue: null,
+            tier: "tier-3",
+          },
+          "tier-1",
+        ),
+      ).toBe("tier-1");
+
+      expect(
+        resolveCommitTier(
+          {
+            $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+            version: "1.3.7",
+            issue: { id: 42 },
+            tier: "tier-2",
+          },
+          "tier-1",
+        ),
+      ).toBe("tier-1");
+
+      const commitWithAuthor = (file: string, message: string, trailerAuthor: string) => {
+        const target = join(tempDir, file);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, "export const x = 1;\n", "utf8");
+        execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+        execFileSync("git", ["commit", "-q", "-m", `${message}\n\nAuthored-by: ${trailerAuthor}`], {
+          cwd: tempDir,
+          stdio: "ignore",
+          shell: false,
+        });
+        return execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+      };
+
+      const shaExplicitOverride = commitWithAuthor(
+        "src/argon-explicit.ts",
+        "chore(#98/T1): explicit tier-3 override",
+        "Gemini 4 Argon (antigravity)",
+      );
+      note(shaExplicitOverride, {
+        $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+        version: "1.6.1",
+        issue: { id: 98, tier: "tier-1" },
+        subtask: { id: "T1" },
+        tier: "tier-3",
+        tierExplicit: true,
+      });
+
+      const shaNeonPre140 = commitWithAuthor(
+        "src/neon-legacy.ts",
+        "feat(#98/T2): pre-1.4.0 flagship commit",
+        "Gemini 4 Neon (antigravity)",
+      );
+      note(shaNeonPre140, {
+        $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+        version: "1.3.7",
+        issue: { id: 98 },
+        subtask: { id: "T2" },
+        tier: "tier-2",
+      });
+
+      const shaArgonNullIssue = commitWithAuthor(
+        "src/argon-null.ts",
+        "chore(#98/T3): note attached outside active issue",
+        "Gemini 4 Argon (antigravity)",
+      );
+      note(shaArgonNullIssue, {
+        $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+        version: "1.6.1",
+        issue: null,
+        subtask: null,
+        tier: "tier-3",
+      });
+
+      const synced = syncTelemetryFromGitNotes(tempDir, { issue: 98 });
+      expect(synced.models["gemini/argon"]?.commits).toBe(2);
+      expect(synced.models["gemini/argon"]?.tier).toBe("tier-1");
+      expect(synced.models["gemini/neon"]?.tier).toBe("tier-1");
+      expect(synced.summary.tierCommits["tier-1"]).toBe(2);
+      expect(synced.summary.tierCommits["tier-3"]).toBe(1);
+
+      const unscoped = syncTelemetryFromGitNotes(tempDir);
+      const argonNullScoped = syncTelemetryFromGitNotes(tempDir, { since: "2000-01-01" });
+      expect(unscoped.models["gemini/neon"]?.tier).toBe("tier-1");
+      expect(argonNullScoped.summary.tierCommits["tier-1"]).toBe(2);
+    });
+
+    it("T-BUG 3: persists subtask.durationSec in Git Notes and populates model duration metrics", () => {
+      execSync("git checkout -q -b issue/98-duration-metrics", { cwd: tempDir, stdio: "ignore" });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+
+      setSubtask(
+        "T1",
+        "Timed implementation",
+        { allowedFiles: ["src/timed.ts"], forbiddenFiles: [], decisionBudget: "none" },
+        tempDir,
+        { tier: "tier-2" },
+      );
+
+      const target = join(tempDir, "src", "timed.ts");
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, "export const timed = true;\n", "utf8");
+
+      const res = executeAtomicCommit({
+        message: "feat(#98/T1): implement timed subtask",
+        author: "google/gemini-4-hydrogen-high (antigravity)",
+        stageAllowed: true,
+        finishTask: true,
+        targetDir: tempDir,
+      });
+
+      const rawNote = getNote(res.sha, { cwd: tempDir });
+      expect(rawNote).not.toBeNull();
+      const parsedNote = JSON.parse(rawNote as string) as {
+        author?: string;
+        tierExplicit?: boolean;
+        subtask?: { durationSec?: number };
+      };
+      expect(parsedNote.author).toBe("google/gemini-4-hydrogen-high (antigravity)");
+      expect(parsedNote.tierExplicit).toBe(false);
+      expect(parsedNote.subtask?.durationSec).toBeGreaterThanOrEqual(1);
+
+      const live = loadTelemetry(tempDir);
+      expect(live.models["gemini/hydrogen"]?.totalDurationSec).toBeGreaterThanOrEqual(1);
+      expect(live.models["gemini/hydrogen"]?.avgSubtaskDurationSec).toBeGreaterThanOrEqual(1);
+
+      const synced = syncTelemetryFromGitNotes(tempDir, { issue: 98 });
+      expect(synced.models["gemini/hydrogen"]?.totalDurationSec).toBeGreaterThanOrEqual(1);
+      expect(synced.models["gemini/hydrogen"]?.avgSubtaskDurationSec).toBeGreaterThanOrEqual(1);
+    });
+
+    it("T-BUG 4: falls back to Git Note author when commit body lacks an Authored-by trailer", () => {
+      const target = join(tempDir, "src", "note-author.ts");
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, "export const fallback = true;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "feat(#98/T4): commit without trailer"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      note(sha, {
+        $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+        version: "1.6.1",
+        author: "google/gemini-4-hydrogen-high (antigravity)",
+        issue: { id: 98, tier: "tier-3" },
+        subtask: { id: "T4" },
+        tier: "tier-3",
+        tierExplicit: false,
+      });
+
+      const synced = syncTelemetryFromGitNotes(tempDir, { issue: 98 });
+      expect(synced.models["gemini/hydrogen"]?.commits).toBe(1);
+      expect(synced.models["gemini/hydrogen"]?.tier).toBe("tier-2");
+      expect(synced.models["unknown/other"]).toBeUndefined();
+    });
+
+    it("T-BUG 5: detects Bun and monorepo workspace stacks while skipping hidden and vendor dirs", () => {
+      writeFileSync(join(tempDir, "bun.lock"), "{}\n", "utf8");
+
+      mkdirSync(join(tempDir, "apps", "web"), { recursive: true });
+      writeFileSync(join(tempDir, "apps", "web", "package.json"), '{"name":"web"}\n', "utf8");
+      writeFileSync(
+        join(tempDir, "apps", "web", "astro.config.mjs"),
+        "export default {};\n",
+        "utf8",
+      );
+
+      mkdirSync(join(tempDir, "packages", "sdk"), { recursive: true });
+      writeFileSync(join(tempDir, "packages", "sdk", "tsconfig.json"), "{}\n", "utf8");
+
+      mkdirSync(join(tempDir, "node_modules", "vendor-crate"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "node_modules", "vendor-crate", "Cargo.toml"),
+        "[package]\n",
+        "utf8",
+      );
+      mkdirSync(join(tempDir, ".cache-go"), { recursive: true });
+      writeFileSync(join(tempDir, ".cache-go", "go.mod"), "module cache\n", "utf8");
+
+      const stacks = detectProjectStacks(tempDir);
+      expect(stacks).toEqual(expect.arrayContaining(["astro", "bun", "nodejs", "typescript"]));
+      expect(stacks).not.toContain("rust");
+      expect(stacks).not.toContain("go");
     });
   });
 });
