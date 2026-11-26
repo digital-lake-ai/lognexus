@@ -16,9 +16,12 @@ export interface GitNotePayload {
     id: string;
     title: string;
     status?: "pending" | "in-progress" | "completed";
+    durationSec?: number;
     contract?: unknown;
   } | null;
   tier: string;
+  tierExplicit?: boolean;
+  author?: string;
   escalated?: boolean;
   swarm?: { workers?: number; posts?: number };
 }
@@ -26,6 +29,12 @@ export interface GitNotePayload {
 export interface NoteAttachOptions extends NoteOptions {
   /** Effective routing tier used for this commit (defaults to the active issue tier). */
   tier?: string;
+  /** Whether `tier` was explicitly supplied via `--tier` rather than inferred or inherited. */
+  tierExplicit?: boolean;
+  /** Author identity recorded in the Git Note for provenance fallback. */
+  author?: string;
+  /** Subtask wall-clock duration in seconds when completed on this commit. */
+  durationSec?: number;
   /** Marks the commit as an explicit tier escalation (e.g. tier-1 author on a tier-3 subtask). */
   escalated?: boolean;
   /** Number of active swarm workers participating in this subtask. */
@@ -82,6 +91,9 @@ export function buildStateNotePayload(
   targetDir: string = process.cwd(),
   options: {
     tier?: string;
+    tierExplicit?: boolean;
+    author?: string;
+    durationSec?: number;
     escalated?: boolean;
     commitSha?: string;
     swarmWorkers?: number;
@@ -99,7 +111,7 @@ export function buildStateNotePayload(
     issue = { id: meta.issueId, title: meta.subject };
   }
 
-  let subtask = state.currentSubtask
+  let subtask: GitNotePayload["subtask"] = state.currentSubtask
     ? {
         id: state.currentSubtask.id,
         title: state.currentSubtask.title,
@@ -116,6 +128,11 @@ export function buildStateNotePayload(
     };
   }
 
+  const dur = options.durationSec;
+  if (subtask !== null && typeof dur === "number" && Number.isSafeInteger(dur) && dur > 0) {
+    subtask.durationSec = dur;
+  }
+
   const payload: GitNotePayload = {
     $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
     generator: "LogNexus",
@@ -125,6 +142,14 @@ export function buildStateNotePayload(
     subtask,
     tier: options.tier ?? state.activeIssue?.tier ?? "tier-3",
   };
+
+  if (typeof options.tierExplicit === "boolean") {
+    payload.tierExplicit = options.tierExplicit;
+  }
+
+  if (typeof options.author === "string" && options.author.trim() !== "") {
+    payload.author = options.author.trim();
+  }
 
   if (options.escalated) {
     payload.escalated = true;
@@ -183,6 +208,9 @@ export function attachCurrentStateToCommit(
 
   const payload = buildStateNotePayload(cwd, {
     tier: options.tier,
+    tierExplicit: options.tierExplicit,
+    author: options.author,
+    durationSec: options.durationSec,
     escalated: options.escalated,
     commitSha: safeSha,
     swarmWorkers: options.swarmWorkers,

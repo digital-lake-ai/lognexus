@@ -144,6 +144,7 @@ export function setSubtask(
     id: taskId,
     title,
     status: "in-progress",
+    startedAt: new Date().toISOString(),
     contract,
   };
   state.currentSubtask = subtask;
@@ -160,6 +161,13 @@ export function finishSubtask(taskId: string, targetDir: string = process.cwd())
   }
   if (state.currentSubtask?.id === taskId) {
     state.currentSubtask.status = "completed";
+    if (state.currentSubtask.startedAt) {
+      const startedMs = Date.parse(state.currentSubtask.startedAt);
+      if (Number.isFinite(startedMs)) {
+        const durationSec = Math.max(1, Math.round((Date.now() - startedMs) / 1000));
+        state.currentSubtask.durationSec = durationSec;
+      }
+    }
   } else if (!state.currentSubtask) {
     state.currentSubtask = {
       id: taskId,

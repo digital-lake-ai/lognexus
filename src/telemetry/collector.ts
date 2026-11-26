@@ -12,6 +12,7 @@ import {
   extractCommitDiffStats,
   extractModelFamilyCategory,
   inferTierFromAuthor,
+  normalizeDiffTreePath,
 } from "./detector.js";
 import {
   type AnonymousDiagnosticPayload,
@@ -152,6 +153,7 @@ function createModelStat(family: string, tier: string): ModelStat {
     family,
     tier,
     commits: 0,
+    timedSubtasks: 0,
     totalDurationSec: 0,
     avgSubtaskDurationSec: 0,
     sourceLinesAdded: 0,
@@ -184,6 +186,40 @@ function accumulateModelPricing(
   model.estimatedInputTokens += pricing.inputTokens;
   model.estimatedOutputTokens += pricing.outputTokens;
   model.estimatedCostUsd = round6(model.estimatedCostUsd + pricing.costUsd);
+}
+
+/**
+ * Folds a completed subtask duration into a model bucket's cumulative and average duration
+ * counters without letting un-timed commits dilute `avgSubtaskDurationSec`.
+ */
+function accumulateModelDuration(
+  model: ModelStat,
+  durationSec: number | null | undefined,
+  timedCounts?: Map<string, number>,
+): void {
+  if (typeof durationSec !== "number" || !Number.isSafeInteger(durationSec) || durationSec <= 0) {
+    return;
+  }
+
+  if (timedCounts !== undefined) {
+    const count = (timedCounts.get(model.family) ?? 0) + 1;
+    timedCounts.set(model.family, count);
+    model.timedSubtasks = count;
+    model.totalDurationSec += durationSec;
+    model.avgSubtaskDurationSec = Math.round(model.totalDurationSec / count);
+    return;
+  }
+
+  const prevCount =
+    (model.timedSubtasks ?? 0) > 0
+      ? model.timedSubtasks
+      : model.totalDurationSec > 0 && model.avgSubtaskDurationSec > 0
+        ? Math.max(1, Math.round(model.totalDurationSec / model.avgSubtaskDurationSec))
+        : 0;
+  const nextCount = prevCount + 1;
+  model.timedSubtasks = nextCount;
+  model.totalDurationSec += durationSec;
+  model.avgSubtaskDurationSec = Math.round(model.totalDurationSec / nextCount);
 }
 
 function round6(value: number): number {
@@ -614,7 +650,16 @@ function listChangedFiles(sha: string, targetDir: string): string[] {
   try {
     const raw = execFileSync(
       "git",
-      ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", validateGitReference(sha)],
+      [
+        "-c",
+        "core.quotePath=false",
+        "diff-tree",
+        "--root",
+        "--no-commit-id",
+        "--name-only",
+        "-r",
+        validateGitReference(sha),
+      ],
       {
         cwd: targetDir,
         encoding: "utf8",
@@ -625,7 +670,7 @@ function listChangedFiles(sha: string, targetDir: string): string[] {
 
     return raw
       .split("\n")
-      .map((line) => line.trim().replace(/\\/g, "/"))
+      .map((line) => normalizeDiffTreePath(line).replace(/\\/g, "/"))
       .filter((line) => line !== "" && !line.startsWith(EPHEMERAL_PATH_PREFIX));
   } catch {
     return [];
@@ -647,6 +692,8 @@ export function recordCommitTelemetry(options: {
   sha: string;
   author?: string;
   tier?: string;
+  tierExplicit?: boolean;
+  durationSec?: number;
   targetDir?: string;
 }): void {
   try {
@@ -675,20 +722,6 @@ export function recordCommitTelemetry(options: {
     store.summary.totalLinesAdded += commitAdded;
     store.summary.totalLinesDeleted += commitDeleted;
 
-    const modelKey = extractModelFamilyCategory(options.author);
-    const tier = options.tier ?? inferTierFromAuthor(options.author) ?? "tier-3";
-    const existingModel: ModelStat = store.models[modelKey] ?? createModelStat(modelKey, tier);
-    existingModel.tier = tier;
-    existingModel.commits += 1;
-    accumulateModelPricing(existingModel, linesByCategory(diffItems), tier);
-    store.models[modelKey] = existingModel;
-
-    const pricingTier = resolvePricingTier(tier);
-    if (store.summary.tierCommits === undefined) {
-      store.summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
-    }
-    store.summary.tierCommits[pricingTier] += 1;
-
     let safeSha: string | null = null;
     try {
       safeSha = validateGitReference(options.sha);
@@ -697,6 +730,32 @@ export function recordCommitTelemetry(options: {
     }
 
     const parsedNote = readParsedNote(safeSha ?? options.sha, cwd);
+    const inferredTier = inferTierFromAuthor(options.author);
+    const tier =
+      options.tierExplicit === false
+        ? (inferredTier ?? options.tier ?? "tier-3")
+        : (options.tier ?? inferredTier ?? "tier-3");
+
+    const modelKey = extractModelFamilyCategory(options.author);
+    const existingModel: ModelStat = store.models[modelKey] ?? createModelStat(modelKey, tier);
+    existingModel.tier = tier;
+    existingModel.commits += 1;
+    accumulateModelPricing(existingModel, linesByCategory(diffItems), tier);
+    const effectiveDuration =
+      typeof options.durationSec === "number" &&
+      Number.isSafeInteger(options.durationSec) &&
+      options.durationSec > 0
+        ? options.durationSec
+        : null;
+    accumulateModelDuration(existingModel, effectiveDuration);
+    store.models[modelKey] = existingModel;
+
+    const pricingTier = resolvePricingTier(tier);
+    if (store.summary.tierCommits === undefined) {
+      store.summary.tierCommits = { "tier-1": 0, "tier-2": 0, "tier-3": 0 };
+    }
+    store.summary.tierCommits[pricingTier] += 1;
+
     const subject = safeSha !== null ? readCommitSubject(safeSha, cwd) : "";
 
     if (parsedNote?.escalated === true || ESCALATION_SUBJECT_PATTERN.test(subject)) {
@@ -836,9 +895,12 @@ function median(values: number[]): number {
 
 interface ParsedNote {
   $schema?: unknown;
+  version?: unknown;
+  author?: unknown;
   issue?: { id?: unknown; tier?: unknown } | null;
   subtask?: {
     id?: unknown;
+    durationSec?: unknown;
     contract?: {
       allowedFiles?: unknown;
       isolation?: unknown;
@@ -847,6 +909,7 @@ interface ParsedNote {
     } | null;
   } | null;
   tier?: unknown;
+  tierExplicit?: unknown;
   escalated?: unknown;
   swarm?: { workers?: unknown; posts?: unknown } | null;
 }
@@ -892,23 +955,43 @@ export function extractNoteSwarmMetrics(parsedNote: ParsedNote | null): {
   };
 }
 
+function isPre140NoteVersion(version: unknown): boolean {
+  if (typeof version !== "string") return false;
+  const match = version.trim().match(/^(\d+)\.(\d+)\./);
+  if (!match) return false;
+  const major = Number.parseInt(match[1], 10);
+  const minor = Number.parseInt(match[2], 10);
+  return major < 1 || (major === 1 && minor < 4);
+}
+
 /**
  * Resolves the routing tier of a noted commit.
  *
- * Modern notes (carrying `$schema`) honour explicit `--tier` overrides: `inferredTier`
- * overrides `noteTier` only when `noteTier` merely inherited `issue.tier`, while legacy
- * notes without `$schema` still upgrade the historical `tier-3` default when an author
- * identity resolves.
+ * Modern notes carrying `tierExplicit` distinguish `--tier` overrides (`true`) from
+ * inferred/inherited tiers (`false`), while notes from earlier schemas reconcile `issue: null`
+ * fallback notes and pre-`1.4.0` flagship `tier-1` commits accurately.
  */
 export function resolveCommitTier(
   parsedNote: ParsedNote | null,
   inferredTier: string | null,
 ): PricingTierKey {
   const noteTier = typeof parsedNote?.tier === "string" ? parsedNote.tier : null;
-  const isModernNote = typeof parsedNote?.$schema === "string";
-
   if (noteTier === null) return resolvePricingTier(inferredTier);
+  if (parsedNote?.tierExplicit === true) return resolvePricingTier(noteTier);
+  if (parsedNote?.tierExplicit === false) return resolvePricingTier(inferredTier ?? noteTier);
+
+  const isModernNote = typeof parsedNote?.$schema === "string";
   if (isModernNote) {
+    if (parsedNote?.issue === null && noteTier === "tier-3" && inferredTier !== null) {
+      return resolvePricingTier(inferredTier);
+    }
+    if (
+      isPre140NoteVersion(parsedNote?.version) &&
+      inferredTier === "tier-1" &&
+      (noteTier === "tier-2" || noteTier === "tier-3")
+    ) {
+      return "tier-1";
+    }
     const issueTier = typeof parsedNote?.issue?.tier === "string" ? parsedNote.issue.tier : null;
     if (inferredTier !== null && issueTier !== null && noteTier === issueTier) {
       return resolvePricingTier(inferredTier);
@@ -977,6 +1060,8 @@ export function syncTelemetryFromGitNotes(
 
   const extensions: Record<string, ExtensionStat> = {};
   const models: Record<string, ModelStat> = {};
+  const timedSubtaskCounts = new Map<string, number>();
+  const seenTimedSubtasks = new Set<string>();
   const notedSubtasks = new Set<string>();
   const summary = store.summary;
 
@@ -1020,7 +1105,11 @@ export function syncTelemetryFromGitNotes(
     }
 
     const isNoted = notedShas.has(safeSha);
-    const author = extractTrailers(commit.body).author ?? commit.author.trim();
+    const noteAuthor =
+      typeof parsedNote?.author === "string" && parsedNote.author.trim() !== ""
+        ? parsedNote.author.trim()
+        : null;
+    const author = extractTrailers(commit.body).author ?? noteAuthor ?? commit.author.trim();
     const tier = resolveCommitTier(parsedNote, inferTierFromAuthor(author));
 
     const noteSubtaskId =
@@ -1072,6 +1161,19 @@ export function syncTelemetryFromGitNotes(
     const existingModel: ModelStat = models[modelKey] ?? createModelStat(modelKey, tier);
     existingModel.commits += 1;
     accumulateModelPricing(existingModel, linesByCategory(diffItems), tier);
+    const noteDuration = parseNonNegativeInt(parsedNote?.subtask?.durationSec);
+    if (noteDuration !== null && noteDuration > 0) {
+      const rawIssueId = parsedNote?.issue?.id;
+      const issueKeyForSubtask =
+        typeof rawIssueId === "number" || typeof rawIssueId === "string"
+          ? normalizeIssueFilter(rawIssueId)
+          : (issueFilter ?? "0");
+      const timingKey = noteSubtaskId !== null ? `${issueKeyForSubtask}/${noteSubtaskId}` : safeSha;
+      if (!seenTimedSubtasks.has(timingKey)) {
+        seenTimedSubtasks.add(timingKey);
+        accumulateModelDuration(existingModel, noteDuration, timedSubtaskCounts);
+      }
+    }
     models[modelKey] = existingModel;
 
     summary.tierCommits[resolvePricingTier(tier)] += 1;

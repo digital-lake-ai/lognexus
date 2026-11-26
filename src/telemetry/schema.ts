@@ -33,6 +33,7 @@ export const ModelStatSchema = z.object({
   family: z.string(),
   tier: z.string().default("tier-3"),
   commits: z.number().default(0),
+  timedSubtasks: z.number().int().nonnegative().default(0),
   totalDurationSec: z.number().default(0),
   avgSubtaskDurationSec: z.number().default(0),
   sourceLinesAdded: z.number().default(0),

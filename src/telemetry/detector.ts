@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { type Dirent, existsSync, readdirSync } from "node:fs";
+import { type Dirent, readdirSync } from "node:fs";
 import { extname, join } from "node:path";
 import { validateGitReference } from "../git/safe.js";
 import type { DiffCategory } from "./schema.js";
@@ -97,6 +97,28 @@ const SHELL_SCAN_MAX_DEPTH = 2;
 
 const SHELL_SCAN_IGNORED_DIRS = new Set([".git", "node_modules", "dist", ".lognexus"]);
 
+const MANIFEST_SCAN_IGNORED_DIRS = new Set([
+  "node_modules",
+  "dist",
+  "dist-pypi",
+  "build",
+  "coverage",
+  "target",
+  "venv",
+  "__pycache__",
+  "playwright-report",
+  "test-results",
+]);
+
+const WORKSPACE_CONTAINER_DIRS = new Set([
+  "apps",
+  "packages",
+  "services",
+  "libs",
+  "crates",
+  "modules",
+]);
+
 /**
  * Walks the project tree up to two levels deep looking for shell scripts, so projects whose
  * PowerShell/Batch automation lives in subdirectories are still classified correctly.
@@ -129,54 +151,103 @@ function detectShellStacks(targetDir: string, stacks: Set<string>, depth = 0): v
   }
 }
 
+function scanDirManifests(dir: string, stacks: Set<string>): Dirent[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const files = new Set<string>();
+  for (const entry of entries) {
+    if (entry.isFile() && !entry.isSymbolicLink()) {
+      files.add(entry.name);
+    }
+  }
+
+  const hasPackageJson = files.has("package.json");
+  const hasTsconfig = files.has("tsconfig.json");
+  if (hasPackageJson) {
+    stacks.add("nodejs");
+    if (hasTsconfig) {
+      stacks.add("typescript");
+    } else {
+      stacks.add("javascript");
+    }
+  } else if (hasTsconfig) {
+    stacks.add("typescript");
+  }
+
+  if (files.has("bun.lock") || files.has("bun.lockb") || files.has("bunfig.toml")) {
+    stacks.add("bun");
+    stacks.add("nodejs");
+  }
+
+  if (files.has("pyproject.toml") || files.has("requirements.txt") || files.has("setup.py")) {
+    stacks.add("python");
+  }
+
+  if (files.has("Cargo.toml")) {
+    stacks.add("rust");
+  }
+
+  if (files.has("go.mod")) {
+    stacks.add("go");
+  }
+
+  let hasGradle = files.has("build.gradle") || files.has("build.gradle.kts");
+  if (!hasGradle) {
+    for (const file of files) {
+      if (file.startsWith("build.gradle")) {
+        hasGradle = true;
+        break;
+      }
+    }
+  }
+  if (files.has("pom.xml") || hasGradle) {
+    stacks.add("java");
+  }
+
+  if (files.has("CMakeLists.txt") || files.has("Makefile")) {
+    stacks.add("c/cpp");
+  }
+
+  if (
+    files.has("astro.config.mjs") ||
+    files.has("astro.config.ts") ||
+    files.has("astro.config.js") ||
+    files.has("astro.config.cjs")
+  ) {
+    stacks.add("astro");
+  }
+
+  return entries;
+}
+
+function shouldSkipManifestDir(entry: Dirent): boolean {
+  if (!entry.isDirectory() || entry.isSymbolicLink()) return true;
+  if (entry.name.startsWith(".")) return true;
+  return MANIFEST_SCAN_IGNORED_DIRS.has(entry.name);
+}
+
 export function detectProjectStacks(targetDir: string = process.cwd()): string[] {
   const stacks = new Set<string>();
 
   try {
-    if (existsSync(join(targetDir, "package.json"))) {
-      stacks.add("nodejs");
-      if (existsSync(join(targetDir, "tsconfig.json"))) {
-        stacks.add("typescript");
-      } else {
-        stacks.add("javascript");
+    const rootEntries = scanDirManifests(targetDir, stacks);
+
+    for (const entry of rootEntries) {
+      if (shouldSkipManifestDir(entry)) continue;
+      const subDir = join(targetDir, entry.name);
+      const subEntries = scanDirManifests(subDir, stacks);
+
+      if (WORKSPACE_CONTAINER_DIRS.has(entry.name.toLowerCase())) {
+        for (const childEntry of subEntries) {
+          if (shouldSkipManifestDir(childEntry)) continue;
+          scanDirManifests(join(subDir, childEntry.name), stacks);
+        }
       }
-    }
-
-    if (
-      existsSync(join(targetDir, "pyproject.toml")) ||
-      existsSync(join(targetDir, "requirements.txt")) ||
-      existsSync(join(targetDir, "setup.py"))
-    ) {
-      stacks.add("python");
-    }
-
-    if (existsSync(join(targetDir, "Cargo.toml"))) {
-      stacks.add("rust");
-    }
-
-    if (existsSync(join(targetDir, "go.mod"))) {
-      stacks.add("go");
-    }
-
-    if (
-      existsSync(join(targetDir, "pom.xml")) ||
-      existsSync(join(targetDir, "build.gradle")) ||
-      existsSync(join(targetDir, "build.gradle.kts"))
-    ) {
-      stacks.add("java");
-    }
-
-    if (existsSync(join(targetDir, "CMakeLists.txt")) || existsSync(join(targetDir, "Makefile"))) {
-      stacks.add("c/cpp");
-    }
-
-    if (
-      existsSync(join(targetDir, "astro.config.mjs")) ||
-      existsSync(join(targetDir, "astro.config.ts")) ||
-      existsSync(join(targetDir, "astro.config.js")) ||
-      existsSync(join(targetDir, "astro.config.cjs"))
-    ) {
-      stacks.add("astro");
     }
 
     detectShellStacks(targetDir, stacks);
@@ -185,6 +256,43 @@ export function detectProjectStacks(targetDir: string = process.cwd()): string[]
   }
 
   return Array.from(stacks).sort();
+}
+
+function stripSurroundingQuotes(value: string): string {
+  let s = value.trim();
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
+/**
+ * Unquotes and normalizes a raw `git diff-tree` path (including `{old => new}` and `old => new`
+ * rename forms) so extensions and contract file comparisons never retain surrounding quotes.
+ */
+export function normalizeDiffTreePath(rawPath: string): string {
+  let p = rawPath.trim();
+  if (!p.includes('" =>') && !p.includes('"=>')) {
+    p = stripSurroundingQuotes(p);
+  }
+
+  const braceStart = p.indexOf("{");
+  const braceEnd = braceStart !== -1 ? p.indexOf("}", braceStart + 1) : -1;
+  if (braceStart !== -1 && braceEnd !== -1) {
+    const inner = p.slice(braceStart + 1, braceEnd);
+    if (inner.includes("=>")) {
+      const arrowIdx = inner.indexOf("=>");
+      const newSegment = inner.slice(arrowIdx + 2).trim();
+      const prefix = p.slice(0, braceStart);
+      const suffix = p.slice(braceEnd + 1);
+      p = `${prefix}${newSegment}${suffix}`.replace(/\/{2,}/g, "/").replace(/^\//, "");
+    }
+  } else if (p.includes("=>")) {
+    const arrowIdx = p.indexOf("=>");
+    p = p.slice(arrowIdx + 2).trim();
+  }
+
+  return stripSurroundingQuotes(p);
 }
 
 /**
@@ -204,7 +312,16 @@ export function extractCommitDiffStats(
     // first commit of a repository is priced like every other one.
     const raw = execFileSync(
       "git",
-      ["diff-tree", "--root", "--numstat", "--no-commit-id", "-r", sanitizedSha],
+      [
+        "-c",
+        "core.quotePath=false",
+        "diff-tree",
+        "--root",
+        "--numstat",
+        "--no-commit-id",
+        "-r",
+        sanitizedSha,
+      ],
       {
         cwd: targetDir,
         encoding: "utf8",
@@ -217,12 +334,26 @@ export function extractCommitDiffStats(
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      const parts = trimmed.split(/\s+/);
-      if (parts.length < 3) continue;
+      let addedStr: string;
+      let deletedStr: string;
+      let rawFilePath: string;
+      const tabParts = trimmed.split("\t");
+      if (tabParts.length >= 3) {
+        addedStr = tabParts[0];
+        deletedStr = tabParts[1];
+        rawFilePath = tabParts.slice(2).join("\t");
+      } else {
+        const parts = trimmed.split(/\s+/);
+        if (parts.length < 3) continue;
+        addedStr = parts[0];
+        deletedStr = parts[1];
+        rawFilePath = parts.slice(2).join(" ");
+      }
 
-      const added = Number.parseInt(parts[0], 10);
-      const deleted = Number.parseInt(parts[1], 10);
-      const filePath = parts.slice(2).join(" ");
+      const added = Number.parseInt(addedStr, 10);
+      const deleted = Number.parseInt(deletedStr, 10);
+      const filePath = normalizeDiffTreePath(rawFilePath);
+      if (!filePath) continue;
 
       // Ignore binary files where numstat outputs '-'
       const linesAdded = Number.isNaN(added) ? 0 : added;

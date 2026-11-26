@@ -64,6 +64,8 @@ export const SubtaskStateSchema = z.preprocess(
     id: z.string(),
     title: z.string().default(""),
     status: z.enum(["pending", "in-progress", "completed"]).default("pending"),
+    startedAt: z.string().optional(),
+    durationSec: z.number().int().nonnegative().optional(),
     contract: SubtaskContractSchema.optional(),
   }),
 );

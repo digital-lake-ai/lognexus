@@ -435,15 +435,21 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
 
   // 7. If finishTask requested, mark subtask completed
   let subtaskCompleted: string | null = null;
+  let finishedDurationSec: number | undefined;
   if (options.finishTask && state.currentSubtask) {
     subtaskCompleted = state.currentSubtask.id;
-    finishSubtask(subtaskCompleted, cwd);
+    const finishedState = finishSubtask(subtaskCompleted, cwd);
+    finishedDurationSec = finishedState.currentSubtask?.durationSec;
   }
 
   // 8. Attach current state Git Note (with completed status preserved)
+  const tierExplicit = options.tier !== undefined;
   attachCurrentStateToCommit("HEAD", {
     cwd,
     tier: effectiveTier,
+    tierExplicit,
+    author: author || undefined,
+    durationSec: finishedDurationSec,
     escalated: Boolean(options.escalated),
     swarmWorkers: options.swarmWorkers,
     swarmPosts: options.swarmPosts,
@@ -459,6 +465,8 @@ export function executeAtomicCommit(options: CommitOptions): CommitResult {
     sha,
     author,
     tier: effectiveTier,
+    tierExplicit,
+    durationSec: finishedDurationSec,
     targetDir: cwd,
   });
 
