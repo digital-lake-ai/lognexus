@@ -298,6 +298,8 @@ const GENERATED_LOCKFILES = new Set([
   "npm-shrinkwrap.json",
   "pnpm-lock.yaml",
   "yarn.lock",
+  "bun.lock",
+  "bun.lockb",
   "Cargo.lock",
   "poetry.lock",
   "uv.lock",

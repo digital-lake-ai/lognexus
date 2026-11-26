@@ -23,9 +23,9 @@ reviewer: auto
 # Tip: Cross-family review is recommended for critical milestones, while intra-fleet review (e.g. Fable/Opus -> Sonnet, GPT-6.2 Astra -> Sol/Luna in ChatGPT/Codex, Argon/Carbon/Neon -> Hydrogen/Flash) works out of the box for single-provider teams. Cross-vendor review is never forced: review_gate: auto uses intra-fleet, and single-session ChatGPT/solo workflows may set review_gate: advisory or off.
 
 # Operational Tier Taxonomy (Empirical recommendations across Gemini, Claude, OpenAI, DeepSeek, Kimi — Nov 2026)
-# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Gemini 4 Neon, Claude Fable 5.2 / Mythos 5.2 / Opus 5.5, OpenAI GPT-6.2 Astra / o3, DeepSeek R1
+# tier-1 (Reasoning / Arch / Review Gate): Gemini 4 Carbon, Gemini 4 Argon, Gemini 4 Neon, Claude Fable 5.2 / Mythos 5.2 / Opus 5.5, OpenAI GPT-6.2 Astra / GPT-6-Cyber, DeepSeek R1 / V4-Pro
 # tier-2 (Orchestration / Large Context >500 lines): Gemini 4 Hydrogen, Gemini 3.8 Flash High, Claude Sonnet 5.5, OpenAI GPT-6.2 Sol / GPT-5.4 / Codex, Kimi K3 / K2.7 Code
-# tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini Flash, DeepSeek V3 (Chat), Kimi Code, Claude Haiku 5.5, OpenAI GPT-6 Luna / codex-mini / GPT-4o-mini
+# tier-3 (Scoped Execution / Focused Modules <500 lines): Gemini Flash, DeepSeek V4.1-Flash / V3 (Chat), Kimi Code, Claude Haiku 5.5, OpenAI GPT-6 Luna / codex-mini
 
 # Native Assistant Autonomy & Contract Execution Governance
 # max_subtask_files: 6
@@ -59,18 +59,34 @@ export const TOKEN_SHIELD_PATTERNS = [
   "npm-shrinkwrap.json",
   "pnpm-lock.yaml",
   "yarn.lock",
+  "bun.lock",
   "bun.lockb",
   "Cargo.lock",
   "poetry.lock",
   "uv.lock",
+  "composer.lock",
+  "Gemfile.lock",
   ".venv/",
   "venv/",
   "__pycache__/",
+  "*.egg-info/",
   "dist/",
   "dist-pypi/",
   "build/",
   "coverage/",
   ".next/",
+  ".nuxt/",
+  ".output/",
+  ".svelte-kit/",
+  ".tanstack/",
+  ".astro/",
+  ".turbo/",
+  ".vercel/",
+  ".netlify/",
+  ".wrangler/",
+  ".cache/",
+  "playwright-report/",
+  "test-results/",
   "target/",
   ".lognexus/*.json",
 ] as const;
@@ -81,19 +97,40 @@ export const CLAUDE_DENY_RULES = [
   "Grep(./package-lock.json)",
   "Read(./npm-shrinkwrap.json)",
   "Read(./pnpm-lock.yaml)",
+  "Grep(./pnpm-lock.yaml)",
   "Read(./yarn.lock)",
+  "Grep(./yarn.lock)",
+  "Read(./bun.lock)",
+  "Grep(./bun.lock)",
   "Read(./bun.lockb)",
   "Read(./Cargo.lock)",
   "Read(./poetry.lock)",
   "Read(./uv.lock)",
+  "Read(./composer.lock)",
+  "Read(./Gemfile.lock)",
   "Read(./.venv/**)",
   "Read(./venv/**)",
   "Read(./__pycache__/**)",
+  "Read(./**/*.egg-info/**)",
   "Read(./dist/**)",
   "Read(./dist-pypi/**)",
   "Read(./build/**)",
   "Read(./coverage/**)",
   "Read(./.next/**)",
+  "Read(./.nuxt/**)",
+  "Read(./.output/**)",
+  "Read(./.svelte-kit/**)",
+  "Read(./.tanstack/**)",
+  "Read(./.astro/**)",
+  "Read(./.turbo/**)",
+  "Read(./.vercel/**)",
+  "Read(./.netlify/**)",
+  "Read(./.wrangler/**)",
+  "Read(./.cache/**)",
+  "Read(./playwright-report/**)",
+  "Read(./test-results/**)",
+  "Read(./target/**)",
+  "Read(./.lognexus/*.json)",
 ] as const;
 
 function ensureGitignore(targetDir: string, result: InitResult): void {
