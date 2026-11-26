@@ -87,6 +87,11 @@ describe("initProject", () => {
     expect(content).toContain("GPT-6.2 Astra");
     expect(content).toContain("GPT-6.2 Sol");
     expect(content).toContain("GPT-6 Luna");
+    expect(content).toContain("GPT-6-Cyber");
+    expect(content).toContain("DeepSeek R1 / V4-Pro");
+    expect(content).toContain("DeepSeek V4.1-Flash / V3 (Chat)");
+    expect(content).not.toContain("o3");
+    expect(content).not.toContain("GPT-4o-mini");
     expect(content).toContain("Cross-vendor review is never forced");
     expect(content).toContain(
       "single-session ChatGPT/solo workflows may set review_gate: advisory or off",
@@ -133,8 +138,21 @@ describe("initProject token shield (--protect-tokens)", () => {
 
     for (const file of [".geminiignore", ".aiexclude", ".cursorignore"]) {
       const content = readFileSync(join(tempDir, file), "utf8");
-      expect(content).toContain("package-lock.json");
-      expect(content).toContain("node_modules/");
+      for (const pattern of [
+        "package-lock.json",
+        "node_modules/",
+        "bun.lock",
+        "composer.lock",
+        "Gemfile.lock",
+        "*.egg-info/",
+        ".output/",
+        ".tanstack/",
+        ".astro/",
+        "playwright-report/",
+        "test-results/",
+      ]) {
+        expect(content).toContain(pattern);
+      }
     }
 
     const settings = JSON.parse(
@@ -147,14 +165,51 @@ describe("initProject token shield (--protect-tokens)", () => {
     for (const rule of [
       "Read(./dist-pypi/**)",
       "Read(./.next/**)",
+      "Read(./bun.lock)",
+      "Grep(./bun.lock)",
       "Read(./bun.lockb)",
       "Read(./npm-shrinkwrap.json)",
       "Read(./.venv/**)",
       "Read(./venv/**)",
       "Read(./__pycache__/**)",
+      "Read(./.output/**)",
+      "Read(./.tanstack/**)",
+      "Read(./.astro/**)",
+      "Read(./playwright-report/**)",
+      "Read(./test-results/**)",
+      "Read(./target/**)",
+      "Read(./.lognexus/*.json)",
     ]) {
       expect(settings.permissions.deny).toContain(rule);
     }
+  });
+
+  it("incrementally appends missing 1.6.1 patterns onto a 1.6.0 .geminiignore without overwriting user custom lines", () => {
+    const legacyIgnore = [
+      "# LogNexus Multi-Model Token Shield — prevent accidental token burn on lockfiles & build outputs",
+      "# custom user comment",
+      "custom-secrets/",
+      "node_modules/",
+      "package-lock.json",
+      "bun.lockb",
+      ".next/",
+      "target/",
+      ".lognexus/*.json",
+    ].join("\n");
+    writeFileSync(join(tempDir, ".geminiignore"), `${legacyIgnore}\n`, "utf8");
+
+    const res = initProject(tempDir, { protectTokens: true });
+    expect(res.created).toContain(".geminiignore");
+
+    const updated = readFileSync(join(tempDir, ".geminiignore"), "utf8");
+    const lines = updated.split(/\r?\n/).map((line) => line.trim());
+    expect(updated).toContain("# custom user comment");
+    expect(updated).toContain("custom-secrets/");
+    expect(lines).toContain("bun.lock");
+    expect(lines).toContain(".output/");
+    expect(lines).toContain(".tanstack/");
+    expect(lines.filter((line) => line === "bun.lockb")).toHaveLength(1);
+    expect(lines.filter((line) => line === "package-lock.json")).toHaveLength(1);
   });
 
   it("is idempotent on a second run", () => {

@@ -395,16 +395,24 @@ describe("Context Handoff Generator", () => {
       "T4",
       "Version sync",
       {
-        allowedFiles: ["package.json", "package-lock.json", "src/state/handoff.ts"],
+        allowedFiles: [
+          "package.json",
+          "package-lock.json",
+          "bun.lock",
+          "bun.lockb",
+          "src/state/handoff.ts",
+        ],
         decisionBudget: "none",
       },
       tempDir,
     );
     writeFileSync(join(tempDir, "package-lock.json"), '{\n  "v": 1\n}\n'.repeat(1000), "utf8");
+    writeFileSync(join(tempDir, "bun.lock"), '{\n  "lockfileVersion": 1\n}\n'.repeat(1000), "utf8");
+    writeFileSync(join(tempDir, "bun.lockb"), "binary-placeholder\n".repeat(2000), "utf8");
 
     const budget = evaluateContextBudget(tempDir);
 
-    // The 2,000-line lockfile must not count as an implementation file nor toward totalLines.
+    // The 2,000+-line lockfiles must not count as implementation files nor toward totalLines.
     expect(budget.fileCount).toBe(2);
     expect(budget.totalLines).toBeLessThan(100);
     expect(budget.exceeded).toBe(false);
