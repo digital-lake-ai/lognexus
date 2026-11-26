@@ -9,7 +9,7 @@ LogNexus transforms Git and GitHub into a persistent, traceable knowledge graph.
 - npm Package: https://www.npmjs.com/package/@digital-lake/lognexus
 - PyPI Package: https://pypi.org/project/lognexus-mcp/
 - Glama Server Hub: https://glama.ai/mcp/servers/digital-lake-ai/lognexus
-- Software Version: 1.6.0
+- Software Version: 1.6.1
 - Architecture: 100% Local-First, Zero Network Egress, Privacy-Preserving
 
 ## Packages & Launch Commands

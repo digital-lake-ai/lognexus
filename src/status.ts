@@ -129,6 +129,22 @@ const MANIFEST_IGNORED_DIRS = new Set([
   "target",
   "coverage",
   ".lognexus",
+  ".next",
+  ".nuxt",
+  ".output",
+  ".svelte-kit",
+  ".tanstack",
+  ".astro",
+  ".turbo",
+  ".vercel",
+  ".netlify",
+  ".wrangler",
+  ".cache",
+  ".venv",
+  "venv",
+  "__pycache__",
+  "playwright-report",
+  "test-results",
 ]);
 
 function readJsonManifestVersion(filePath: string): string | null {
@@ -290,7 +306,7 @@ const SINGLE_ECOSYSTEM_TIER_LABELS: Partial<
       "tier-3 (Scoped Execution: Claude Haiku 5.5 / GPT-6 Luna / Gemini 3.8 Flash / Cursor Fast)",
   },
   codex: {
-    base: "tier-1 (Reasoning / Planning: OpenAI GPT-6.2 Astra / GPT-6-Cyber / o3)",
+    base: "tier-1 (Reasoning / Planning: OpenAI GPT-6.2 Astra / GPT-6-Cyber)",
     issue: "tier-3 (Scoped Execution: OpenAI GPT-6 Luna / codex-mini)",
   },
   copilot: {
@@ -360,9 +376,9 @@ export function getProjectStatus(targetDir: string = process.cwd()): ProjectStat
   const singleLabels = singleEcosystem ? SINGLE_ECOSYSTEM_TIER_LABELS[singleEcosystem] : undefined;
   const recommendedTier = activeIssue
     ? (singleLabels?.issue ??
-      "tier-3 (Scoped Execution: Claude Haiku 5.5, GPT-6 Luna / GPT-4o-mini, DeepSeek V4-Flash / Chat, GLM-4-Flash, Grok Code Fast, Gemini Flash)")
+      "tier-3 (Scoped Execution: Claude Haiku 5.5, GPT-6 Luna, DeepSeek V4-Flash / Chat, GLM-4-Flash, Grok Code Fast, Gemini Flash)")
     : (singleLabels?.base ??
-      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Fable 5.2 / Claude Opus 5.5, OpenAI GPT-6.2 Astra / GPT-6-Cyber / o3, Grok 4.7, DeepSeek R1 / V4-Pro, GLM-5.4, Qwen 4 Max)");
+      "tier-1 (Reasoning / Planning: Gemini 4 Carbon / Argon / Neon, Claude Fable 5.2 / Claude Opus 5.5, OpenAI GPT-6.2 Astra / GPT-6-Cyber, Grok 4.7, DeepSeek R1 / V4-Pro, GLM-5.4, Qwen 4 Max)");
 
   return {
     branch,

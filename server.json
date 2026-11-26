@@ -7,13 +7,13 @@
     "url": "https://github.com/digital-lake-ai/lognexus",
     "source": "github"
   },
-  "version": "1.6.0",
+  "version": "1.6.1",
   "websiteUrl": "https://digital-lake-ai.github.io/lognexus/",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@digital-lake/lognexus",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "transport": {
         "type": "stdio"
       },
@@ -29,7 +29,7 @@
     {
       "registryType": "pypi",
       "identifier": "lognexus-mcp",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "transport": {
         "type": "stdio"
       },
