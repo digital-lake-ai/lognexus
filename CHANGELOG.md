@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-11-26
+
+### Summary
+A Token Shield, context-budget, and model-hygiene maintenance release (`#96`). Expands **Token Shield v2** across `src/scaffold.ts` and root dogfooding files (`.geminiignore`, `.aiexclude`, `.cursorignore`, `.claude/settings.json`) to block `bun.lock`, `composer.lock`, `Gemfile.lock`, `*.egg-info/`, `.output/`, `.tanstack/`, `.astro/`, `.nuxt/`, `.svelte-kit/`, `.turbo/`, `.vercel/`, `.netlify/`, `.wrangler/`, `.cache/`, `playwright-report/`, and `test-results/` with full `39`-rule `CLAUDE_DENY_RULES` parity, exempts `bun.lock` and `bun.lockb` from `GENERATED_LOCKFILES` context-budget counts in `src/state/handoff.ts`, expands `MANIFEST_IGNORED_DIRS` in `src/status.ts`, removes deprecated `o3` and `GPT-4o-mini` routing/status labels, documents `@digital-lake/modelcanon` lifecycle verification in `CONTRIBUTING.md`, and synchronizes `1.6.1` across all 7 version surfaces, static SEO hub, and telemetry docs while preserving **TDQS Grade A in Security & Schema Integrity** with `0` changes to `src/mcp/tools.ts` and `"lognexusPolicy.minCriticalVersion": "0.0.0"`.
+
+### Added
+- **Token Shield v2 & `CLAUDE_DENY_RULES` Parity (`#96`, `src/scaffold.ts`, `.geminiignore`, `.aiexclude`, `.cursorignore`, `.claude/settings.json`):**
+  - Expanded `TOKEN_SHIELD_PATTERNS` to cover `bun.lock`, `composer.lock`, `Gemfile.lock`, `*.egg-info/`, `.nuxt/`, `.output/`, `.svelte-kit/`, `.tanstack/`, `.astro/`, `.turbo/`, `.vercel/`, `.netlify/`, `.wrangler/`, `.cache/`, `playwright-report/`, and `test-results/`.
+  - Brought `CLAUDE_DENY_RULES` in `src/scaffold.ts` and `.claude/settings.json` to full `39`-entry parity across `Read(...)` and `Grep(...)` lockfile/cache rules, and synchronized the root dogfooding ignore files (`.geminiignore`, `.aiexclude`, `.cursorignore`).
+- **ModelCanon Verification Documentation (`#96`, `CONTRIBUTING.md`):**
+  - Documented out-of-band `@digital-lake/modelcanon` CLI (`audit`) and MCP (`audit_model_id`, `get_latest_updates`, `modelcanon://deprecations/upcoming`) verification steps for release maintenance while preserving `0` runtime `fetch()` calls.
+- **Verification Coverage (`#96`, `tests/scaffold.test.ts`, `tests/handoff.test.ts`):**
+  - Added unit tests verifying `bun.lock` Token Shield merging, `CLAUDE_DENY_RULES` parity, and `GENERATED_LOCKFILES` context-budget exemption for `bun.lock` and `bun.lockb`.
+
+### Changed
+- **Context Budget & Manifest Directory Hygiene (`#96`, `src/state/handoff.ts`, `src/status.ts`):**
+  - Added `"bun.lock"` and `"bun.lockb"` to `GENERATED_LOCKFILES` in `src/state/handoff.ts` so generated Bun lockfiles never inflate subtask file budgets.
+  - Expanded `MANIFEST_IGNORED_DIRS` in `src/status.ts` with framework build/cache/venv/report directories (`.next`, `.nuxt`, `.output`, `.svelte-kit`, `.tanstack`, `.astro`, `.turbo`, `.vercel`, `.netlify`, `.wrangler`, `.cache`, `.venv`, `venv`, `__pycache__`, `playwright-report`, `test-results`).
+- **Model Label Hygiene (`#96`, `src/scaffold.ts`, `src/status.ts`):**
+  - Removed deprecated `o3` and `GPT-4o-mini` labels from `DEFAULT_ROUTING_TEMPLATE` and `getProjectStatus()` / `SINGLE_ECOSYSTEM_TIER_LABELS`, aligning tier recommendations with `GPT-6-Cyber`, `V4-Pro`, and `V4.1-Flash`.
+- **Version & Documentation Sync (`#96`):**
+  - Bumped all 7 version surfaces (`package.json`, `package-lock.json`, `.claude-plugin/plugin.json`, `server.json`, `pyproject.toml`, `python/lognexus_mcp/__init__.py`, `src/cli.ts`), `site/index.html`, `site/llms.txt`, `docs/TELEMETRY_PRIVACY.md`, and `.github/ISSUE_TEMPLATE/diagnostic-report.yml` to `1.6.1`.
+
+### Security
+- **TDQS Grade A in Security & Schema Integrity:**
+  - `0` modifications to `src/mcp/tools.ts`.
+  - `"lognexusPolicy.minCriticalVersion"` remains locked at `"0.0.0"`, and `Policy Version: 2.0.0` remains strictly isolated.
+
 ## [1.6.0] - 2026-11-25
 
 ### Summary
@@ -458,3 +486,5 @@ Official General Availability (GA) release of **LogNexus** — the universal, Gi
   - Fast, modular unit tests with Vitest.
   - Strict linting and formatting via Biome.
   - Automated CI workflow on GitHub Actions.
+
+[1.6.1]: https://github.com/digital-lake-ai/lognexus/compare/v1.6.0...v1.6.1
