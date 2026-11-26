@@ -1,0 +1,40 @@
+{
+  "$schema": "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+  "generator": "LogNexus",
+  "version": "1.6.1",
+  "timestamp": "2026-11-26T18:12:13.126Z",
+  "issue": {
+    "id": 98,
+    "title": "fix(telemetry,packaging): resolve diff-quote, tier-1 & duration telemetry bugs and adopt PEP 639",
+    "tier": "tier-1"
+  },
+  "subtask": {
+    "id": "T3",
+    "title": "cover telemetry path unquoting, tier-1 reconciliation, durations, and PEP 639",
+    "status": "completed",
+    "contract": {
+      "allowedFiles": [
+        "tests/telemetry.test.ts",
+        "tests/packaging.test.ts"
+      ],
+      "forbiddenFiles": [
+        "src/mcp/tools.ts",
+        "package-lock.json"
+      ],
+      "decisionBudget": "narrow",
+      "verificationCmd": "npm run lint && npm test && npm run build",
+      "assignee": "google/gemini-4-carbon-high (antigravity)",
+      "isolation": "swarm",
+      "swarmWorkers": 1,
+      "swarmPosts": 1
+    },
+    "durationSec": 299
+  },
+  "tier": "tier-1",
+  "tierExplicit": false,
+  "author": "google/gemini-4-carbon-high (antigravity)",
+  "swarm": {
+    "workers": 1,
+    "posts": 1
+  }
+}
