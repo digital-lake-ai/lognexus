@@ -153,6 +153,7 @@ function createModelStat(family: string, tier: string): ModelStat {
     family,
     tier,
     commits: 0,
+    timedSubtasks: 0,
     totalDurationSec: 0,
     avgSubtaskDurationSec: 0,
     sourceLinesAdded: 0,
@@ -203,16 +204,20 @@ function accumulateModelDuration(
   if (timedCounts !== undefined) {
     const count = (timedCounts.get(model.family) ?? 0) + 1;
     timedCounts.set(model.family, count);
+    model.timedSubtasks = count;
     model.totalDurationSec += durationSec;
     model.avgSubtaskDurationSec = Math.round(model.totalDurationSec / count);
     return;
   }
 
   const prevCount =
-    model.totalDurationSec > 0 && model.avgSubtaskDurationSec > 0
-      ? Math.max(1, Math.round(model.totalDurationSec / model.avgSubtaskDurationSec))
-      : 0;
+    (model.timedSubtasks ?? 0) > 0
+      ? model.timedSubtasks
+      : model.totalDurationSec > 0 && model.avgSubtaskDurationSec > 0
+        ? Math.max(1, Math.round(model.totalDurationSec / model.avgSubtaskDurationSec))
+        : 0;
   const nextCount = prevCount + 1;
+  model.timedSubtasks = nextCount;
   model.totalDurationSec += durationSec;
   model.avgSubtaskDurationSec = Math.round(model.totalDurationSec / nextCount);
 }
@@ -741,7 +746,7 @@ export function recordCommitTelemetry(options: {
       Number.isSafeInteger(options.durationSec) &&
       options.durationSec > 0
         ? options.durationSec
-        : parseNonNegativeInt(parsedNote?.subtask?.durationSec);
+        : null;
     accumulateModelDuration(existingModel, effectiveDuration);
     store.models[modelKey] = existingModel;
 
@@ -1056,6 +1061,7 @@ export function syncTelemetryFromGitNotes(
   const extensions: Record<string, ExtensionStat> = {};
   const models: Record<string, ModelStat> = {};
   const timedSubtaskCounts = new Map<string, number>();
+  const seenTimedSubtasks = new Set<string>();
   const notedSubtasks = new Set<string>();
   const summary = store.summary;
 
@@ -1156,7 +1162,18 @@ export function syncTelemetryFromGitNotes(
     existingModel.commits += 1;
     accumulateModelPricing(existingModel, linesByCategory(diffItems), tier);
     const noteDuration = parseNonNegativeInt(parsedNote?.subtask?.durationSec);
-    accumulateModelDuration(existingModel, noteDuration, timedSubtaskCounts);
+    if (noteDuration !== null && noteDuration > 0) {
+      const rawIssueId = parsedNote?.issue?.id;
+      const issueKeyForSubtask =
+        typeof rawIssueId === "number" || typeof rawIssueId === "string"
+          ? normalizeIssueFilter(rawIssueId)
+          : (issueFilter ?? "0");
+      const timingKey = noteSubtaskId !== null ? `${issueKeyForSubtask}/${noteSubtaskId}` : safeSha;
+      if (!seenTimedSubtasks.has(timingKey)) {
+        seenTimedSubtasks.add(timingKey);
+        accumulateModelDuration(existingModel, noteDuration, timedSubtaskCounts);
+      }
+    }
     models[modelKey] = existingModel;
 
     summary.tierCommits[resolvePricingTier(tier)] += 1;

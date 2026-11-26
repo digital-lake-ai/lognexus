@@ -1344,15 +1344,15 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
 
       expect(largeModel?.sourceLinesAdded).toBe(101);
       // `docsLinesAdded` folds documentation and configuration together. Here it is entirely
-      // configuration: the telemetry store the recorder itself writes (51 plus 43 lines).
-      expect(largeModel?.docsLinesAdded).toBe(94);
+      // configuration: the telemetry store the recorder itself writes (51 plus 44 lines).
+      expect(largeModel?.docsLinesAdded).toBe(95);
 
       const deltaCost = Number((largeCost - smallCost).toFixed(6));
       const deltaTokens = largeTokens - smallTokens;
       // 100 source lines cost 100x the per-line rate plus a token floor far above the
       // single-line commit, so a refactor can never be priced like a typo fix.
-      expect(deltaCost).toBeCloseTo(0.002886, 6);
-      expect(deltaTokens).toBe(3888);
+      expect(deltaCost).toBeCloseTo(0.002888, 6);
+      expect(deltaTokens).toBe(3904);
     });
 
     it("prices source lines above documentation lines within one commit", () => {
@@ -2169,6 +2169,111 @@ describe("LogNexus Telemetry & ROI Engine (v1.2.0)", () => {
       expect(stacks).toEqual(expect.arrayContaining(["astro", "bun", "nodejs", "typescript"]));
       expect(stacks).not.toContain("rust");
       expect(stacks).not.toContain("go");
+    });
+
+    it("B1: prevents follow-up duration double-counting and deduplicates subtask durations on sync", () => {
+      execSync("git checkout -q -b issue/98-b1-duration", { cwd: tempDir, stdio: "ignore" });
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+
+      setSubtask(
+        "T1",
+        "Timed implementation",
+        {
+          allowedFiles: ["src/a.ts", "src/b.ts", "src/c.ts"],
+          forbiddenFiles: [],
+          decisionBudget: "none",
+        },
+        tempDir,
+        { tier: "tier-2" },
+      );
+
+      const fileA = join(tempDir, "src", "a.ts");
+      mkdirSync(dirname(fileA), { recursive: true });
+      writeFileSync(fileA, "export const a = 1;\n", "utf8");
+
+      const first = executeAtomicCommit({
+        message: "feat(#98/T1): initial timed commit",
+        author: "google/gemini-4-hydrogen-high (antigravity)",
+        stageAllowed: true,
+        finishTask: true,
+        targetDir: tempDir,
+      });
+
+      const fileB = join(tempDir, "src", "b.ts");
+      writeFileSync(fileB, "export const b = 2;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      const second = executeAtomicCommit({
+        message: "fix(#98/T1): follow-up without finish-task",
+        author: "google/gemini-4-hydrogen-high (antigravity)",
+        targetDir: tempDir,
+      });
+
+      const firstNote = JSON.parse(getNote(first.sha, { cwd: tempDir }) as string) as {
+        subtask?: { durationSec?: number };
+      };
+      const secondNote = JSON.parse(getNote(second.sha, { cwd: tempDir }) as string) as {
+        subtask?: { durationSec?: number };
+      };
+
+      const expectedDuration = firstNote.subtask?.durationSec;
+      expect(expectedDuration).toBeGreaterThanOrEqual(1);
+      expect(secondNote.subtask?.durationSec).toBeUndefined();
+
+      const live = loadTelemetry(tempDir);
+      expect(live.models["gemini/hydrogen"]?.timedSubtasks).toBe(1);
+      expect(live.models["gemini/hydrogen"]?.totalDurationSec).toBe(expectedDuration);
+
+      // Defense-in-depth: duplicate notes sharing #98/T1 + durationSec count at most once during sync.
+      const fileC = join(tempDir, "src", "c.ts");
+      writeFileSync(fileC, "export const c = 3;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "fix(#98/T1): duplicate noted duration"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+      const dupSha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+      note(dupSha, {
+        $schema: "https://lognexus.digital-lake.ai/schemas/git-note-v1.json",
+        version: "1.6.1",
+        author: "google/gemini-4-hydrogen-high (antigravity)",
+        issue: { id: 98, tier: "tier-2" },
+        subtask: { id: "T1", durationSec: expectedDuration },
+        tier: "tier-2",
+      });
+
+      const synced = syncTelemetryFromGitNotes(tempDir, { issue: 98 });
+      expect(synced.models["gemini/hydrogen"]?.timedSubtasks).toBe(1);
+      expect(synced.models["gemini/hydrogen"]?.totalDurationSec).toBe(expectedDuration);
+    });
+
+    it("N1: persists exact timedSubtasks across 150 incremental commits without rounding drift", () => {
+      enableTelemetry({ cwd: tempDir, acceptTerms: true });
+
+      const target = join(tempDir, "src", "drift.ts");
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, "export const drift = 1;\n", "utf8");
+      execSync("git add -A", { cwd: tempDir, stdio: "ignore" });
+      execSync('git commit -q -m "feat(#98/T1): baseline commit"', {
+        cwd: tempDir,
+        stdio: "ignore",
+      });
+      const sha = execSync("git rev-parse HEAD", { cwd: tempDir, encoding: "utf8" }).trim();
+
+      for (let i = 0; i < 150; i += 1) {
+        recordCommitTelemetry({
+          sha,
+          author: "google/gemini-4-hydrogen-high (antigravity)",
+          tier: "tier-2",
+          durationSec: i % 2 === 0 ? 100 : 149,
+          targetDir: tempDir,
+        });
+      }
+
+      const store = loadTelemetry(tempDir);
+      const model = store.models["gemini/hydrogen"];
+      expect(model?.timedSubtasks).toBe(150);
+      expect(model?.totalDurationSec).toBe(18675);
+      expect(model?.avgSubtaskDurationSec).toBe(125);
     });
   });
 });

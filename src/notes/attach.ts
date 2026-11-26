@@ -128,7 +128,7 @@ export function buildStateNotePayload(
     };
   }
 
-  const dur = options.durationSec ?? state.currentSubtask?.durationSec;
+  const dur = options.durationSec;
   if (subtask !== null && typeof dur === "number" && Number.isSafeInteger(dur) && dur > 0) {
     subtask.durationSec = dur;
   }
