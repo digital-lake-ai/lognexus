@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2026-11-26
+
+### Summary
+A field telemetry hardening and PyPI PEP 639 packaging maintenance release (`#98`). Resolves diff-tree quoted-path, historical `tier-1` reconciliation, Git Note provenance/duration, and Bun monorepo stack-detection defects (`T-BUG 1..5`, `B1`/`N1`) across `src/telemetry/detector.ts`, `src/telemetry/schema.ts`, `src/telemetry/collector.ts`, `src/notes/attach.ts`, and `src/commit.ts`, adopts modern PyPI PEP 639 license metadata in `pyproject.toml` (`license = "MIT"`, `license-files = ["LICENSE", "NOTICE.md"]`, `requires = ["setuptools>=77.0.3"]`), and synchronizes `1.6.2` across all 7 version surfaces, static SEO hub, and telemetry docs while preserving **TDQS Grade A in Security & Schema Integrity** with `0` changes to `src/mcp/tools.ts` and `"lognexusPolicy.minCriticalVersion": "0.0.0"`.
+
+### Fixed
+- **Telemetry Engine Hardening (`#98`, `T-BUG 1..5`, `B1`/`N1`, `src/telemetry/detector.ts`, `src/telemetry/schema.ts`, `src/telemetry/collector.ts`, `src/notes/attach.ts`, `src/commit.ts`):**
+  - Enforced `-c core.quotePath=false`, tab-delimited `--numstat` / `--diff-filter` parsing, and `normalizeDiffTreePath()` unquoting/rename handling so accented or spaced file paths never produce corrupted extensions or false contract mismatches (`T-BUG 1`).
+  - Added `tierExplicit`, `author`, and `subtask.durationSec` provenance to Git Note payloads (`src/notes/attach.ts`, `src/commit.ts`), falling back to Git Note `author` when commit trailers are absent (`T-BUG 4`) and accurately reconciling historical `tier-1` and `issue: null` notes (`T-BUG 2`).
+  - Prevented follow-up commit duration double-counting (`B1`), added subtask-level timing deduplication in `syncTelemetryFromGitNotes()`, and persisted exact `ModelStat.timedSubtasks` in `ModelStatSchema` so incremental average durations never drift (`N1`).
+  - Expanded `detectProjectStacks()` to recognize Bun (`bun.lock` / `bun.lockb`) and monorepo workspace manifests while skipping hidden and vendor directories (`T-BUG 5`).
+
+### Changed
+- **PyPI PEP 639 License Metadata (`#98`, `pyproject.toml`):**
+  - Migrated to PEP 639 SPDX metadata (`license = "MIT"`, `license-files = ["LICENSE", "NOTICE.md"]`) with `setuptools>=77.0.3` in `[build-system]`.
+- **Version & Documentation Sync (`#98`):**
+  - Bumped all 7 version surfaces (`package.json`, `package-lock.json`, `.claude-plugin/plugin.json`, `server.json`, `pyproject.toml`, `python/lognexus_mcp/__init__.py`, `src/cli.ts`), `site/index.html`, `site/llms.txt`, `docs/TELEMETRY_PRIVACY.md`, and `.github/ISSUE_TEMPLATE/diagnostic-report.yml` to `1.6.2`.
+
+### Security
+- **TDQS Grade A in Security & Schema Integrity:**
+  - `0` modifications to `src/mcp/tools.ts`.
+  - `"lognexusPolicy.minCriticalVersion"` remains locked at `"0.0.0"`, and `Policy Version: 2.0.0` remains strictly isolated.
+
 ## [1.6.1] - 2026-11-26
 
 ### Summary
@@ -487,4 +510,5 @@ Official General Availability (GA) release of **LogNexus** — the universal, Gi
   - Strict linting and formatting via Biome.
   - Automated CI workflow on GitHub Actions.
 
+[1.6.2]: https://github.com/digital-lake-ai/lognexus/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/digital-lake-ai/lognexus/compare/v1.6.0...v1.6.1
